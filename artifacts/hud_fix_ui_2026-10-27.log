@@ -1,0 +1,28 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Start backdrop blocks world input
+PASS: Start button resumes without attacking
+PASS: HUD pause does not attack or spend stamina, weapon 1
+PASS: Continue button does not attack, weapon 1
+PASS: HUD pause does not attack or spend stamina, weapon 2
+PASS: Continue button does not attack, weapon 2
+PASS: HUD pause does not attack or spend stamina, weapon 3
+PASS: Continue button does not attack, weapon 3
+PASS: Attributes button does not attack
+PASS: Attributes return does not attack
+PASS: Dragging a UI press into world cannot begin an attack
+PASS: World press still supports hold-to-attack
+PASS: Release over GUI ends a world attack gesture
+PASS: Pause clears a held world attack; resume requires a new press
+PASS: Upgrade choice 1 resumes without attack or stamina loss
+PASS: Upgrade choice 1 does not retain old attack hold
+PASS: Upgrade choice 2 resumes without attack or stamina loss
+PASS: Upgrade choice 2 does not retain old attack hold
+PASS: Upgrade choice 3 resumes without attack or stamina loss
+PASS: Upgrade choice 3 does not retain old attack hold
+PASS: Pause-menu restart creates a clean player
+PASS: Death result fixture opens
+PASS: Death-result restart does not leak mouse attack into new scene
+PASS: Starting after death restart remains free of UI attacks
+PASS: Victory-result restart does not leak mouse attack
+UI REGRESSION RESULT: 25 checks, 0 failures
