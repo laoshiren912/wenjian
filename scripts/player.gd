@@ -4,6 +4,8 @@ extends CharacterBody2D
 signal died
 signal level_gained
 signal hurt
+signal damage_received(amount: float)
+signal experience_received(amount: int)
 
 var max_health: float = 100.0
 var health: float = 100.0
@@ -61,7 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
 		_attack_held = true
 		get_viewport().set_input_as_handled()
-	for index in range(3):
+	for index in range(SurvivorWeapon.DATA.size()):
 		if event.is_action_pressed("weapon_%d" % (index + 1)):
 			weapon.select_weapon(index)
 
@@ -76,10 +78,12 @@ func spend_stamina(amount: float) -> bool:
 func take_damage(amount: float, direction: Vector2) -> bool:
 	if dead or invulnerability > 0.0:
 		return false
+	var actual_damage: float = minf(health, amount)
 	health = maxf(0.0, health - amount)
 	invulnerability = 0.7
 	knockback = direction * 180.0
 	hurt.emit()
+	damage_received.emit(actual_damage)
 	if health <= 0.0:
 		dead = true
 		died.emit()
@@ -91,6 +95,7 @@ func gain_experience(amount: int) -> void:
 		return
 	experience += amount
 	total_experience += amount
+	experience_received.emit(amount)
 	while experience >= next_level_xp:
 		experience -= next_level_xp
 		level += 1

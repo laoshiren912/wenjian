@@ -70,7 +70,7 @@ func _run() -> void:
 	check(paused and game.player.weapon.attack_count == 0, "Start backdrop blocks world input")
 	await click(button("开始试炼"))
 	check(not paused and game.player.weapon.attack_count == 0 and game.player.stamina == 100.0, "Start button resumes without attacking")
-	for index in range(3):
+	for index in range(SurvivorWeapon.DATA.size()):
 		game.player.weapon.select_weapon(index)
 		await click(button("暂停"))
 		check(paused and game.player.weapon.attack_count == 0 and game.player.stamina == 100.0, "HUD pause does not attack or spend stamina, weapon %d" % (index + 1))

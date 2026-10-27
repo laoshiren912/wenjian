@@ -1,0 +1,20 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Enemy base HP is now 180 hostile / 120 passive
+PASS: Enemy damage displays the actual 52 HP lost
+PASS: Successful hit shakes camera without moving the player
+PASS: Camera shake returns to zero after its short duration
+PASS: Player damage shows red loss matching actual health
+PASS: Blocked damage during invulnerability creates no false damage popup
+PASS: Experience gain displays +8 XP in the world and HUD
+PASS: Floating text cannot intercept game or GUI mouse input
+PASS: Lethal popup reports remaining HP lost and survives enemy removal
+FAIL: Damage and XP visuals expire without orphan labels
+PASS: Combat visual lifetime pauses with combat
+FAIL: Visual cleanup resumes correctly after pause
+PASS: Late spawn HP reaches 450 hostile / 300 passive at 180 seconds
+PASS: Late enemy survives a sword hit after six damage upgrades
+PASS: Time progression does not refill existing enemy HP
+PASS: Sword chooses nearest valid enemy rather than scene insertion order
+PASS: HUD shows current weapon role and current upgraded damage
+COMBAT FEEDBACK RESULT: 17 checks, 2 failures

@@ -6,7 +6,7 @@ var game: SurvivorGame
 var recovering: bool = false
 var hits_received: int = 0
 var upgrades: int = 0
-var weapon_uses: Array[int] = [0, 0, 0]
+var weapon_uses: Array[int] = [0, 0]
 var previous_attack_count: int = 0
 var last_report: int = -1
 var mode: String = "combat"
@@ -102,7 +102,7 @@ func _control() -> void:
 		event.position = player.get_global_transform_with_canvas() * player.to_local(nearest.global_position)
 		event.global_position = event.position
 		root.push_input(event, true)
-		var weapon: int = 0 if nearest_distance < 102.0 or nearby >= 2 else (1 if nearest_distance < 165.0 else 2)
+		var weapon: int = 1 if nearby >= 2 or nearest_distance > 102.0 else 0
 		if player.weapon.selected != weapon:
 			var key := InputEventKey.new()
 			key.keycode = KEY_1 + weapon

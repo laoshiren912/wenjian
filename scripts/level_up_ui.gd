@@ -47,7 +47,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible or not accepting:
 		return
 	for index in range(3):
-		if event.is_action_pressed("weapon_%d" % (index + 1)):
+		if event.is_action_pressed("upgrade_%d" % (index + 1)):
 			get_viewport().set_input_as_handled()
 			_choose(index)
 			return

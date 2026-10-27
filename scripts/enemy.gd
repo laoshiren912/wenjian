@@ -2,12 +2,14 @@ class_name SurvivorEnemy
 extends CharacterBody2D
 
 signal killed(location: Vector2, experience_value: int)
+signal damaged(location: Vector2, amount: float)
 enum Kind { PASSIVE, HOSTILE }
 var kind: int = Kind.HOSTILE
 var player: CharacterBody2D
 var world: SurvivorWorld
-var max_health: float = 50.0
-var health: float = 50.0
+var health_multiplier: float = 1.0
+var max_health: float = 180.0
+var health: float = 180.0
 var speed: float = 105.0
 var damage: float = 12.0
 var experience_value: int = 10
@@ -27,10 +29,11 @@ var wander_timer: float = 2.0
 func _ready() -> void:
 	player = get_tree().get_first_node_in_group("player")
 	if kind == Kind.PASSIVE:
-		max_health = 36.0
+		max_health = 120.0
 		speed = 85.0
 		damage = 9.0
 		experience_value = 8
+	max_health *= health_multiplier
 	health = max_health
 	wander_target = global_position
 	wander_timer = world.random.randf_range(1.0, 3.0)
@@ -104,7 +107,9 @@ func take_damage(amount: float, push: Vector2) -> void:
 		return
 	aggro = true
 	flash = 0.14
+	var actual_damage: float = minf(health, amount)
 	health -= amount
+	damaged.emit(global_position, actual_damage)
 	knockback = push
 	# Damage interrupts a telegraphed attack.
 	windup = 0.0

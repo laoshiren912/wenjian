@@ -109,32 +109,30 @@ func _run() -> void:
 	var behind := enemy_at(Vector2(-55, 0))
 	await key(KEY_1)
 	await fire_once()
-	check(game.player.weapon.selected == 0 and is_equal_approx(sword_target.health, 24.0) and is_equal_approx(sword_side.health, 24.0), "Sword hits multiple enemies in its forward cone")
+	check(game.player.weapon.selected == 0 and is_equal_approx(sword_target.health, sword_target.max_health - 52.0), "Sword deals 52 damage to the nearest target")
+	check(is_equal_approx(sword_side.health, sword_side.max_health), "Sword hits only one enemy, even with two in its cone")
 	check(is_equal_approx(behind.health, behind.max_health), "Sword does not hit behind player")
 	check(is_equal_approx(game.player.stamina, 84.0), "Sword spends 16 stamina")
 	var count: int = game.player.weapon.attack_count
 	check(not game.player.weapon.attack(Vector2.RIGHT) and count == game.player.weapon.attack_count, "Cooldown prevents extra attacks")
 	clear_enemies()
 	var spear_target := enemy_at(Vector2(135, 0))
-	var spear_side := enemy_at(Vector2(70, 50))
+	var spear_side := enemy_at(Vector2(105, 40))
+	var spear_outside := enemy_at(Vector2(70, 80))
 	await key(KEY_2)
 	await fire_once()
-	check(game.player.weapon.selected == 1 and is_equal_approx(spear_target.health, 12.0), "Key 2 selects the longer, 38-damage spear")
-	check(is_equal_approx(spear_side.health, 50.0) and is_equal_approx(game.player.stamina, 77.0), "Spear is narrow and costs 23 stamina")
-	clear_enemies()
-	var staff_target := enemy_at(Vector2(200, 0))
+	check(game.player.weapon.selected == 1 and is_equal_approx(spear_target.health, spear_target.max_health - 32.0), "Key 2 selects longer spear with lower 32 damage per target")
+	check(is_equal_approx(spear_side.health, spear_side.max_health - 32.0), "Spear damages multiple enemies in its cone")
+	check(is_equal_approx(spear_outside.health, spear_outside.max_health) and is_equal_approx(game.player.stamina, 77.0), "Spear respects cone edges and costs 23 stamina once per attack")
 	await key(KEY_3)
-	await fire_once()
-	check(game.player.weapon.selected == 2 and is_equal_approx(game.player.stamina, 88.0), "Key 3 selects staff and costs 12 stamina")
-	await frames(30)
-	check(is_equal_approx(staff_target.health, 29.0), "Staff projectile travels and deals 21 damage on collision")
+	check(SurvivorWeapon.DATA.size() == 2 and game.player.weapon.selected == 1, "Staff is removed; key 3 does not select a weapon")
 	game.player.weapon.cooldown = 0.0
 	game.player.stamina = 0.0
 	check(not game.player.weapon.attack(Vector2.RIGHT), "Insufficient stamina blocks attacks")
 	await frames(90)
 	check(game.player.stamina > 20.0, "Stamina recovers after the recovery delay")
 	clear_enemies()
-	# A solid pillar blocks both a spear and a staff projectile.
+	# A solid pillar blocks spear attacks.
 	var wall_cell := Vector2i.ZERO
 	for cell in game.world.blocked:
 		if cell.x > 2 and cell.x < 37 and cell.y > 2 and cell.y < 27:
@@ -146,11 +144,7 @@ func _run() -> void:
 	var shielded := enemy_at(Vector2(110, 0))
 	await key(KEY_2)
 	await fire_once()
-	check(is_equal_approx(shielded.health, 50.0), "Melee cannot hit through a wall")
-	await key(KEY_3)
-	await fire_once()
-	await frames(20)
-	check(is_equal_approx(shielded.health, 50.0), "Projectiles collide with walls")
+	check(is_equal_approx(shielded.health, shielded.max_health), "Melee cannot hit through a wall")
 	clear_enemies()
 	game.player.position = wall_center - Vector2(120, 0)
 	game.player.invulnerability = 99.0
@@ -180,7 +174,7 @@ func _run() -> void:
 	# Actual kill signal -> deferred pickup -> attraction -> XP -> modal UI.
 	for index in range(2):
 		var victim := enemy_at(Vector2(25 + index * 5, 0))
-		victim.take_damage(100.0, Vector2.ZERO)
+		victim.take_damage(10000.0, Vector2.ZERO)
 	await frames(15)
 	check(game.kills >= 2 and game.player.total_experience == 20, "Enemy deaths drop pickups that grant experience")
 	check(game.player.level == 2 and game.state == SurvivorGame.State.LEVEL_UP and paused, "XP threshold opens three-choice level UI and pauses combat")
@@ -206,7 +200,7 @@ func _run() -> void:
 	var upgraded := enemy_at(Vector2(65, 0))
 	await key(KEY_1)
 	await fire_once()
-	check(is_equal_approx(upgraded.health, 50.0 - 26.0 * 1.2), "Damage upgrade affects real hits")
+	check(is_equal_approx(upgraded.health, upgraded.max_health - 52.0 * 1.2), "Damage upgrade affects real sword hits")
 	check(game.player.weapon.cooldown < 0.48 / 1.15, "Speed upgrade shortens real attack cooldown")
 	clear_enemies()
 	await key(KEY_TAB)

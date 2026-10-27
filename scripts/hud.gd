@@ -17,6 +17,7 @@ var health_text: Label
 var stamina_text: Label
 var xp_text: Label
 var weapon_text: Label
+var weapon_detail: Label
 var timer_text: Label
 var status_text: Label
 var hurt_flash: ColorRect
@@ -79,7 +80,9 @@ func _ready() -> void:
 	equipment.add_child(equipment_box)
 	weapon_text = PrototypeUI.label("1  剑", 23, Color("e5cd95"))
 	equipment_box.add_child(weapon_text)
-	equipment_box.add_child(PrototypeUI.label("1 剑    2 长矛    3 法杖", 16))
+	equipment_box.add_child(PrototypeUI.label("1 剑 · 单体    2 长矛 · 群体", 16))
+	weapon_detail = PrototypeUI.label("", 15, Color("b4d1d4"))
+	equipment_box.add_child(weapon_detail)
 	equipment_box.add_child(PrototypeUI.button("角色属性  [Tab]", func(): stats_requested.emit(), 36))
 	equipment_box.add_child(PrototypeUI.button("暂停  [Esc]", func(): pause_requested.emit(), 36))
 	var spacer := Control.new()
@@ -135,6 +138,8 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	xp_bar.max_value = player.next_level_xp
 	xp_bar.value = player.experience
 	weapon_text.text = "%d  %s" % [player.weapon.selected + 1, SurvivorWeapon.DATA[player.weapon.selected].name]
+	var weapon_data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
+	weapon_detail.text = "%s · 每目标伤害 %.0f" % [weapon_data.role, float(weapon_data.damage) * player.damage_multiplier]
 	timer_text.text = "%02d:%02d / %02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60, int(duration) / 60, int(duration) % 60]
 	status_text.text = "击败 %d 个敌人 · 生存至 03:00" % kills
 
@@ -168,7 +173,7 @@ func _screen(title: String, subtitle: String) -> VBoxContainer:
 
 func show_start() -> void:
 	var box := _screen("边境试炼", "2D 俯视角动作 RPG · 核心可玩性原型")
-	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击\n数字键 1 / 2 / 3 切换剑、长矛、法杖\nTab 查看属性 · Esc 暂停\n\n剑适合群攻，长矛适合拉开距离，法杖发射远程弹。\n体力耗尽时先停止攻击，等待恢复。敌人红色弧线是攻击预警。\n金色圆形平时中立，受到攻击后会持续反击。", 19))
+	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击\n数字键 1 / 2 切换剑与长矛 · Tab 属性 · Esc 暂停\n\n剑：高伤害，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可以同时穿刺范围内多只怪物。\n体力耗尽时先停止攻击，等待恢复。红色弧线是攻击预警。\n金色圆形平时中立，受到攻击后反击；新刷出的怪物逐渐增血。", 19))
 	var button := PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()
@@ -187,7 +192,7 @@ func show_stats() -> void:
 	var box := _screen("角色属性  /  Lv.%d" % player.level, "查看期间暂停战斗 · 数值包含当前升级效果")
 	box.add_child(PrototypeUI.label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（停手 0.42 秒后）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 19))
 	for data in SurvivorWeapon.DATA:
-		box.add_child(PrototypeUI.label("%s   伤害 %.1f  ·  距离 %.0f  ·  间隔 %.2f 秒  ·  体力 %.0f" % [data.name, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
+		box.add_child(PrototypeUI.label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	button.grab_focus()

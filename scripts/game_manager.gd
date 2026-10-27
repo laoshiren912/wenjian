@@ -15,6 +15,7 @@ var spawn_timer: float = 4.0
 var stats_open: bool = false
 @onready var world: SurvivorWorld = $World
 @onready var hud = $HUD
+@onready var feedback = $World/CombatFeedback
 
 func _ready() -> void:
 	_setup_inputs()
@@ -30,6 +31,9 @@ func _ready() -> void:
 	player.died.connect(_on_death)
 	player.level_gained.connect(_queue_level)
 	player.hurt.connect(hud.flash_damage)
+	feedback.camera = player.camera
+	player.damage_received.connect(_on_player_damaged)
+	player.experience_received.connect(_on_experience_received)
 	hud.player = player
 	hud.start_requested.connect(start_run)
 	hud.restart_requested.connect(restart_run)
@@ -46,7 +50,7 @@ func _ready() -> void:
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -104,7 +108,10 @@ func _spawn_enemy(kind: int, location: Vector2) -> SurvivorEnemy:
 	enemy.kind = kind
 	enemy.position = location
 	enemy.world = world
+	# New enemies gain 50% of base HP per elapsed minute; existing HP is never refilled.
+	enemy.health_multiplier = 1.0 + elapsed / 120.0
 	enemy.killed.connect(_on_enemy_killed)
+	enemy.damaged.connect(_on_enemy_damaged)
 	world.actors.add_child(enemy)
 	return enemy
 
@@ -120,6 +127,16 @@ func _on_enemy_killed(location: Vector2, value: int) -> void:
 	pickup.position = location
 	pickup.value = value
 	world.actors.add_child.call_deferred(pickup)
+
+func _on_enemy_damaged(location: Vector2, amount: float) -> void:
+	feedback.show_damage(location, amount, false)
+
+func _on_player_damaged(amount: float) -> void:
+	feedback.show_damage(player.global_position, amount, true)
+
+func _on_experience_received(amount: int) -> void:
+	feedback.show_experience(player.global_position, amount)
+	hud.show_notice("+%d 经验" % amount)
 
 func _queue_level() -> void:
 	pending_levels += 1

@@ -1,0 +1,54 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Start screen pauses the world
+PASS: Start button enters playable state
+PASS: WASD movement updates the physical player
+PASS: Diagonal speed is normalized
+PASS: Boundary collision stops movement
+PASS: Mouse position drives aim
+PASS: Sword deals 52 damage to the nearest target
+PASS: Sword hits only one enemy, even with two in its cone
+PASS: Sword does not hit behind player
+PASS: Sword spends 16 stamina
+PASS: Cooldown prevents extra attacks
+PASS: Key 2 selects longer spear with lower 32 damage per target
+PASS: Spear damages multiple enemies in its cone
+PASS: Spear respects cone edges and costs 23 stamina once per attack
+PASS: Staff is removed; key 3 does not select a weapon
+PASS: Insufficient stamina blocks attacks
+PASS: Stamina recovers after the recovery delay
+PASS: Melee cannot hit through a wall
+PASS: Enemy physically navigates around an obstructing pillar
+PASS: Passive enemy does not initiate combat
+PASS: Hostile enemy detects and pursues player
+PASS: Passive enemy retaliates after being hit
+PASS: Enemy windup resolves into player damage
+PASS: Player invulnerability prevents repeated damage
+PASS: Enemy deaths drop pickups that grant experience
+PASS: XP threshold opens three-choice level UI and pauses combat
+PASS: Survival timer stops while choosing upgrades
+PASS: Damage choice applies and resumes combat
+PASS: Speed choice works through key 2
+PASS: Health choice raises maximum and heals
+PASS: Damage upgrade affects real sword hits
+PASS: Speed upgrade shortens real attack cooldown
+PASS: Tab opens attributes and pauses combat
+PASS: Tab closes attributes and resumes combat
+PASS: Escape opens pause menu
+PASS: Escape resumes combat
+PASS: All walkable cells are reachable, map seed 1
+PASS: All walkable cells are reachable, map seed 17
+PASS: All walkable cells are reachable, map seed 2026
+SOAK: 0 seconds, 1 enemies
+SOAK: 30 seconds, 8 enemies
+SOAK: 60 seconds, 15 enemies
+SOAK: 90 seconds, 23 enemies
+SOAK: 120 seconds, 28 enemies
+SOAK: 150 seconds, 28 enemies
+SOAK: 180 seconds, 28 enemies
+PASS: Full 180-second session reaches completion without blocking
+PASS: Enemy population stays bounded during full session
+PASS: Result restart reloads a clean new session
+PASS: Zero health opens death result and freezes combat
+PASS: R after death restarts with restored player
+RESULT: 44 checks, 0 failures
