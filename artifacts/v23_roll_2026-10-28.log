@@ -1,0 +1,109 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Space roll action is installed
+PASS: Space can accept the start button without leaking into a roll
+PASS: Roll (1.0, 0.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (1.0, 0.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (-1.0, 0.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (-1.0, 0.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (0.0, -1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (0.0, -1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (0.0, 1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (0.0, 1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (1.0, 1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (1.0, 1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (-1.0, 1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (-1.0, 1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (-1.0, -1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (-1.0, -1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: Roll (1.0, -1.0) charges 30 once and starts existing recovery delay
+PASS: Active roll cannot restart or spend stamina twice
+PASS: Only the body visual tumbles; the collider and actor never rotate
+PASS: Roll (1.0, -1.0) travels 150 without diagonal acceleration
+PASS: Roll ends in a clean standing pose
+PASS: Cooldown still blocks a new roll after movement ends
+PASS: A same-frame Space tap rolls toward body facing, not the mouse
+PASS: Changing WASD mid-roll cannot steer or turn the roll
+PASS: Standing roll retains its full configured distance
+PASS: Keyboard auto-repeat does not trigger another roll after cooldown
+PASS: Inspector parameters change cost and cooldown without code edits
+PASS: Inspector distance and duration control actual physics movement
+PASS: A real physics wall stops the full roll without teleporting through
+PASS: Rolling while pressed against the wall cannot cross it or become stuck in roll state
+PASS: The existing outer map boundary also blocks a roll
+PASS: Tuned default extends duration to 0.34 seconds while keeping 150 distance
+PASS: Roll cost and start-based cooldown retain their original values
+PASS: Early displacement follows the slower configured speed instead of finishing abruptly
+PASS: Body animation automatically uses the longer player roll duration
+PASS: Holding movement through roll retains its distance with at most one normal walk tick
+PASS: Held movement resumes at the original walk speed immediately after roll
+PASS: Releasing movement stops cleanly after the longer roll
+PASS: Weapon 1 can be selected during the longer roll without attacking or showing an old pose
+PASS: Weapon 1 held attack starts with the selected weapon after the longer roll
+PASS: Weapon 2 can be selected during the longer roll without attacking or showing an old pose
+PASS: Weapon 2 held attack starts with the selected weapon after the longer roll
+PASS: Weapon 3 can be selected during the longer roll without attacking or showing an old pose
+PASS: Weapon 3 held attack starts with the selected weapon after the longer roll
+PASS: Insufficient stamina rejects roll without charging or starting cooldown
+PASS: Rejected roll creates no displacement
+PASS: Weapon 1 still attacks for free with insufficient roll stamina
+PASS: Weapon 2 still attacks for free with insufficient roll stamina
+PASS: Weapon 3 still attacks for free with insufficient roll stamina
+PASS: Repeated rolls with real cooldown exhaust available stamina
+PASS: An exhausted resource resumes its original recovery
+ROLL RECOVERY: stamina=34.700 regen=26.0 waiting=153 frames
+PASS: Recovery clamps at the original cap and allows rolling again
+PASS: Weapon 1 can transition from an attack to roll without resetting attack cooldown
+PASS: Weapon 1 direct attack API also rejects rolling attacks
+PASS: Weapon 1 held input cannot attack during roll
+PASS: Weapon 1 held attack resumes after roll without consuming or interrupting stamina recovery
+PASS: Weapon 1 attacks around a roll still respect the original attack interval
+PASS: Weapon 2 can transition from an attack to roll without resetting attack cooldown
+PASS: Weapon 2 direct attack API also rejects rolling attacks
+PASS: Weapon 2 held input cannot attack during roll
+PASS: Weapon 2 held attack resumes after roll without consuming or interrupting stamina recovery
+PASS: Weapon 2 attacks around a roll still respect the original attack interval
+PASS: Weapon 3 can transition from an attack to roll without resetting attack cooldown
+PASS: Weapon 3 direct attack API also rejects rolling attacks
+PASS: Weapon 3 held input cannot attack during roll
+PASS: Weapon 3 held attack resumes after roll without consuming or interrupting stamina recovery
+PASS: Weapon 3 attacks around a roll still respect the original attack interval
+PASS: A short attack clicked only during roll is not buffered for later
+PASS: An already-fired arrow keeps moving and damaging during roll
+PASS: Roll adds no invulnerability and preserves normal damage and post-hit protection
+PASS: The original post-hit protection still rejects immediate repeated damage
+PASS: Pause freezes roll displacement, animation, cooldown and resource recovery together
+PASS: Space accepts Continue without queuing an extra roll
+PASS: Pause clears an unprocessed roll press before resume
+PASS: Space accepts an upgrade without also rolling
+PASS: Death cancels active roll and restores the visual before settlement
+PASS: Restart resets roll timers, resource and animation state
+ROLL RESULT: 105 checks, 0 failures

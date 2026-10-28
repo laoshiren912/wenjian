@@ -65,13 +65,13 @@ func _visible_position(popup: Dictionary, origin: Vector2) -> Vector2:
 	var rectangle: Rect2 = canvas * Rect2(origin, popup.label.size)
 	var maximum: Vector2 = (bounds.end - Vector2.ONE * EDGE_MARGIN - rectangle.size).max(bounds.position + Vector2.ONE * EDGE_MARGIN)
 	var clamped := Vector2(clampf(rectangle.position.x, bounds.position.x + EDGE_MARGIN, maximum.x), clampf(rectangle.position.y, bounds.position.y + EDGE_MARGIN, maximum.y))
-	# Preserve the current HUD layout; only move a covered floating number below it.
+	# Keep numbers clear of both the top HUD and the new bottom equipment panel.
 	for control in hud_obstacles:
 		if not is_instance_valid(control) or not control.is_visible_in_tree():
 			continue
 		var panel: Rect2 = control.get_global_transform_with_canvas() * Rect2(Vector2.ZERO, control.size)
 		if Rect2(clamped, rectangle.size).intersects(panel.grow(4.0)):
-			clamped.y = minf(maximum.y, panel.end.y + EDGE_MARGIN)
+			clamped.y = minf(maximum.y, panel.end.y + EDGE_MARGIN) if panel.get_center().y < bounds.get_center().y else maxf(bounds.position.y + EDGE_MARGIN, panel.position.y - rectangle.size.y - EDGE_MARGIN)
 	return canvas.affine_inverse() * (canvas * origin + clamped - rectangle.position)
 
 func _place_popup(popup: Dictionary) -> void:

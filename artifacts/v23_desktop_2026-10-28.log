@@ -1,0 +1,30 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+V23 DESKTOP READY: Enter start; 3 select bow; click slot 1 display; HUD pause + Space continue; attributes + Tab return; mouse option 1, key 2, mouse option 3; mouse restart + Enter start
+V23 DESKTOP KEY: Enter
+PASS: Physical Enter starts without attack or roll
+V23 DESKTOP KEY: 3
+FAIL: Physical 3 selects bow and updates the weapon display
+V23 DESKTOP CLICK: (441.3333, 629.3334)
+PASS: Physical slot click shoots the selected bow for free without mouse weapon selection
+V23 DESKTOP CLICK: (1146.667, 86.66667)
+PASS: Physical HUD pause consumes click without an extra attack
+V23 DESKTOP KEY: Space
+PASS: Physical Space Continue does not attack or roll
+V23 DESKTOP CLICK: (1148.0, 41.33334)
+PASS: Physical attribute click opens paused stats without attack
+V23 DESKTOP KEY: Tab
+PASS: Physical Tab returns without stale attack input
+PASS: Actual 960-wide window uses vertical cards for three queued upgrades
+V23 DESKTOP CLICK: (638.6667, 277.3333)
+PASS: Physical mouse option 1 applies damage once without attack
+V23 DESKTOP KEY: 2
+PASS: Physical key 2 applies speed once without weapon switch
+V23 DESKTOP CLICK: (638.6667, 498.6667)
+PASS: Physical mouse option 3 applies health and resumes without attack
+V23 DESKTOP CLICK: (638.6667, 484.0)
+PASS: Physical result restart loads a clean player
+V23 DESKTOP KEY: Enter
+PASS: Physical Enter after restart remains free of UI input leakage
+V23 DESKTOP RESULT: 13 checks, 1 failures, phase=13/13

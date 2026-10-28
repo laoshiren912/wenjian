@@ -1,0 +1,119 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+V23 SIZE: requested=(1280, 720) actual=(1280, 720) canvas=(1280.0, 720.0) driver=headless
+PASS: Actual window size matches requested (1280, 720)
+PASS: (1280, 720) start all visible controls within canvas: []
+PASS: (1280, 720) start labels/buttons fit their measured text: []
+PASS: (1280, 720) combat all visible controls within canvas: []
+PASS: (1280, 720) combat labels/buttons fit their measured text: []
+PASS: Compact top HUD and bottom equipment keep the central battle area clear
+PASS: Level and experience are at the bottom
+PASS: Three weapon slots remain centered at the bottom
+PASS: Weapon display and bars neither consume input nor introduce clickable weapon switching
+PASS: Keyboard weapon 1 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 2 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 3 updates exactly one slot highlight and actual weapon
+PASS: Bottom-edge damage avoids equipment and remains inside the viewport
+PASS: (1280, 720) stats all visible controls within canvas: []
+PASS: (1280, 720) stats labels/buttons fit their measured text: []
+PASS: (1280, 720) pause all visible controls within canvas: []
+PASS: (1280, 720) pause labels/buttons fit their measured text: []
+PASS: (1280, 720) upgrade all visible controls within canvas: []
+PASS: (1280, 720) upgrade labels/buttons fit their measured text: []
+PASS: Upgrade orientation follows actual available window width, including canvas scaling
+PASS: Upgrade options do not overlap and the first option receives keyboard focus
+PASS: Resizing an open upgrade reflows cards without losing focus or choosing an upgrade
+PASS: Numeric upgrade applies once without changing the selected weapon
+PASS: A stale second activation of a chosen card cannot apply twice
+PASS: (1280, 720) death all visible controls within canvas: []
+PASS: (1280, 720) death labels/buttons fit their measured text: []
+PASS: (1280, 720) success all visible controls within canvas: []
+PASS: (1280, 720) success labels/buttons fit their measured text: []
+V23 SIZE: requested=(960, 540) actual=(960, 540) canvas=(1280.0, 720.0) driver=headless
+PASS: Actual window size matches requested (960, 540)
+PASS: (960, 540) start all visible controls within canvas: []
+PASS: (960, 540) start labels/buttons fit their measured text: []
+PASS: (960, 540) combat all visible controls within canvas: []
+PASS: (960, 540) combat labels/buttons fit their measured text: []
+PASS: Compact top HUD and bottom equipment keep the central battle area clear
+PASS: Level and experience are at the bottom
+PASS: Three weapon slots remain centered at the bottom
+PASS: Weapon display and bars neither consume input nor introduce clickable weapon switching
+PASS: Keyboard weapon 1 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 2 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 3 updates exactly one slot highlight and actual weapon
+PASS: Bottom-edge damage avoids equipment and remains inside the viewport
+PASS: (960, 540) stats all visible controls within canvas: []
+PASS: (960, 540) stats labels/buttons fit their measured text: []
+PASS: (960, 540) pause all visible controls within canvas: []
+PASS: (960, 540) pause labels/buttons fit their measured text: []
+PASS: (960, 540) upgrade all visible controls within canvas: []
+PASS: (960, 540) upgrade labels/buttons fit their measured text: []
+PASS: Upgrade orientation follows actual available window width, including canvas scaling
+PASS: Upgrade options do not overlap and the first option receives keyboard focus
+PASS: Resizing an open upgrade reflows cards without losing focus or choosing an upgrade
+PASS: Numeric upgrade applies once without changing the selected weapon
+PASS: A stale second activation of a chosen card cannot apply twice
+PASS: (960, 540) death all visible controls within canvas: []
+PASS: (960, 540) death labels/buttons fit their measured text: []
+PASS: (960, 540) success all visible controls within canvas: []
+PASS: (960, 540) success labels/buttons fit their measured text: []
+V23 SIZE: requested=(1024, 768) actual=(1024, 768) canvas=(1280.0, 960.0) driver=headless
+PASS: Actual window size matches requested (1024, 768)
+PASS: (1024, 768) start all visible controls within canvas: []
+PASS: (1024, 768) start labels/buttons fit their measured text: []
+PASS: (1024, 768) combat all visible controls within canvas: []
+PASS: (1024, 768) combat labels/buttons fit their measured text: []
+PASS: Compact top HUD and bottom equipment keep the central battle area clear
+PASS: Level and experience are at the bottom
+PASS: Three weapon slots remain centered at the bottom
+PASS: Weapon display and bars neither consume input nor introduce clickable weapon switching
+PASS: Keyboard weapon 1 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 2 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 3 updates exactly one slot highlight and actual weapon
+PASS: Bottom-edge damage avoids equipment and remains inside the viewport
+PASS: (1024, 768) stats all visible controls within canvas: []
+PASS: (1024, 768) stats labels/buttons fit their measured text: []
+PASS: (1024, 768) pause all visible controls within canvas: []
+PASS: (1024, 768) pause labels/buttons fit their measured text: []
+PASS: (1024, 768) upgrade all visible controls within canvas: []
+PASS: (1024, 768) upgrade labels/buttons fit their measured text: []
+PASS: Upgrade orientation follows actual available window width, including canvas scaling
+PASS: Upgrade options do not overlap and the first option receives keyboard focus
+PASS: Resizing an open upgrade reflows cards without losing focus or choosing an upgrade
+PASS: Numeric upgrade applies once without changing the selected weapon
+PASS: A stale second activation of a chosen card cannot apply twice
+PASS: (1024, 768) death all visible controls within canvas: []
+PASS: (1024, 768) death labels/buttons fit their measured text: []
+PASS: (1024, 768) success all visible controls within canvas: []
+PASS: (1024, 768) success labels/buttons fit their measured text: []
+V23 SIZE: requested=(1920, 1080) actual=(1920, 1080) canvas=(1280.0, 720.0) driver=headless
+PASS: Actual window size matches requested (1920, 1080)
+PASS: (1920, 1080) start all visible controls within canvas: []
+PASS: (1920, 1080) start labels/buttons fit their measured text: []
+PASS: (1920, 1080) combat all visible controls within canvas: []
+PASS: (1920, 1080) combat labels/buttons fit their measured text: []
+PASS: Compact top HUD and bottom equipment keep the central battle area clear
+PASS: Level and experience are at the bottom
+PASS: Three weapon slots remain centered at the bottom
+PASS: Weapon display and bars neither consume input nor introduce clickable weapon switching
+PASS: Keyboard weapon 1 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 2 updates exactly one slot highlight and actual weapon
+PASS: Keyboard weapon 3 updates exactly one slot highlight and actual weapon
+PASS: Bottom-edge damage avoids equipment and remains inside the viewport
+PASS: (1920, 1080) stats all visible controls within canvas: []
+PASS: (1920, 1080) stats labels/buttons fit their measured text: []
+PASS: (1920, 1080) pause all visible controls within canvas: []
+PASS: (1920, 1080) pause labels/buttons fit their measured text: []
+PASS: (1920, 1080) upgrade all visible controls within canvas: []
+PASS: (1920, 1080) upgrade labels/buttons fit their measured text: []
+PASS: Upgrade orientation follows actual available window width, including canvas scaling
+PASS: Upgrade options do not overlap and the first option receives keyboard focus
+PASS: Resizing an open upgrade reflows cards without losing focus or choosing an upgrade
+PASS: Numeric upgrade applies once without changing the selected weapon
+PASS: A stale second activation of a chosen card cannot apply twice
+PASS: (1920, 1080) death all visible controls within canvas: []
+PASS: (1920, 1080) death labels/buttons fit their measured text: []
+PASS: (1920, 1080) success all visible controls within canvas: []
+PASS: (1920, 1080) success labels/buttons fit their measured text: []
+V23 UI RESULT: 112 checks, 0 failures, 0 native captures

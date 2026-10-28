@@ -32,8 +32,7 @@ func _ready() -> void:
 	player.level_gained.connect(_queue_level)
 	player.hurt.connect(hud.flash_damage)
 	feedback.camera = player.camera
-	for panel in hud.root.find_children("*", "PanelContainer", true, false):
-		feedback.hud_obstacles.append(panel)
+	feedback.hud_obstacles.assign(hud.combat_panels)
 	player.damage_received.connect(_on_player_damaged)
 	player.experience_received.connect(_on_experience_received)
 	hud.player = player

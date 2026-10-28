@@ -1,0 +1,71 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: (1280, 720) Start click is isolated from combat
+PASS: (1280, 720) 暂停 click consumes input without an attack or roll
+PASS: (1280, 720) Returning from 暂停 retains no old held attack
+PASS: (1280, 720) 角色属性 click consumes input without an attack or roll
+PASS: (1280, 720) Returning from 角色属性 retains no old held attack
+PASS: (1280, 720) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1280, 720) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1280, 720) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1280, 720) Noninteractive bar permits normal world input
+PASS: (1280, 720) Noninteractive bar permits normal world input
+PASS: (1280, 720) Upgrade backdrop blocks combat and does not select an option
+PASS: (1280, 720) Mouse option 1 applies only its upgrade once and resumes without attacking
+PASS: (1280, 720) Upgrade backdrop blocks combat and does not select an option
+PASS: (1280, 720) Mouse option 2 applies only its upgrade once and resumes without attacking
+PASS: (1280, 720) Upgrade backdrop blocks combat and does not select an option
+PASS: (1280, 720) Mouse option 3 applies only its upgrade once and resumes without attacking
+PASS: (1280, 720) Result restart does not leak input into the new run
+PASS: (960, 540) Start click is isolated from combat
+PASS: (960, 540) 暂停 click consumes input without an attack or roll
+PASS: (960, 540) Returning from 暂停 retains no old held attack
+PASS: (960, 540) 角色属性 click consumes input without an attack or roll
+PASS: (960, 540) Returning from 角色属性 retains no old held attack
+PASS: (960, 540) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (960, 540) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (960, 540) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (960, 540) Noninteractive bar permits normal world input
+PASS: (960, 540) Noninteractive bar permits normal world input
+PASS: (960, 540) Upgrade backdrop blocks combat and does not select an option
+PASS: (960, 540) Mouse option 1 applies only its upgrade once and resumes without attacking
+PASS: (960, 540) Upgrade backdrop blocks combat and does not select an option
+PASS: (960, 540) Mouse option 2 applies only its upgrade once and resumes without attacking
+PASS: (960, 540) Upgrade backdrop blocks combat and does not select an option
+PASS: (960, 540) Mouse option 3 applies only its upgrade once and resumes without attacking
+PASS: (960, 540) Result restart does not leak input into the new run
+PASS: (1024, 768) Start click is isolated from combat
+PASS: (1024, 768) 暂停 click consumes input without an attack or roll
+PASS: (1024, 768) Returning from 暂停 retains no old held attack
+PASS: (1024, 768) 角色属性 click consumes input without an attack or roll
+PASS: (1024, 768) Returning from 角色属性 retains no old held attack
+PASS: (1024, 768) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1024, 768) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1024, 768) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1024, 768) Noninteractive bar permits normal world input
+PASS: (1024, 768) Noninteractive bar permits normal world input
+PASS: (1024, 768) Upgrade backdrop blocks combat and does not select an option
+PASS: (1024, 768) Mouse option 1 applies only its upgrade once and resumes without attacking
+PASS: (1024, 768) Upgrade backdrop blocks combat and does not select an option
+PASS: (1024, 768) Mouse option 2 applies only its upgrade once and resumes without attacking
+PASS: (1024, 768) Upgrade backdrop blocks combat and does not select an option
+PASS: (1024, 768) Mouse option 3 applies only its upgrade once and resumes without attacking
+PASS: (1024, 768) Result restart does not leak input into the new run
+PASS: (1920, 1080) Start click is isolated from combat
+PASS: (1920, 1080) 暂停 click consumes input without an attack or roll
+PASS: (1920, 1080) Returning from 暂停 retains no old held attack
+PASS: (1920, 1080) 角色属性 click consumes input without an attack or roll
+PASS: (1920, 1080) Returning from 角色属性 retains no old held attack
+PASS: (1920, 1080) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1920, 1080) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1920, 1080) Weapon slot display permits a normal attack without mouse-selecting a weapon
+PASS: (1920, 1080) Noninteractive bar permits normal world input
+PASS: (1920, 1080) Noninteractive bar permits normal world input
+PASS: (1920, 1080) Upgrade backdrop blocks combat and does not select an option
+PASS: (1920, 1080) Mouse option 1 applies only its upgrade once and resumes without attacking
+PASS: (1920, 1080) Upgrade backdrop blocks combat and does not select an option
+PASS: (1920, 1080) Mouse option 2 applies only its upgrade once and resumes without attacking
+PASS: (1920, 1080) Upgrade backdrop blocks combat and does not select an option
+PASS: (1920, 1080) Mouse option 3 applies only its upgrade once and resumes without attacking
+PASS: (1920, 1080) Result restart does not leak input into the new run
+V23 UI INPUT RESULT: 68 checks, 0 failures
