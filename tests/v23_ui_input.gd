@@ -20,7 +20,7 @@ func _run() -> void:
 			await click(button("继续" if prefix == "暂停" else "返回战斗"))
 			await frames(35)
 			check(not paused and game.player.weapon.attack_count == attacks and game.player.stamina == stamina, "%s Returning from %s retains no old held attack" % [size, prefix])
-		for slot in game.hud.weapon_slots:
+		for slot in [game.hud.combat_panels[2]]:
 			await frames(35)
 			var selected: int = game.player.weapon.selected
 			var attacks: int = game.player.weapon.attack_count
@@ -32,7 +32,7 @@ func _run() -> void:
 			await click(bar)
 			check(game.player.weapon.attack_count == attacks + 1, "%s Noninteractive bar permits normal world input" % size)
 		for index in range(3):
-			game.player.weapon.select_weapon(index)
+			game.player.weapon.select_weapon(index) # Direct selection must also be rejected after start.
 			var attacks: int = game.player.weapon.attack_count
 			game.player.gain_experience(game.player.next_level_xp)
 			await frames(4)
@@ -46,7 +46,7 @@ func _run() -> void:
 			await frames(40)
 			var after: Array = [game.player.damage_multiplier, game.player.attack_speed_multiplier, game.player.max_health]
 			var changes: Array = [0.2, 0.15, 25.0]
-			var correct: bool = not paused and game.pending_levels == 0 and game.player.weapon.selected == index and game.player.weapon.attack_count == attacks and game.player.stamina == 100
+			var correct: bool = not paused and game.pending_levels == 0 and game.player.weapon.selected == 0 and game.player.weapon.attack_count == attacks and game.player.stamina == 100
 			for other in range(3):
 				correct = correct and is_equal_approx(after[other], before[other] + (changes[other] if other == index else 0.0))
 			check(correct, "%s Mouse option %d applies only its upgrade once and resumes without attacking" % [size, index + 1])
@@ -55,6 +55,6 @@ func _run() -> void:
 		await click(button("重新开始"))
 		await reloaded()
 		check(game.state == SurvivorGame.State.START and game.player.weapon.attack_count == 0 and game.player.stamina == 100, "%s Result restart does not leak input into the new run" % size)
-	print("V23 UI INPUT RESULT: %d checks, %d failures" % [checks, failures])
+	print("V24 UI INPUT RESULT: %d checks, %d failures" % [checks, failures])
 	paused = false
 	quit(0 if failures == 0 else 1)

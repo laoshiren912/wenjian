@@ -28,6 +28,26 @@ func clear_enemies() -> void:
 	for pickup in get_nodes_in_group("pickups"):
 		pickup.free()
 
+func begin_profession(index: int) -> void:
+	attack_input(false)
+	for action in ["move_left", "move_right", "move_up", "move_down", "roll"]:
+		Input.action_release(action)
+	game.restart_run()
+	await frames(4)
+	game = current_scene
+	game.select_profession(index)
+	game.start_run()
+	clear_enemies()
+	game.spawn_timer = 9999.0
+	await aim_right()
+	check(game.player.profession_index == index and game.player.weapon.selected == index and game.player.weapon.locked, "Fresh profession starts with its actual locked weapon %d" % (index + 1))
+
+func interior_wall() -> Vector2:
+	for cell in game.world.blocked:
+		if cell.x > 2 and cell.x < 37 and cell.y > 2 and cell.y < 27:
+			return game.world.cell_center(cell)
+	return Vector2.ZERO
+
 func enemy_at(offset: Vector2, kind: int = SurvivorEnemy.Kind.HOSTILE) -> SurvivorEnemy:
 	var enemy := game._spawn_enemy(kind, game.player.position + offset)
 	enemy.set_physics_process(false)
@@ -156,20 +176,20 @@ func _run() -> void:
 	check(is_equal_approx(game.player.stamina, 100.0), "Sword normal attack does not spend stamina")
 	var count: int = game.player.weapon.attack_count
 	check(not game.player.weapon.attack(Vector2.RIGHT) and count == game.player.weapon.attack_count, "Cooldown prevents extra attacks")
-	clear_enemies()
+	await begin_profession(1)
 	var spear_target := enemy_at(Vector2(135, 0))
 	var spear_side := enemy_at(Vector2(105, 40))
 	var spear_outside := enemy_at(Vector2(70, 80))
 	await key(KEY_2)
 	await fire_once()
-	check(game.player.weapon.selected == 1 and is_equal_approx(spear_target.health, spear_target.max_health - 32.0), "Key 2 selects longer spear with lower 32 damage per target")
+	check(game.player.weapon.selected == 1 and is_equal_approx(spear_target.health, spear_target.max_health - 32.0), "Lancer retains its longer spear and deals 32 damage per target")
 	check(is_equal_approx(spear_side.health, spear_side.max_health - 32.0), "Spear damages multiple enemies in its cone")
 	check(is_equal_approx(spear_outside.health, spear_outside.max_health) and is_equal_approx(game.player.stamina, 100.0), "Spear respects cone edges without spending stamina")
-	clear_enemies()
+	await begin_profession(2)
 	var bow_target := enemy_at(Vector2(200, 0), SurvivorEnemy.Kind.PASSIVE)
 	var bow_behind := enemy_at(Vector2(245, 0))
 	await key(KEY_3)
-	check(SurvivorWeapon.DATA.size() == 3 and game.player.weapon.selected == 2, "Key 3 selects bow as the third weapon")
+	check(SurvivorWeapon.DATA.size() == 3 and game.player.weapon.selected == 2, "Archer starts with the third weapon, bow, already locked")
 	await fire_once()
 	check(is_equal_approx(game.player.stamina, 100.0), "Bow normal shot does not spend stamina")
 	check(is_equal_approx(bow_target.health, bow_target.max_health) and get_nodes_in_group("projectiles").size() == 1, "Bow launches a traveling arrow instead of instant melee damage")
@@ -183,7 +203,7 @@ func _run() -> void:
 	game.resume_run()
 	await key(KEY_1)
 	await frames(30)
-	check(game.player.weapon.selected == 0 and is_equal_approx(bow_target.health, bow_target.max_health - 21.0), "Arrow deals 21 damage even after switching back to sword")
+	check(game.player.weapon.selected == 2 and is_equal_approx(bow_target.health, bow_target.max_health - 21.0), "Arrow deals 21 damage while a battle switch attempt is rejected")
 	var arrow_damage_popup: bool = false
 	for popup in game.feedback.popups:
 		if popup.kind == "enemy_damage" and is_equal_approx(float(popup.amount), 21.0):
@@ -192,7 +212,7 @@ func _run() -> void:
 	check(is_equal_approx(bow_behind.health, bow_behind.max_health) and get_nodes_in_group("projectiles").is_empty(), "Arrow hits only the first enemy and is removed on impact")
 	await key(KEY_3)
 	await frames(2)
-	check(game.hud.weapon_text.text == "3  弓箭" and game.hud.weapon_detail.text.contains("远程单体"), "HUD displays bow name and ranged role")
+	check(game.hud.weapon_text.text == "弓箭手 · 弓箭" and game.hud.weapon_detail.text.contains("远程单体"), "HUD displays bow name and ranged role")
 	game.player.weapon.cooldown = 0.0
 	game.player.stamina = 0.0
 	check(game.player.weapon.attack(Vector2.RIGHT), "Zero stamina still allows a normal bow attack")
@@ -214,7 +234,7 @@ func _run() -> void:
 	# Real held mouse input at zero stamina, with no fixture resets between attacks.
 	clear_enemies()
 	for index in range(SurvivorWeapon.DATA.size()):
-		await key(KEY_1 + index)
+		await begin_profession(index)
 		game.player.weapon.cooldown = 0.0
 		game.player.stamina = 0.0
 		game.player.stamina_delay = 5.0
@@ -235,7 +255,7 @@ func _run() -> void:
 		check(attack_ticks.size() >= 2 and game.player.stamina == 0.0 and game.player.stamina_delay > 3.0, "Weapon %d holds normal attack at zero stamina without deducting or resetting recovery" % (index + 1))
 		check(intervals_valid and attack_ticks.size() >= 2, "Weapon %d still enforces its original interval under held input" % (index + 1))
 		game.player.weapon.select_weapon((index + 1) % SurvivorWeapon.DATA.size())
-		check(not game.player.weapon.attack(Vector2.RIGHT) and game.player.weapon.attack_count == previous_attacks, "Switching from weapon %d cannot bypass an active cooldown" % (index + 1))
+		check(not game.player.weapon.attack(Vector2.RIGHT) and game.player.weapon.attack_count == previous_attacks, "Rejected switching from locked weapon %d cannot bypass an active cooldown" % (index + 1))
 		game.player.weapon.select_weapon(index)
 		game.player.stamina = 50.0
 		game.player.stamina_delay = 0.0
@@ -249,18 +269,19 @@ func _run() -> void:
 	game.player.stamina_delay = 0.0
 	clear_enemies()
 	# A solid pillar blocks both spear attacks and arrows.
-	var wall_cell := Vector2i.ZERO
-	for cell in game.world.blocked:
-		if cell.x > 2 and cell.x < 37 and cell.y > 2 and cell.y < 27:
-			wall_cell = cell
-			break
-	var wall_center: Vector2 = game.world.cell_center(wall_cell)
+	await begin_profession(1)
+	var wall_center: Vector2 = interior_wall()
 	game.player.position = wall_center - Vector2(55, 0)
 	await aim_right()
 	var shielded := enemy_at(Vector2(110, 0))
 	await key(KEY_2)
 	await fire_once()
 	check(is_equal_approx(shielded.health, shielded.max_health), "Melee cannot hit through a wall")
+	await begin_profession(2)
+	wall_center = interior_wall()
+	game.player.position = wall_center - Vector2(55, 0)
+	await aim_right()
+	shielded = enemy_at(Vector2(110, 0))
 	await key(KEY_3)
 	await fire_once()
 	await frames(20)
@@ -279,7 +300,8 @@ func _run() -> void:
 	arrow.max_distance = 90.0
 	await frames(10)
 	check(get_nodes_in_group("projectiles").is_empty(), "An arrow expires when it reaches its maximum distance")
-	clear_enemies()
+	await begin_profession(0)
+	wall_center = interior_wall()
 	game.player.position = wall_center - Vector2(120, 0)
 	game.player.invulnerability = 99.0
 	var navigator := game._spawn_enemy(SurvivorEnemy.Kind.HOSTILE, wall_center + Vector2(120, 0))
@@ -339,7 +361,9 @@ func _run() -> void:
 	await fire_once()
 	check(is_equal_approx(upgraded.health, upgraded.max_health - 52.0 * 1.2), "Damage upgrade affects real sword hits")
 	check(game.player.weapon.cooldown < 0.48 / 1.15, "Speed upgrade shortens real attack cooldown")
-	clear_enemies()
+	await begin_profession(2)
+	game.player.apply_upgrade(0)
+	game.player.apply_upgrade(1)
 	var upgraded_bow := enemy_at(Vector2(200, 0))
 	await key(KEY_3)
 	await fire_once()

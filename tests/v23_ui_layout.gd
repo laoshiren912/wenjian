@@ -1,7 +1,7 @@
 extends "res://tests/v21_animation.gd"
 
 # Real scene/container layout. Fixtures remove enemies; they do not certify play balance.
-const V23_OUTPUT := "res://artifacts/v23_layout_final_2026-10-28/"
+const V23_OUTPUT := "res://artifacts/v24_ui_2026-10-28/"
 var render: bool = false
 var captures: int = 0
 var sample_size: Vector2i
@@ -53,7 +53,7 @@ func _run() -> void:
 	render = OS.get_cmdline_user_args().has("--render")
 	if render:
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(V23_OUTPUT))
-	root.title = "V2.3 UI Layout Checks"
+	root.title = "V2.4 UI Layout Checks"
 	game = load("res://scenes/main.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
@@ -66,6 +66,20 @@ func _run() -> void:
 		check(root.size == sample_size, "Actual window size matches requested " + str(sample_size))
 		await fresh_ui()
 		await inspect_layout("start")
+		check(game.hud.profession_layout.vertical == (sample_size.x < 1100), "Profession orientation follows actual window width")
+		for index in range(3):
+			await press(KEY_1 + index)
+			var chosen: bool = paused and game.selected_profession == index and not game.player.weapon.locked
+			for other in range(3):
+				var style := game.hud.profession_buttons[other].get_theme_stylebox("normal") as StyleBoxFlat
+				chosen = chosen and (style.border_color == Color("9cebd7")) == (other == index)
+			check(chosen, "Start key %d highlights exactly one profession without starting" % (index + 1))
+		var selection: int = game.selected_profession
+		root.size = Vector2i(1280, 720) if sample_size.x < 1100 else Vector2i(960, 540)
+		await frames(5)
+		check(game.hud.profession_layout.vertical == (root.size.x < 1100) and game.selected_profession == selection and paused and root.gui_get_focus_owner() == game.hud.start_button, "Resizing profession selection keeps selection, start focus and pause")
+		root.size = sample_size
+		await frames(5)
 		game.start_run()
 		game.hud.notice.text = ""
 		await inspect_layout("combat")
@@ -77,18 +91,14 @@ func _run() -> void:
 			clear_center = clear_center and not panel.get_global_rect().intersects(center_battle)
 		check(clear_center and hud.combat_panels[0].size.y < 120 and hud.combat_panels[1].size.y < 120, "Compact top HUD and bottom equipment keep the central battle area clear")
 		check(hud.xp_bar.get_global_rect().position.y > size.y * 0.8 and hud.xp_text.get_global_rect().position.y > size.y * 0.8, "Level and experience are at the bottom")
-		check(hud.weapon_slots.size() == 3 and hud.combat_panels[2].get_global_rect().get_center().x == size.x * 0.5, "Three weapon slots remain centered at the bottom")
+		check(hud.weapon_text.text == "弓箭手 · 弓箭" and hud.combat_panels[2].get_global_rect().get_center().x == size.x * 0.5, "Single profession and locked weapon remain centered at the bottom")
 		var transparent: bool = hud.weapon_text.mouse_filter == Control.MOUSE_FILTER_IGNORE and hud.xp_bar.mouse_filter == Control.MOUSE_FILTER_IGNORE
-		for slot in hud.weapon_slots:
-			transparent = transparent and slot.mouse_filter == Control.MOUSE_FILTER_IGNORE and slot.find_children("*", "Button", true, false).is_empty()
+		transparent = transparent and hud.combat_panels[2].mouse_filter == Control.MOUSE_FILTER_IGNORE and hud.combat_panels[2].find_children("*", "Button", true, false).is_empty()
 		check(transparent, "Weapon display and bars neither consume input nor introduce clickable weapon switching")
 		for index in range(3):
 			await press(KEY_1 + index)
-			var correct: bool = game.player.weapon.selected == index and hud.weapon_text.text == "%d  %s" % [index + 1, SurvivorWeapon.DATA[index].name]
-			for other in range(3):
-				var style := hud.weapon_slots[other].get_theme_stylebox("panel") as StyleBoxFlat
-				correct = correct and style.border_width_left == (2 if other == index else 1)
-			check(correct, "Keyboard weapon %d updates exactly one slot highlight and actual weapon" % (index + 1))
+			var correct: bool = game.player.weapon.selected == 2 and hud.weapon_text.text == "弓箭手 · 弓箭" and game.player.weapon.locked
+			check(correct, "Battle number %d cannot change the profession or locked weapon" % (index + 1))
 		# Feedback at the bottom must move above the relocated HUD instead of underneath it.
 		var point := Vector2(size.x * 0.5, size.y - 2)
 		var world_point: Vector2 = game.feedback.to_global(game.feedback.get_global_transform_with_canvas().affine_inverse() * point)
@@ -135,7 +145,7 @@ func _run() -> void:
 		game.elapsed = SurvivorGame.RUN_DURATION
 		game._end_run(true)
 		await inspect_layout("success")
-	print("V23 UI RESULT: %d checks, %d failures, %d native captures" % [checks, failures, captures])
+	print("V24 UI RESULT: %d checks, %d failures, %d native captures" % [checks, failures, captures])
 	paused = false
 	quit(0 if failures == 0 else 1)
 

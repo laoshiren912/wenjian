@@ -1,0 +1,101 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Default start selects swordsman without initializing a run
+PASS: Enter starts the default swordsman
+PASS: Invalid professions cannot initialize or lock a player
+PASS: Invalid preview selections leave the default unchanged
+PASS: Mouse card selection previews without starting or attacking
+PASS: Numeric selection freezes world/time and leaves actual attributes unapplied
+PASS: Profession 1 initializes the specified HP, speed and locked weapon
+PASS: Profession 1 keeps the original stamina and roll rules
+PASS: Card/Enter confirmation leaks no attack or roll
+PASS: Combat HUD names only the actual profession and weapon
+PASS: Profession 1 uses its actual configured walking speed
+PASS: Battle keys, public selection API and selected property cannot switch a locked loadout
+PASS: Locked loadout cannot be initialized or locked a second time
+PASS: Each profession can roll normally
+PASS: Numeric keys cannot switch weapons or attack during a roll
+PASS: Roll finishes and restores stamina at the original rate
+PASS: Stats show the current profession and lock rule
+PASS: Stats contain only the current weapon, checked against slot 1
+PASS: Stats contain only the current weapon, checked against slot 2
+PASS: Stats contain only the current weapon, checked against slot 3
+PASS: Paused stats cannot reinitialize profession attributes
+PASS: Vitality adds 25 maximum HP and heals exactly 40 for profession 1
+PASS: Vitality healing clamps to the increased maximum
+PASS: Earned multi-level gains queue two separate choices
+PASS: Queued numeric upgrades apply once each without switching or attacking
+PASS: Repeated start and pause/resume preserve HP, upgrades and profession speed
+PASS: Profession 1 can perform its real weapon attack
+PASS: Rejected weapon switch cannot reset or bypass attack cooldown
+PASS: Profession 1 keeps original damage and actual upgrade application
+PASS: Victory reports the actual run profession
+PASS: Victory restart clears profession, upgrades and input state
+PASS: Death reports the actual run profession
+PASS: Death restart allows a new profession selection
+PASS: Pause-menu restart returns to default profession without old attacks
+PASS: Invalid professions cannot initialize or lock a player
+PASS: Invalid preview selections leave the default unchanged
+PASS: Mouse card selection previews without starting or attacking
+PASS: Numeric selection freezes world/time and leaves actual attributes unapplied
+PASS: Profession 2 initializes the specified HP, speed and locked weapon
+PASS: Profession 2 keeps the original stamina and roll rules
+PASS: Card/Enter confirmation leaks no attack or roll
+PASS: Combat HUD names only the actual profession and weapon
+PASS: Profession 2 uses its actual configured walking speed
+PASS: Battle keys, public selection API and selected property cannot switch a locked loadout
+PASS: Locked loadout cannot be initialized or locked a second time
+PASS: Each profession can roll normally
+PASS: Numeric keys cannot switch weapons or attack during a roll
+PASS: Roll finishes and restores stamina at the original rate
+PASS: Stats show the current profession and lock rule
+PASS: Stats contain only the current weapon, checked against slot 1
+PASS: Stats contain only the current weapon, checked against slot 2
+PASS: Stats contain only the current weapon, checked against slot 3
+PASS: Paused stats cannot reinitialize profession attributes
+PASS: Vitality adds 25 maximum HP and heals exactly 40 for profession 2
+PASS: Vitality healing clamps to the increased maximum
+PASS: Earned multi-level gains queue two separate choices
+PASS: Queued numeric upgrades apply once each without switching or attacking
+PASS: Repeated start and pause/resume preserve HP, upgrades and profession speed
+PASS: Profession 2 can perform its real weapon attack
+PASS: Rejected weapon switch cannot reset or bypass attack cooldown
+PASS: Profession 2 keeps original damage and actual upgrade application
+PASS: Victory reports the actual run profession
+PASS: Victory restart clears profession, upgrades and input state
+PASS: Death reports the actual run profession
+PASS: Death restart allows a new profession selection
+PASS: Pause-menu restart returns to default profession without old attacks
+PASS: Invalid professions cannot initialize or lock a player
+PASS: Invalid preview selections leave the default unchanged
+PASS: Mouse card selection previews without starting or attacking
+PASS: Numeric selection freezes world/time and leaves actual attributes unapplied
+PASS: Profession 3 initializes the specified HP, speed and locked weapon
+PASS: Profession 3 keeps the original stamina and roll rules
+PASS: Card/Enter confirmation leaks no attack or roll
+PASS: Combat HUD names only the actual profession and weapon
+PASS: Profession 3 uses its actual configured walking speed
+PASS: Battle keys, public selection API and selected property cannot switch a locked loadout
+PASS: Locked loadout cannot be initialized or locked a second time
+PASS: Each profession can roll normally
+PASS: Numeric keys cannot switch weapons or attack during a roll
+PASS: Roll finishes and restores stamina at the original rate
+PASS: Stats show the current profession and lock rule
+PASS: Stats contain only the current weapon, checked against slot 1
+PASS: Stats contain only the current weapon, checked against slot 2
+PASS: Stats contain only the current weapon, checked against slot 3
+PASS: Paused stats cannot reinitialize profession attributes
+PASS: Vitality adds 25 maximum HP and heals exactly 40 for profession 3
+PASS: Vitality healing clamps to the increased maximum
+PASS: Earned multi-level gains queue two separate choices
+PASS: Queued numeric upgrades apply once each without switching or attacking
+PASS: Repeated start and pause/resume preserve HP, upgrades and profession speed
+PASS: Profession 3 can perform its real weapon attack
+PASS: Rejected weapon switch cannot reset or bypass attack cooldown
+PASS: Profession 3 keeps original damage and actual upgrade application
+PASS: Victory reports the actual run profession
+PASS: Victory restart clears profession, upgrades and input state
+PASS: Death reports the actual run profession
+PASS: Death restart allows a new profession selection
+PASS: Pause-menu restart returns to default profession without old attacks
+V24 PROFESSION RESULT: 98 checks, 0 failures

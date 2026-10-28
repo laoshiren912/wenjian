@@ -2,13 +2,14 @@ extends "res://tests/v21_animation.gd"
 
 const ROLL_OUTPUT := "res://artifacts/roll_visual_2026-10-28/"
 
-func fresh() -> void:
+func fresh(index: int = 0) -> void:
 	movement(Vector2.ZERO)
 	Input.action_release("attack")
 	Input.action_release("roll")
 	game.restart_run()
 	await frames(4)
 	game = current_scene
+	game.select_profession(index)
 	game.start_run()
 	game.spawn_timer = 9999
 	clear_targets()
@@ -197,12 +198,12 @@ func _run() -> void:
 	await frames(4)
 	check(player.position.distance_to(before) < 0.1 and player.visual.rotation == 0 and player.weapon.visible, "Releasing movement stops cleanly after the longer roll")
 	for index in range(3):
-		await fresh()
+		await fresh(index)
 		player = game.player
 		player.weapon.select_weapon((index + 2) % 3)
 		player.try_roll()
 		var event := InputEventKey.new()
-		event.keycode = KEY_1 + index
+		event.keycode = KEY_1 + (index + 1) % 3
 		event.physical_keycode = event.keycode
 		event.pressed = true
 		root.push_input(event, true)
@@ -211,7 +212,7 @@ func _run() -> void:
 		root.push_input(event, true)
 		mouse(true)
 		await frames(10)
-		check(player.is_rolling() and player.weapon.selected == index and player.weapon.attack_count == 0 and not player.weapon.visible, "Weapon %d can be selected during the longer roll without attacking or showing an old pose" % (index + 1))
+		check(player.is_rolling() and player.weapon.selected == index and player.weapon.attack_count == 0 and not player.weapon.visible, "Locked weapon %d rejects switching during roll without attacking or showing an old pose" % (index + 1))
 		await frames(roll_frames())
 		check(not player.is_rolling() and player.weapon.attack_count >= 1 and player.weapon.swing_weapon == index and player.weapon.visible, "Weapon %d held attack starts with the selected weapon after the longer roll" % (index + 1))
 		mouse(false)
@@ -224,7 +225,10 @@ func _run() -> void:
 	await frames(2)
 	check(player.position == before, "Rejected roll creates no displacement")
 	for index in range(3):
-		player.weapon.select_weapon(index)
+		await fresh(index)
+		player = game.player
+		player.stamina = 29
+		player.stamina_delay = 5
 		player.weapon.cooldown = 0
 		var stamina_before: float = player.stamina
 		check(player.weapon.attack(Vector2.RIGHT) and player.stamina == stamina_before, "Weapon %d still attacks for free with insufficient roll stamina" % (index + 1))
@@ -244,9 +248,8 @@ func _run() -> void:
 	await frames(recovery_frames)
 	check(player.stamina == 100 and player.try_roll(), "Recovery clamps at the original cap and allows rolling again")
 	for index in range(3):
-		await fresh()
+		await fresh(index)
 		player = game.player
-		player.weapon.select_weapon(index)
 		var attack_frames: Array[int] = []
 		var record_attack: Callable = func(_index: int, _direction: Vector2): attack_frames.append(Engine.get_physics_frames())
 		player.weapon.attack_started.connect(record_attack)
@@ -273,9 +276,8 @@ func _run() -> void:
 	mouse(false)
 	await frames(40)
 	check(player.weapon.attack_count == 0, "A short attack clicked only during roll is not buffered for later")
-	await fresh()
+	await fresh(2)
 	player = game.player
-	player.weapon.select_weapon(2)
 	var enemy := target_at(70)
 	player.weapon.attack(Vector2.RIGHT)
 	movement(Vector2.LEFT)

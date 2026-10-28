@@ -25,6 +25,19 @@ func clear_targets() -> void:
 		for node in get_nodes_in_group(group):
 			node.free()
 
+func begin_profession(index: int = 0) -> void:
+	movement(Vector2.ZERO)
+	Input.action_release("attack")
+	Input.action_release("roll")
+	game.restart_run()
+	await frames(4)
+	game = current_scene
+	game.select_profession(index)
+	game.start_run()
+	game.spawn_timer = 9999.0
+	clear_targets()
+	await frames(2)
+
 func target_at(distance: float, kind: int = SurvivorEnemy.Kind.HOSTILE) -> SurvivorEnemy:
 	var enemy := game._spawn_enemy(kind, game.player.position + Vector2(distance, 0))
 	enemy.set_physics_process(false)
@@ -64,7 +77,9 @@ func render_samples() -> void:
 	await frames()
 	for index in range(3):
 		clear_targets()
-		game.player.weapon.select_weapon(index)
+		await begin_profession(index)
+		game.player.set_physics_process(false)
+		game.player.camera.position_smoothing_enabled = false
 		game.player.weapon.cooldown = 0.0
 		game.player.aim_direction = Vector2.RIGHT
 		game.player.visual.update_pose(Vector2.ZERO, Vector2.RIGHT, Color("79e2d0"))
@@ -73,7 +88,8 @@ func render_samples() -> void:
 		await capture("0%d_attack" % (index + 1))
 		await frames(24)
 	clear_targets()
-	game.player.weapon.select_weapon(0)
+	await begin_profession(0)
+	game.player.set_physics_process(false)
 	game.player.visual.update_pose(Vector2(225, 0), Vector2.UP, Color("79e2d0"))
 	var walking := target_at(95.0, SurvivorEnemy.Kind.PASSIVE)
 	walking.visual.update_pose(Vector2(85, 0), Vector2.RIGHT, Color("d4bb76"))
@@ -124,8 +140,9 @@ func _run() -> void:
 	player.position = SurvivorWorld.SPAWN
 	await aim(Vector2.RIGHT)
 	for index in range(3):
-		clear_targets()
-		player.weapon.select_weapon(index)
+		await begin_profession(index)
+		player = game.player
+		await aim(Vector2.RIGHT)
 		player.weapon.cooldown = 0.0
 		var enemy := target_at([70.0, 135.0, 200.0][index])
 		var position_before: Vector2 = player.position
@@ -139,11 +156,11 @@ func _run() -> void:
 		check(not player.weapon.attack(Vector2.UP) and player.weapon.attack_count == attacks, "Weapon %d cannot bypass cooldown through animation" % (index + 1))
 		var cooldown: float = player.weapon.cooldown
 		player.weapon.select_weapon((index + 1) % 3)
-		check(player.visual.attack_time == 0.0 and player.weapon.swing_time == 0.0 and player.weapon.cooldown == cooldown, "Switching from weapon %d clears its pose but preserves cooldown" % (index + 1))
+		check(player.weapon.selected == index and player.visual.attack_time > 0.0 and player.weapon.swing_time > 0.0 and player.weapon.cooldown == cooldown, "Locked weapon %d rejects switching without resetting its pose or cooldown" % (index + 1))
 		await frames(20)
-	clear_targets()
+	await begin_profession(0)
+	player = game.player
 	player.attack_speed_multiplier = 4.0
-	player.weapon.select_weapon(0)
 	player.weapon.cooldown = 0.0
 	var fast_target := target_at(70.0)
 	player.weapon.attack(Vector2.RIGHT)
@@ -172,6 +189,8 @@ func _run() -> void:
 	player.invulnerability = 0.0
 	player.take_damage(12.0, Vector2.ZERO)
 	check(player.visual.hurt_time > 0.0 and player.health == 88.0 and player.invulnerability == 0.7, "Player hit pose preserves actual damage and invulnerability")
+	await begin_profession(2)
+	player = game.player
 	var victim := target_at(80.0)
 	var victim_position: Vector2 = victim.position
 	var kills: int = game.kills
@@ -196,8 +215,8 @@ func _run() -> void:
 	check(is_instance_valid(ghost) and is_equal_approx(behind_ghost.health, behind_ghost.max_health - 21.0), "Arrow passes the still-visible residual and damages the living enemy behind it")
 	await frames(10)
 	check(not is_instance_valid(ghost) and get_nodes_in_group("death_visuals").is_empty(), "Death residual cleans itself after 0.22 active seconds")
-	clear_targets()
-	player.weapon.select_weapon(0)
+	await begin_profession(0)
+	player = game.player
 	player.weapon.cooldown = 0.0
 	player.weapon.attack(Vector2.RIGHT)
 	await frames(2)

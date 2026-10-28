@@ -10,6 +10,7 @@ var weapon_uses: Array[int] = [0, 0, 0]
 var previous_attack_count: int = 0
 var last_report: int = -1
 var mode: String = "combat"
+var profession: int = 0
 var route: PackedVector2Array = PackedVector2Array()
 var route_index: int = 0
 var target_cell := Vector2i(-1, -1)
@@ -23,6 +24,8 @@ func _initialize() -> void:
 			mode = "idle"
 		elif argument == "--kite":
 			mode = "kite"
+		elif argument.begins_with("--profession="):
+			profession = clampi(argument.get_slice("=", 1).to_int(), 0, 2)
 	_run.call_deferred()
 
 func _run() -> void:
@@ -40,6 +43,7 @@ func _run() -> void:
 				closest = candidate
 		patrol.append(closest)
 	print("NORMAL SESSION: mode=%s, map_seed=%d, health=%.0f, invulnerability=%.2f, natural spawns, no stat overrides" % [mode, game.world.random.seed, game.player.health, game.player.invulnerability])
+	game.select_profession(profession)
 	game.hud.start_requested.emit()
 	while game.state != SurvivorGame.State.DEAD and game.state != SurvivorGame.State.WON:
 		await physics_frame
@@ -102,15 +106,7 @@ func _control() -> void:
 		event.position = player.get_global_transform_with_canvas() * player.to_local(nearest.global_position)
 		event.global_position = event.position
 		root.push_input(event, true)
-		var weapon: int = 1 if nearby >= 2 or nearest_distance > 102.0 else 0
-		if player.weapon.selected != weapon:
-			var key := InputEventKey.new()
-			key.keycode = KEY_1 + weapon
-			key.pressed = true
-			Input.parse_input_event(key)
-			var release := InputEventKey.new()
-			release.keycode = KEY_1 + weapon
-			Input.parse_input_event(release)
+		var weapon: int = player.weapon.selected
 		if player.stamina < float(SurvivorWeapon.DATA[weapon].stamina):
 			recovering = true
 		if player.stamina >= 70.0:

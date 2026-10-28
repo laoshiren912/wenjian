@@ -51,7 +51,16 @@ func _run() -> void:
 	await frames(2)
 	var player: SurvivorPlayer = game.player
 	for index in range(3):
-		player.weapon.select_weapon(index)
+		game.restart_run()
+		await frames(4)
+		game = current_scene
+		game.select_profession(index)
+		game.start_run()
+		game.spawn_timer = 9999.0
+		for enemy in get_nodes_in_group("enemies"):
+			enemy.free()
+		player = game.player
+		check(player.weapon.selected == index and player.weapon.locked, "Fresh profession supplies the intended locked weapon")
 		player.weapon.cooldown = 0.0
 		player.stamina = 0.0
 		player.stamina_delay = 10.0

@@ -13,6 +13,7 @@ var kills: int = 0
 var pending_levels: int = 0
 var spawn_timer: float = 4.0
 var stats_open: bool = false
+var selected_profession: int = 0
 @onready var world: SurvivorWorld = $World
 @onready var hud = $HUD
 @onready var feedback = $World/CombatFeedback
@@ -37,6 +38,7 @@ func _ready() -> void:
 	player.experience_received.connect(_on_experience_received)
 	hud.player = player
 	hud.start_requested.connect(start_run)
+	hud.profession_requested.connect(select_profession)
 	hud.restart_requested.connect(restart_run)
 	hud.stats_requested.connect(show_stats)
 	hud.pause_requested.connect(toggle_pause)
@@ -51,7 +53,7 @@ func _ready() -> void:
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -68,11 +70,20 @@ func _setup_inputs() -> void:
 		mouse.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_add_event("attack", mouse)
 
+func select_profession(index: int) -> void:
+	if state != State.START or index < 0 or index >= SurvivorPlayer.PROFESSIONS.size():
+		return
+	selected_profession = index
+	hud.select_profession(index)
+
 func start_run() -> void:
 	if state != State.START:
 		return
+	if not player.initialize_profession(selected_profession):
+		return
 	state = State.PLAYING
 	hud.hide_screen()
+	hud.update_game(elapsed, kills, RUN_DURATION)
 	get_tree().paused = false
 	hud.show_notice("试炼开始 · 拾取蓝色晶体来升级")
 
@@ -92,6 +103,16 @@ func _process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
 		return
+	if state == State.START:
+		for index in range(SurvivorPlayer.PROFESSIONS.size()):
+			if event.is_action_pressed("profession_%d" % (index + 1)):
+				select_profession(index)
+				get_viewport().set_input_as_handled()
+				return
+		if event is InputEventKey and event.pressed and (event.keycode in [KEY_ENTER, KEY_KP_ENTER] or event.physical_keycode in [KEY_ENTER, KEY_KP_ENTER]):
+			start_run()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("stats"):
 		if state == State.PLAYING:
 			show_stats()

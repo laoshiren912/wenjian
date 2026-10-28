@@ -95,8 +95,10 @@ func _run() -> void:
 	player.position = SurvivorWorld.SPAWN
 	await aim(Vector2.RIGHT)
 	for index in range(3):
-		clear_targets()
-		player.weapon.select_weapon(index)
+		await begin_profession(index)
+		player = game.player
+		player.visual.facing = Vector2.LEFT
+		await aim(Vector2.RIGHT)
 		player.weapon.cooldown = 0.0
 		var enemy := target_at([70.0, 135.0, 200.0][index])
 		player.weapon.attack(player.aim_direction)

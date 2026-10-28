@@ -11,7 +11,16 @@ const DATA: Array[Dictionary] = [
 	{"name": "弓箭", "damage": 21.0, "reach": 640.0, "angle": 0.0, "cooldown": 0.32, "stamina": 0.0, "single_target": true, "role": "远程单体"},
 ]
 
-var selected: int = 0
+var _selected: int = 0
+var selected: int:
+	get:
+		return _selected
+	set(value):
+		select_weapon(value)
+var _locked: bool = false
+var locked: bool:
+	get:
+		return _locked
 var cooldown: float = 0.0
 var swing_time: float = 0.0
 var swing_duration: float = 0.18
@@ -25,13 +34,20 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func select_weapon(index: int) -> void:
-	if index < 0 or index >= DATA.size():
+	if _locked or index < 0 or index >= DATA.size():
 		return
-	if selected != index:
-		selected = index
+	if _selected != index:
+		_selected = index
 		swing_time = 0.0
 		selection_changed.emit(index)
 	queue_redraw()
+
+func lock_to(index: int) -> bool:
+	if _locked or index < 0 or index >= DATA.size():
+		return false
+	select_weapon(index)
+	_locked = true
+	return true
 
 func attack(direction: Vector2) -> bool:
 	var player = get_parent()

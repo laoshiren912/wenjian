@@ -7,6 +7,16 @@ signal hurt
 signal damage_received(amount: float)
 signal experience_received(amount: int)
 
+const PROFESSIONS: Array[Dictionary] = [
+	{"name": "剑士", "weapon": 0, "health": 100.0, "speed": 225.0},
+	{"name": "枪兵", "weapon": 1, "health": 150.0, "speed": 180.0},
+	{"name": "弓箭手", "weapon": 2, "health": 80.0, "speed": 240.0},
+]
+var _profession_index: int = 0
+var profession_index: int:
+	get:
+		return _profession_index
+
 @export_group("Roll")
 @export_range(1.0, 500.0, 1.0) var roll_distance: float = 150.0
 @export_range(0.05, 1.0, 0.01) var roll_duration: float = 0.34
@@ -44,6 +54,22 @@ var _roll_direction: Vector2 = Vector2.DOWN
 func _ready() -> void:
 	weapon.attack_started.connect(_on_attack_started)
 	weapon.selection_changed.connect(_on_weapon_selected)
+
+func initialize_profession(index: int) -> bool:
+	# The manager calls this once, while the start screen still pauses the world.
+	if weapon.locked or not get_tree().paused or index < 0 or index >= PROFESSIONS.size():
+		return false
+	var data: Dictionary = PROFESSIONS[index]
+	if not weapon.lock_to(int(data.weapon)):
+		return false
+	_profession_index = index
+	max_health = float(data.health)
+	health = max_health
+	speed = float(data.speed)
+	_attack_held = false
+	_attack_pending = false
+	_roll_requested = false
+	return true
 
 func _on_attack_started(index: int, direction: Vector2) -> void:
 	visual.play_attack(index, direction, weapon.swing_duration)
@@ -141,9 +167,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("roll"):
 		_roll_requested = true
 		get_viewport().set_input_as_handled()
-	for index in range(SurvivorWeapon.DATA.size()):
-		if event.is_action_pressed("weapon_%d" % (index + 1)):
-			weapon.select_weapon(index)
 
 func spend_stamina(amount: float) -> bool:
 	if stamina < amount:

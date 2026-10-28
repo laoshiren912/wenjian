@@ -1,0 +1,23 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Fresh profession supplies the intended locked weapon
+PASS: Weapon 1 accepts a released same-tick click exactly once
+PASS: Weapon 1 short click stays free at zero stamina
+PASS: Weapon 1 short click cannot bypass cooldown
+PASS: Weapon 1 cooldown-rejected click is not replayed later
+PASS: Fresh profession supplies the intended locked weapon
+PASS: Weapon 2 accepts a released same-tick click exactly once
+PASS: Weapon 2 short click stays free at zero stamina
+PASS: Weapon 2 short click cannot bypass cooldown
+PASS: Weapon 2 cooldown-rejected click is not replayed later
+PASS: Fresh profession supplies the intended locked weapon
+PASS: Weapon 3 accepts a released same-tick click exactly once
+PASS: Weapon 3 short click stays free at zero stamina
+PASS: Weapon 3 short click cannot bypass cooldown
+PASS: Weapon 3 cooldown-rejected click is not replayed later
+PASS: Pause clears an unprocessed click before resuming
+PASS: Focus-out notification clears an unprocessed click
+PASS: Short HUD pause click is consumed by GUI without arming an attack
+PASS: Short continue click resumes without attacking
+PASS: Multiple clicks in one physics interval cannot multiply attacks
+CLICK TIMING RESULT: 20 checks, 0 failures

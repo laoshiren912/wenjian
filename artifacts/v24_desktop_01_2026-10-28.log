@@ -1,0 +1,43 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 617.42 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3050
+
+V24 DESKTOP READY: click lancer; 3 preview archer; Enter; battle 1; click bottom weapon display; HUD pause + Space continue; attributes + Tab return; mouse option 1, key 2, mouse option 3; mouse restart; click lancer + Enter; battle 3; pause restart; default Enter; Space roll
+V24 DESKTOP CLICK: (638.6667, 332.0)
+PASS: Mouse lancer preview does not start or apply stats
+V24 DESKTOP KEY: 3
+PASS: Physical 3 previews archer without starting or attacking
+V24 DESKTOP KEY: Enter
+PASS: Physical Enter starts archer with 80 HP, 240 speed and locked bow without attack or roll
+V24 HUD REFRESH: before=弓箭手 · 弓箭 after=弓箭手 · 弓箭
+PASS: Archer start updates the single profession/weapon display
+V24 DESKTOP KEY: 1
+PASS: Physical battle 1 cannot switch locked bow
+V24 DESKTOP CLICK: (641.3334, 665.3334)
+PASS: Physical slot click shoots the selected bow for free without mouse weapon selection
+V24 DESKTOP CLICK: (1144.0, 86.66667)
+PASS: Physical HUD pause consumes click without an extra attack
+V24 DESKTOP KEY: Space
+PASS: Physical Space Continue does not attack or roll
+V24 DESKTOP CLICK: (1145.333, 44.0)
+PASS: Physical attribute click opens paused stats without attack
+V24 DESKTOP KEY: Tab
+PASS: Physical Tab returns without stale attack input
+PASS: Actual 960-wide window uses vertical cards for three queued upgrades
+V24 DESKTOP CLICK: (638.6667, 281.3333)
+PASS: Physical mouse option 1 applies damage once without attack
+V24 DESKTOP KEY: 2
+PASS: Physical key 2 applies speed once without weapon switch
+V24 DESKTOP CLICK: (638.6667, 498.6667)
+PASS: Physical mouse option 3 applies health and resumes without attack
+V24 DESKTOP CLICK: (638.6667, 502.6667)
+PASS: Physical result restart loads a clean default selection
+V24 DESKTOP CLICK: (638.6667, 333.3333)
+PASS: Physical mouse lancer selection and Enter start 150 HP, 180 speed and locked spear
+V24 DESKTOP KEY: 3
+PASS: Physical battle 3 cannot switch locked spear
+V24 DESKTOP CLICK: (638.6667, 513.3334)
+PASS: Physical pause-menu restart resets profession and upgrades
+PASS: Physical default Enter initializes swordsman without stale input
+V24 DESKTOP KEY: Space
+PASS: Physical Space rolls once for 30 stamina with locked sword
+V24 DESKTOP RESULT: 20 checks, 0 failures, phase=17/17

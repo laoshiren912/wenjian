@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 signal start_requested
+signal profession_requested(index: int)
 signal restart_requested
 signal stats_requested
 signal pause_requested
@@ -24,8 +25,9 @@ var hurt_flash: ColorRect
 var notice: Label
 var notice_time: float = 0.0
 var combat_panels: Array[Control] = []
-var weapon_slots: Array[PanelContainer] = []
-var weapon_labels: Array[Label] = []
+var profession_buttons: Array[Button] = []
+var profession_layout: BoxContainer
+var start_button: Button
 var modal_panel: PanelContainer
 @onready var level_ui = $LevelUpUI
 
@@ -104,24 +106,11 @@ func _ready() -> void:
 	var equipment_box := PrototypeUI.column(4)
 	equipment_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	equipment.add_child(equipment_box)
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 6)
-	slots.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	equipment_box.add_child(slots)
-	for index in range(SurvivorWeapon.DATA.size()):
-		var slot := _combat_panel()
-		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		slots.add_child(slot)
-		weapon_slots.append(slot)
-		var label := PrototypeUI.label("%d  %s" % [index + 1, SurvivorWeapon.DATA[index].name], 18)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		slot.add_child(label)
-		weapon_labels.append(label)
 	var detail_row := HBoxContainer.new()
 	detail_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_row.add_theme_constant_override("separation", 12)
 	equipment_box.add_child(detail_row)
-	weapon_text = PrototypeUI.label("1  剑", 15, Color("e5cd95"))
+	weapon_text = PrototypeUI.label("剑士 · 剑", 18, Color("e5cd95"))
 	detail_row.add_child(weapon_text)
 	weapon_detail = PrototypeUI.label("", 15, Color("b4d1d4"))
 	detail_row.add_child(weapon_detail)
@@ -149,6 +138,7 @@ func _ready() -> void:
 	overlay.add_child(overlay_center)
 	move_child(level_ui, get_child_count() - 1)
 	root.resized.connect(_resize_modal)
+	get_window().size_changed.connect(_resize_modal)
 
 func _combat_panel() -> PanelContainer:
 	var panel := PrototypeUI.panel()
@@ -163,7 +153,13 @@ func _combat_panel() -> PanelContainer:
 
 func _resize_modal() -> void:
 	if is_instance_valid(modal_panel):
-		modal_panel.custom_minimum_size.x = minf(760, root.size.x - 48)
+		var choosing: bool = is_instance_valid(profession_layout)
+		var narrow: bool = minf(root.size.x, get_window().size.x) < 1100
+		modal_panel.custom_minimum_size.x = minf(1000 if choosing and not narrow else 760, root.size.x - 48)
+		if choosing:
+			profession_layout.vertical = narrow
+			for button in profession_buttons:
+				button.custom_minimum_size = Vector2(0, 90 if narrow else 150)
 
 func _modal_label(text: String, size: int = 18, color: Color = Color("dce8e8")) -> Label:
 	var label := PrototypeUI.label(text, size, color)
@@ -198,15 +194,7 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	xp_text.text = "Lv.%d    经验  %d / %d" % [player.level, player.experience, player.next_level_xp]
 	xp_bar.max_value = player.next_level_xp
 	xp_bar.value = player.experience
-	weapon_text.text = "%d  %s" % [player.weapon.selected + 1, SurvivorWeapon.DATA[player.weapon.selected].name]
-	for index in range(weapon_slots.size()):
-		var selected: bool = index == player.weapon.selected
-		# Reuse the existing slot style; updating selection never changes input or focus.
-		var style := weapon_slots[index].get_theme_stylebox("panel") as StyleBoxFlat
-		style.bg_color = Color("2b5149") if selected else Color("101f28")
-		style.border_color = Color("9cebd7") if selected else Color("38525b")
-		style.set_border_width_all(2 if selected else 1)
-		weapon_labels[index].modulate = Color("fff0bd") if selected else Color("b4c6ca")
+	weapon_text.text = "%s · %s" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, SurvivorWeapon.DATA[player.weapon.selected].name]
 	var weapon_data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	weapon_detail.text = "%s · 每目标伤害 %.0f" % [weapon_data.role, float(weapon_data.damage) * player.damage_multiplier]
 	timer_text.text = "%02d:%02d / %02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60, int(duration) / 60, int(duration) % 60]
@@ -227,6 +215,9 @@ func flash_damage() -> void:
 	hurt_flash.color.a = 0.18
 
 func _screen(title: String, subtitle: String) -> VBoxContainer:
+	profession_buttons.clear()
+	profession_layout = null
+	start_button = null
 	for child in overlay_center.get_children():
 		overlay_center.remove_child(child)
 		child.queue_free()
@@ -241,28 +232,52 @@ func _screen(title: String, subtitle: String) -> VBoxContainer:
 	return box
 
 func show_start() -> void:
-	var box := _screen("边境试炼", "2D 俯视角动作 RPG · 核心可玩性原型")
-	box.add_child(_modal_label("在有限的遗迹地图中生存 3 分钟。击败敌人、贴近拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\n数字键 1 / 2 / 3 切换剑、长矛、弓箭 · Tab 属性 · Esc 暂停\n\n剑：高伤单体，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可穿刺范围内多只怪物。\n弓箭：远程单体，箭矢碰到怪物或墙体后消失。\n普攻免费；翻滚耗 %.0f 体力，不能攻击、无额外无敌帧。\n红弧：攻击预警；金色圆形：受击后反击；红色菱形：主动追击。\n蓝色晶体：一个身位内吸附；新刷出的怪物逐渐增血。" % player.roll_stamina_cost, 18))
-	var button := PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 54)
-	box.add_child(button)
-	button.grab_focus()
+	var box := _screen("边境试炼 · 选择职业", "生存 3 分钟 · 点击或按 1 / 2 / 3 选择 · 本局武器固定")
+	profession_layout = BoxContainer.new()
+	profession_layout.add_theme_constant_override("separation", 10)
+	box.add_child(profession_layout)
+	for index in range(SurvivorPlayer.PROFESSIONS.size()):
+		var data: Dictionary = SurvivorPlayer.PROFESSIONS[index]
+		var weapon: Dictionary = SurvivorWeapon.DATA[int(data.weapon)]
+		var text := "%d  %s · %s\n%s\n生命 %.0f · 移速 %.0f" % [index + 1, data.name, weapon.name, weapon.role, data.health, data.speed]
+		var button := PrototypeUI.button(text, func(): profession_requested.emit(index), 150)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 18)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		profession_layout.add_child(button)
+		profession_buttons.append(button)
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 属性 · Esc 暂停 · 普攻免费，翻滚耗 %.0f 体力且无额外无敌帧\n击败怪物后贴近蓝色晶体升级，升级时按 1 / 2 / 3 选强化。" % player.roll_stamina_cost, 16))
+	start_button = PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 48)
+	box.add_child(start_button)
+	select_profession(0)
+	_resize_modal()
+	start_button.grab_focus()
+
+func select_profession(index: int) -> void:
+	for other in range(profession_buttons.size()):
+		var button := profession_buttons[other]
+		var selected: bool = other == index
+		var style := button.get_theme_stylebox("normal") as StyleBoxFlat
+		style.bg_color = Color("2b5149") if selected else Color("243b43")
+		style.border_color = Color("9cebd7") if selected else Color("38525b")
+		button.add_theme_color_override("font_color", Color("fff0bd") if selected else Color("e5efeb"))
 
 func hide_screen() -> void:
 	overlay.hide()
 
 func show_pause() -> void:
 	var box := _screen("已暂停", "战斗与存活计时已暂停。")
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击\n1 / 2 / 3 切换剑、长矛、弓箭 · Space 翻滚\nTab 查看属性 · Esc 继续战斗\n\n红弧是攻击预警；金色圆形受击后反击，红色菱形主动追击。\n贴近蓝色晶体拾取经验，升级时选择一项强化。", 18))
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 查看属性 · Esc 继续战斗 · 本局武器固定\n\n红弧是攻击预警；金色圆形受击后反击，红色菱形主动追击。\n贴近蓝色晶体拾取经验，升级时点击或按 1 / 2 / 3 选择强化。", 18))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
 	button.grab_focus()
 
 func show_stats() -> void:
-	var box := _screen("角色属性  /  Lv.%d" % player.level, "查看期间暂停战斗 · 数值包含当前升级效果")
+	var box := _screen("%s · 角色属性 / Lv.%d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, player.level], "查看期间暂停战斗 · 数值包含当前升级效果 · 本局武器固定")
 	box.add_child(_modal_label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（消耗后延迟 0.42 秒）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 18))
-	for data in SurvivorWeapon.DATA:
-		box.add_child(_modal_label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
+	var data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
+	box.add_child(_modal_label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
 	box.add_child(_modal_label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间不能攻击，无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 	box.add_child(button)
@@ -270,7 +285,7 @@ func show_stats() -> void:
 
 func show_result(won: bool, elapsed: float, kills: int) -> void:
 	var box := _screen("试炼完成" if won else "试炼结束", "已生存 3 分钟！" if won else "生命耗尽。调整距离，留意攻击预警，再试一次。")
-	box.add_child(_modal_label("存活时间  %02d:%02d\n击败敌人  %d\n最终等级  %d\n累计经验  %d" % [int(elapsed) / 60, int(elapsed) % 60, kills, player.level, player.total_experience], 24))
+	box.add_child(_modal_label("本局职业  %s\n存活时间  %02d:%02d\n击败敌人  %d\n最终等级  %d\n累计经验  %d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, int(elapsed) / 60, int(elapsed) % 60, kills, player.level, player.total_experience], 24))
 	var button := PrototypeUI.button("重新开始  [Enter / R]", func(): restart_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()
