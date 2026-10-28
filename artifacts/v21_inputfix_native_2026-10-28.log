@@ -1,0 +1,99 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+PASS: Start screen pauses the world
+PASS: Start button enters playable state
+PASS: WASD movement updates the physical player
+PASS: Diagonal speed is normalized
+PASS: Boundary collision stops movement
+NATIVE AIM REQUEST: sequence=1 viewport=(840.0, 360.0)
+NATIVE AIM READY: sequence=1 actual=(840.0, 360.0)
+PASS: Mouse position drives aim
+PASS: Sword deals 52 damage to the nearest target
+PASS: Sword hits only one enemy, even with two in its cone
+PASS: Sword does not hit behind player
+PASS: Sword normal attack does not spend stamina
+PASS: Cooldown prevents extra attacks
+PASS: Key 2 selects longer spear with lower 32 damage per target
+PASS: Spear damages multiple enemies in its cone
+PASS: Spear respects cone edges without spending stamina
+PASS: Key 3 selects bow as the third weapon
+PASS: Bow normal shot does not spend stamina
+PASS: Bow launches a traveling arrow instead of instant melee damage
+PASS: Bow respects its shared attack cooldown
+PASS: Arrow flight pauses with combat
+PASS: Arrow deals 21 damage even after switching back to sword
+PASS: Arrow impact triggers passive retaliation and actual damage feedback
+PASS: Arrow hits only the first enemy and is removed on impact
+PASS: HUD displays bow name and ranged role
+PASS: Zero stamina still allows a normal bow attack
+PASS: Zero-stamina attack launches a real arrow
+PASS: Stamina recovers after the recovery delay
+PASS: Reserved stamina API still deducts resources and starts the recovery delay
+PASS: Reserved stamina does not recover before its delay ends
+PASS: Reserved stamina recovery resumes after the delay
+PASS: Reserved API still rejects insufficient stamina without a deduction
+PASS: Reserved stamina still recovers at the original rate and clamps to its original cap
+PASS: Existing stamina HUD remains implemented and identifies the reserved resource
+PASS: Weapon 1 holds normal attack at zero stamina without deducting or resetting recovery
+PASS: Weapon 1 still enforces its original interval under held input
+PASS: Switching from weapon 1 cannot bypass an active cooldown
+PASS: Weapon 1 continuous attacks do not interrupt reserved stamina recovery
+FREE ATTACK: weapon=1, attack_ticks=[530, 559, 588], recovered_stamina=76.00
+PASS: Weapon 2 holds normal attack at zero stamina without deducting or resetting recovery
+PASS: Weapon 2 still enforces its original interval under held input
+PASS: Switching from weapon 2 cannot bypass an active cooldown
+PASS: Weapon 2 continuous attacks do not interrupt reserved stamina recovery
+FREE ATTACK: weapon=2, attack_ticks=[667, 714], recovered_stamina=76.00
+PASS: Weapon 3 holds normal attack at zero stamina without deducting or resetting recovery
+PASS: Weapon 3 still enforces its original interval under held input
+PASS: Switching from weapon 3 cannot bypass an active cooldown
+PASS: Weapon 3 continuous attacks do not interrupt reserved stamina recovery
+FREE ATTACK: weapon=3, attack_ticks=[804, 824, 844, 864], recovered_stamina=76.00
+NATIVE AIM REQUEST: sequence=2 viewport=(840.0, 288.0)
+NATIVE AIM READY: sequence=2 actual=(840.0, 288.0)
+PASS: Melee cannot hit through a wall
+PASS: Arrow collides with a wall without damaging the enemy behind it
+PASS: Bow can fire away from the player toward another aim direction
+PASS: Arrow travels in the supplied aim direction
+PASS: Bow retains the original projectile range and speed
+PASS: An arrow expires when it reaches its maximum distance
+PASS: Enemy physically navigates around an obstructing pillar
+PASS: Passive enemy does not initiate combat
+PASS: Hostile enemy detects and pursues player
+PASS: Passive enemy retaliates after being hit
+PASS: Enemy windup resolves into player damage
+PASS: Player invulnerability prevents repeated damage
+PASS: Enemy deaths drop pickups that grant experience
+PASS: XP threshold opens three-choice level UI and pauses combat
+PASS: Survival timer stops while choosing upgrades
+PASS: Damage choice applies and resumes combat
+PASS: Speed choice works through key 2
+PASS: Health choice raises maximum and heals
+PASS: Upgrade key 3 does not change the weapon while combat is paused
+NATIVE AIM REQUEST: sequence=3 viewport=(839.8314, 359.7937)
+NATIVE AIM READY: sequence=3 actual=(840.0, 360.0)
+PASS: Damage upgrade affects real sword hits
+PASS: Speed upgrade shortens real attack cooldown
+PASS: Speed upgrade shortens real bow cooldown
+PASS: Damage upgrade affects actual arrow collision damage
+PASS: Tab opens attributes and pauses combat
+PASS: Tab closes attributes and resumes combat
+PASS: Escape opens pause menu
+PASS: Escape resumes combat
+PASS: All walkable cells are reachable, map seed 1
+PASS: All walkable cells are reachable, map seed 17
+PASS: All walkable cells are reachable, map seed 2026
+SOAK: 0 seconds, 1 enemies
+SOAK: 30 seconds, 8 enemies
+SOAK: 60 seconds, 15 enemies
+SOAK: 90 seconds, 23 enemies
+SOAK: 120 seconds, 28 enemies
+SOAK: 150 seconds, 28 enemies
+SOAK: 180 seconds, 28 enemies
+PASS: Full 180-second session reaches completion without blocking
+PASS: Enemy population stays bounded during full session
+PASS: Result restart reloads a clean new session
+PASS: Zero health opens death result and freezes combat
+PASS: R after death restarts with restored player
+RESULT: 79 checks, 0 failures

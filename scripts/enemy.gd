@@ -25,6 +25,7 @@ var path_index: int = 0
 var repath: float = 0.0
 var wander_target: Vector2
 var wander_timer: float = 2.0
+@onready var visual: ActorVisual = $VisualRoot
 
 func _ready() -> void:
 	player = get_tree().get_first_node_in_group("player")
@@ -38,6 +39,8 @@ func _ready() -> void:
 	wander_target = global_position
 	wander_timer = world.random.randf_range(1.0, 3.0)
 	repath = world.random.randf_range(0.0, 0.4)
+	visual.appearance = 1 if kind == Kind.HOSTILE else 2
+	visual.update_pose(Vector2.ZERO, Vector2.DOWN, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
 
 func _physics_process(delta: float) -> void:
 	if dead or not is_instance_valid(player) or player.dead:
@@ -85,6 +88,8 @@ func _physics_process(delta: float) -> void:
 	velocity = movement * speed + knockback + separation.limit_length(45.0)
 	knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
 	move_and_slide()
+	var look: Vector2 = attack_direction if windup > 0.0 else get_real_velocity()
+	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
 	queue_redraw()
 
 func _follow_path(target: Vector2) -> Vector2:
@@ -107,6 +112,7 @@ func take_damage(amount: float, push: Vector2) -> void:
 		return
 	aggro = true
 	flash = 0.14
+	visual.play_hurt()
 	var actual_damage: float = minf(health, amount)
 	health -= amount
 	damaged.emit(global_position, actual_damage)
@@ -117,6 +123,7 @@ func take_damage(amount: float, push: Vector2) -> void:
 	if health <= 0.0:
 		dead = true
 		set_deferred("collision_layer", 0)
+		visual.detach_and_die(get_parent())
 		killed.emit(global_position, experience_value)
 		queue_free()
 	queue_redraw()
@@ -125,13 +132,6 @@ func _draw() -> void:
 	var color := Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76")
 	if flash > 0.0:
 		color = Color.WHITE
-	draw_circle(Vector2(0, 5), 17.0, Color(0.0, 0.0, 0.0, 0.22))
-	if kind == Kind.HOSTILE:
-		draw_colored_polygon(PackedVector2Array([Vector2(0, -18), Vector2(17, 0), Vector2(0, 18), Vector2(-17, 0)]), color)
-	else:
-		draw_circle(Vector2.ZERO, 15.0, color)
-	draw_circle(Vector2(-5, -3), 2.0, Color("263038"))
-	draw_circle(Vector2(5, -3), 2.0, Color("263038"))
 	if aggro:
 		draw_line(Vector2(0, -30), Vector2(0, -24), Color("ffab89"), 2.0)
 		draw_circle(Vector2(0, -21), 1.5, Color("ffab89"))

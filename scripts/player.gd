@@ -26,8 +26,20 @@ var aim_direction: Vector2 = Vector2.RIGHT
 var dead: bool = false
 var dry_attack_flash: float = 0.0
 var _attack_held: bool = false
+var _attack_pending: bool = false
 @onready var weapon: SurvivorWeapon = $Weapon
 @onready var camera: Camera2D = $Camera2D
+@onready var visual: ActorVisual = $VisualRoot
+
+func _ready() -> void:
+	weapon.attack_started.connect(_on_attack_started)
+	weapon.selection_changed.connect(_on_weapon_selected)
+
+func _on_attack_started(index: int, direction: Vector2) -> void:
+	visual.play_attack(index, direction, weapon.swing_duration)
+
+func _on_weapon_selected(_index: int) -> void:
+	visual.cancel_attack()
 
 func _physics_process(delta: float) -> void:
 	if dead:
@@ -44,8 +56,18 @@ func _physics_process(delta: float) -> void:
 	var aim: Vector2 = get_global_mouse_position() - global_position
 	if aim.length_squared() > 1.0:
 		aim_direction = aim.normalized()
-	if _attack_held and Input.is_action_pressed("attack"):
+	var color := Color("79e2d0")
+	if invulnerability > 0.0:
+		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
+	# Turn the body toward walking input; mouse aim only steers the weapon.
+	# Keep the last body direction at rest, including while pushed or aiming elsewhere.
+	var body_look: Vector2 = movement if not movement.is_zero_approx() else visual.facing
+	visual.update_pose(get_real_velocity(), body_look, color)
+	# Preserve a GUI-approved short click even if it was released between physics ticks.
+	# Consume it once; a press rejected by cooldown is never queued for a later attack.
+	if _attack_pending or (_attack_held and Input.is_action_pressed("attack")):
 		weapon.attack(aim_direction)
+	_attack_pending = false
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -57,11 +79,13 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		# A modal may swallow the release while the player is paused.
 		_attack_held = false
+		_attack_pending = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Only presses that survive GUI handling may start a world attack gesture.
 	if event.is_action_pressed("attack"):
 		_attack_held = true
+		_attack_pending = true
 		get_viewport().set_input_as_handled()
 	for index in range(SurvivorWeapon.DATA.size()):
 		if event.is_action_pressed("weapon_%d" % (index + 1)):
@@ -82,6 +106,7 @@ func take_damage(amount: float, direction: Vector2) -> bool:
 	health = maxf(0.0, health - amount)
 	invulnerability = 0.7
 	knockback = direction * 180.0
+	visual.play_hurt()
 	hurt.emit()
 	damage_received.emit(actual_damage)
 	if health <= 0.0:
@@ -113,14 +138,5 @@ func apply_upgrade(index: int) -> void:
 			health = minf(max_health, health + 40.0)
 
 func _draw() -> void:
-	draw_circle(Vector2(0, 5), 17.0, Color(0.0, 0.0, 0.0, 0.25))
-	var color := Color("79e2d0")
-	if invulnerability > 0.0:
-		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
-	draw_circle(Vector2.ZERO, 14.0, color)
-	draw_arc(Vector2.ZERO, 18.0, 0, TAU, 32, Color("2a706e"), 2.0, true)
-	var tip: Vector2 = aim_direction * 21.0
-	var side: Vector2 = aim_direction.orthogonal() * 5.0
-	draw_colored_polygon(PackedVector2Array([tip, aim_direction * 12.0 + side, aim_direction * 12.0 - side]), Color("f2faf2"))
 	if dry_attack_flash > 0.0:
 		draw_arc(Vector2.ZERO, 24.0, 0, TAU, 24, Color("efb362"), 2.5, true)

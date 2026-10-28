@@ -1,0 +1,21 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+DESKTOP TARGET: weapon=1 distance=70 HP=180.0
+DESKTOP READY: physical 1/2/3 then aim at and click the target to the right. Normal stats; enemy AI frozen only for input isolation.
+DESKTOP KEY RAW: logical=49 physical=4194313 text=1
+DESKTOP TARGET: weapon=1 distance=70 HP=212.1
+DESKTOP PHYSICAL KEY: 1
+DESKTOP LEFT: viewport=(710.0, 360.0) world=(1350.0, 960.0) aim=(1.0, 0.0) stamina=100.0
+DESKTOP HIT: weapon=1 damage=52.0 expected=52.0 stamina=100.0 aim=(1.0, 0.0) result=PASS
+DESKTOP KEY RAW: logical=50 physical=4194313 text=2
+DESKTOP TARGET: weapon=2 distance=135 HP=225.6
+DESKTOP PHYSICAL KEY: 2
+DESKTOP LEFT: viewport=(775.0, 360.0) world=(1415.0, 960.0) aim=(1.0, 0.0) stamina=100.0
+DESKTOP HIT: weapon=2 damage=32.0 expected=32.0 stamina=100.0 aim=(1.0, 0.0) result=PASS
+DESKTOP KEY RAW: logical=51 physical=4194313 text=3
+DESKTOP TARGET: weapon=3 distance=200 HP=241.4
+DESKTOP PHYSICAL KEY: 3
+DESKTOP LEFT: viewport=(840.0, 360.0) world=(1480.0, 960.0) aim=(1.0, 0.0) stamina=100.0
+DESKTOP HIT: weapon=3 damage=21.0 expected=21.0 stamina=100.0 aim=(1.0, 0.0) result=PASS
+DESKTOP RESULT: 3/3 weapons verified, 0 failures, 3 physical left presses

@@ -1,0 +1,5 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+CLICK TIMING: same-tick press+release attacks=0; expected for a registered single click=1
+CLICK TIMING: two-tick held press attacks=1; expected=1; stamina=100.0
+CLICK TIMING RESULT: diagnostic only; native click duration was not measured
