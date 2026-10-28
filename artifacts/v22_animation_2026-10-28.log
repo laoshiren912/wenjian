@@ -1,0 +1,61 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Player animation is a separate non-physical child; collider radius stays 14
+PASS: Resting body keeps its direction while the mouse independently aims (1.0, 0.0)
+PASS: Resting body keeps its direction while the mouse independently aims (0.0, 1.0)
+PASS: Resting body keeps its direction while the mouse independently aims (-1.0, 0.0)
+PASS: Resting body keeps its direction while the mouse independently aims (0.0, -1.0)
+PASS: Resting body keeps its direction while the mouse independently aims (1.0, 1.0)
+PASS: Resting body keeps its direction while the mouse independently aims (-1.0, 1.0)
+PASS: Resting body keeps its direction while the mouse independently aims (-1.0, -1.0)
+PASS: Resting body keeps its direction while the mouse independently aims (1.0, -1.0)
+PASS: Walking turns the body toward (1.0, 0.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (1.0, 0.0)
+PASS: Walking turns the body toward (0.0, 1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (0.0, 1.0)
+PASS: Walking turns the body toward (-1.0, 0.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (-1.0, 0.0)
+PASS: Walking turns the body toward (0.0, -1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (0.0, -1.0)
+PASS: Walking turns the body toward (1.0, 1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (1.0, 1.0)
+PASS: Walking turns the body toward (-1.0, 1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (-1.0, 1.0)
+PASS: Walking turns the body toward (-1.0, -1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (-1.0, -1.0)
+PASS: Walking turns the body toward (1.0, -1.0) despite opposite mouse aim
+PASS: Stopping clears gait and keeps the last walking direction for (1.0, -1.0)
+PASS: Walking into a wall cannot animate sliding in place
+PASS: Weapon 1 starts its matching pose on the accepted attack
+PASS: Weapon 1 deals damage immediately, without an animation windup
+PASS: Weapon 1 poses never move the physical actor or collider
+PASS: Weapon 1 cannot bypass cooldown through animation
+PASS: Switching from weapon 1 clears its pose but preserves cooldown
+PASS: Weapon 2 starts its matching pose on the accepted attack
+PASS: Weapon 2 deals damage immediately, without an animation windup
+PASS: Weapon 2 poses never move the physical actor or collider
+PASS: Weapon 2 cannot bypass cooldown through animation
+PASS: Switching from weapon 2 clears its pose but preserves cooldown
+PASS: Weapon 3 starts its matching pose on the accepted attack
+PASS: Bow spawns the arrow immediately instead of waiting for a visual callback
+PASS: Weapon 3 poses never move the physical actor or collider
+PASS: Weapon 3 cannot bypass cooldown through animation
+PASS: Switching from weapon 3 clears its pose but preserves cooldown
+PASS: Fast attack recovery is capped by the upgraded cooldown
+PASS: A new fast attack restarts the pose without delaying or doubling hits
+WALK FIXTURE: motion=(-104.9927, 1.420898) facing=(-1.0, 0.0) phase=2.428 distance=149.07
+PASS: Hostile pursuit drives real movement and faces its current path segment
+PASS: Passive wandering has a distinct body and gait without triggering aggression
+PASS: Enemy hit reaction begins with the existing damage and retaliation
+PASS: Player hit pose preserves actual damage and invulnerability
+PASS: Death still queues the enemy removal and counts exactly once immediately
+PASS: Only the visual detaches at the original world position
+PASS: Death residual has no enemy membership or colliders
+PASS: Enemy and XP lifecycle are independent of the fading residual
+PASS: Death fade freezes during combat pause
+PASS: Arrow passes the still-visible residual and damages the living enemy behind it
+PASS: Death residual cleans itself after 0.22 active seconds
+PASS: Body and weapon poses pause together
+PASS: Body and weapon return to rest after resume
+PASS: Restart removes old residuals and creates a resting player
+V21 ANIMATION RESULT: 57 checks, 0 failures

@@ -1,0 +1,62 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: XP at 160 does not attract outside the strict 160 radius
+PASS: XP at 161 does not attract outside the strict 160 radius
+PASS: XP just inside the radius advances 7 units at 420 per second
+PASS: Collection distance stays strictly below 23
+PASS: XP is credited immediately at collection
+PASS: The collected marker rejects a second collection before deletion
+PASS: Collected orb is removed
+PASS: A dead player cannot collect nearby XP
+PASS: Real pause freezes attraction and accounting
+PASS: Actual physics resumes attraction and collects the exact value
+PASS: An actual physics wall blocks attraction within 160
+PASS: XP can attract after the player moves around the wall
+PASS: Batch collection immediately credits each orb's exact value
+PASS: Batch XP shares one matching world and HUD total
+PASS: The first pickup is displayed immediately
+PASS: Pickups inside 0.12 seconds update the same popup
+PASS: Adding XP never restarts the first pickup's window or visual lifetime
+PASS: A pickup beyond the first 0.12 seconds starts a fresh group
+PASS: Presentation grouping does not delay or alter actual XP
+PASS: pause freezes the current floating label
+PASS: pause closes the grouping window before combat resumes
+PASS: stats freezes the current floating label
+PASS: stats closes the grouping window before combat resumes
+PASS: Large XP immediately grants all three levels without waiting for display
+PASS: Three earned levels open the existing paused choice queue
+PASS: Survival time is frozen for queued choices
+PASS: First choice applies damage exactly once and keeps the queue paused
+PASS: Second choice applies speed exactly once
+PASS: Final choice applies health once and restores combat with confirmation
+PASS: A stale choice after the queue finishes cannot apply twice
+PASS: Upgrade pause closes the old XP group before new collection
+PASS: Result closes XP batch, won=false
+PASS: Restart clears all presentation state, won=false
+PASS: Result closes XP batch, won=true
+PASS: Restart clears all presentation state, won=true
+PASS: Damage feedback remains tied to actual enemy and player health
+PASS: Enemy damage stays above its health bar
+PASS: Enemy damage stays above its health bar
+PASS: Repeated hits, player damage, and XP occupy distinct text rectangles
+PASS: Player damage has priority above enemy damage and XP
+PASS: Experience stays below the player
+PASS: Invulnerable damage does not create a false number
+PASS: All numbers and bursts expire and shake returns to zero
+PASS: Onscreen edge number keeps an 8 pixel margin during shake: [P: (8.0, 273.0), S: (31.0, 30.0)]
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Onscreen edge number keeps an 8 pixel margin during shake: [P: (1241.0, 273.0), S: (31.0, 30.0)]
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Onscreen edge number keeps an 8 pixel margin during shake: [P: (8.0, 642.6702), S: (31.0, 30.0)]
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Onscreen edge number keeps an 8 pixel margin during shake: [P: (1241.0, 642.6702), S: (31.0, 30.0)]
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Edge number is not hidden behind an existing HUD panel
+PASS: Offscreen enemy damage is not dragged into the viewport
+PASS: Dense feedback preserves every damage event despite four placement attempts
+PASS: Every floating label remains transparent to mouse input
+PASS: Dense labels clean up without orphan controls
+V22 RESULT: 59 checks, 0 failures

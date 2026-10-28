@@ -7,6 +7,12 @@ signal hurt
 signal damage_received(amount: float)
 signal experience_received(amount: int)
 
+@export_group("Roll")
+@export_range(1.0, 500.0, 1.0) var roll_distance: float = 150.0
+@export_range(0.05, 1.0, 0.01) var roll_duration: float = 0.34
+@export_range(0.0, 200.0, 1.0) var roll_stamina_cost: float = 30.0
+@export_range(0.0, 5.0, 0.01) var roll_cooldown: float = 0.65
+
 var max_health: float = 100.0
 var health: float = 100.0
 var max_stamina: float = 100.0
@@ -27,6 +33,10 @@ var dead: bool = false
 var dry_attack_flash: float = 0.0
 var _attack_held: bool = false
 var _attack_pending: bool = false
+var _roll_requested: bool = false
+var _roll_remaining: float = 0.0
+var _roll_cooldown: float = 0.0
+var _roll_direction: Vector2 = Vector2.DOWN
 @onready var weapon: SurvivorWeapon = $Weapon
 @onready var camera: Camera2D = $Camera2D
 @onready var visual: ActorVisual = $VisualRoot
@@ -41,6 +51,30 @@ func _on_attack_started(index: int, direction: Vector2) -> void:
 func _on_weapon_selected(_index: int) -> void:
 	visual.cancel_attack()
 
+func is_rolling() -> bool:
+	return _roll_remaining > 0.0
+
+func try_roll() -> bool:
+	if dead or get_tree().paused or is_rolling() or _roll_cooldown > 0.0:
+		return false
+	if not spend_stamina(roll_stamina_cost):
+		return false
+	var movement := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	_roll_direction = movement.normalized() if not movement.is_zero_approx() else visual.facing
+	_roll_remaining = maxf(0.001, roll_duration)
+	_roll_cooldown = roll_cooldown
+	_attack_pending = false
+	# Existing hits/arrows and shared cooldown survive; only the recovery drawing ends.
+	weapon.swing_time = 0.0
+	weapon.hide()
+	visual.play_roll(_roll_direction, _roll_remaining)
+	return true
+
+func _finish_roll() -> void:
+	_roll_remaining = 0.0
+	weapon.show()
+	visual.stop_roll()
+
 func _physics_process(delta: float) -> void:
 	if dead:
 		return
@@ -49,8 +83,18 @@ func _physics_process(delta: float) -> void:
 	dry_attack_flash = maxf(0.0, dry_attack_flash - delta)
 	if stamina_delay <= 0.0:
 		stamina = minf(max_stamina, stamina + stamina_regen * delta)
+	_roll_cooldown = maxf(0.0, _roll_cooldown - delta)
+	if _roll_requested:
+		_roll_requested = false
+		try_roll()
 	var movement := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	velocity = movement * speed + knockback
+	var rolling_this_frame: bool = is_rolling()
+	if rolling_this_frame:
+		# Scale the final partial tick so unobstructed rolls cover the configured distance.
+		var step: float = minf(delta, _roll_remaining)
+		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
+	else:
+		velocity = movement * speed + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
 	move_and_slide()
 	var aim: Vector2 = get_global_mouse_position() - global_position
@@ -62,12 +106,18 @@ func _physics_process(delta: float) -> void:
 	# Turn the body toward walking input; mouse aim only steers the weapon.
 	# Keep the last body direction at rest, including while pushed or aiming elsewhere.
 	var body_look: Vector2 = movement if not movement.is_zero_approx() else visual.facing
+	if rolling_this_frame:
+		body_look = _roll_direction
 	visual.update_pose(get_real_velocity(), body_look, color)
 	# Preserve a GUI-approved short click even if it was released between physics ticks.
 	# Consume it once; a press rejected by cooldown is never queued for a later attack.
-	if _attack_pending or (_attack_held and Input.is_action_pressed("attack")):
+	if not rolling_this_frame and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
 		weapon.attack(aim_direction)
 	_attack_pending = false
+	if rolling_this_frame:
+		_roll_remaining = maxf(0.0, _roll_remaining - delta)
+		if not is_rolling():
+			_finish_roll()
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
@@ -80,12 +130,16 @@ func _notification(what: int) -> void:
 		# A modal may swallow the release while the player is paused.
 		_attack_held = false
 		_attack_pending = false
+		_roll_requested = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Only presses that survive GUI handling may start a world attack gesture.
 	if event.is_action_pressed("attack"):
 		_attack_held = true
-		_attack_pending = true
+		_attack_pending = not is_rolling()
+		get_viewport().set_input_as_handled()
+	if event.is_action_pressed("roll"):
+		_roll_requested = true
 		get_viewport().set_input_as_handled()
 	for index in range(SurvivorWeapon.DATA.size()):
 		if event.is_action_pressed("weapon_%d" % (index + 1)):
@@ -111,6 +165,8 @@ func take_damage(amount: float, direction: Vector2) -> bool:
 	damage_received.emit(actual_damage)
 	if health <= 0.0:
 		dead = true
+		_roll_requested = false
+		_finish_roll()
 		died.emit()
 	queue_redraw()
 	return true

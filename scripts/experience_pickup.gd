@@ -1,5 +1,9 @@
 extends Node2D
 
+const ATTRACTION_RADIUS: float = 28.0
+const ATTRACTION_SPEED: float = 420.0
+const COLLECTION_DISTANCE: float = 23.0
+
 var value: int = 8
 var player: CharacterBody2D
 var age: float = 0.0
@@ -13,12 +17,12 @@ func _physics_process(delta: float) -> void:
 	if collected or not is_instance_valid(player) or player.dead:
 		return
 	var distance: float = global_position.distance_to(player.global_position)
-	if distance < 125.0:
+	if distance < ATTRACTION_RADIUS:
 		# Obstacles also block attraction; pickups stay reachable where enemies die.
 		var ray := PhysicsRayQueryParameters2D.create(global_position, player.global_position, 1)
 		if get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
-			global_position = global_position.move_toward(player.global_position, 310.0 * delta)
-	if global_position.distance_to(player.global_position) < 23.0:
+			global_position = global_position.move_toward(player.global_position, ATTRACTION_SPEED * delta)
+	if global_position.distance_to(player.global_position) < COLLECTION_DISTANCE:
 		collected = true
 		player.gain_experience(value)
 		queue_free()

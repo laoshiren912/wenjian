@@ -14,6 +14,9 @@ var attack_weapon: int = 0
 var attack_direction: Vector2 = Vector2.RIGHT
 var dying: bool = false
 var death_age: float = 0.0
+var roll_time: float = 0.0
+var roll_duration: float = 0.24
+var roll_direction: Vector2 = Vector2.DOWN
 const DEATH_DURATION: float = 0.22
 
 func update_pose(actual_motion: Vector2, look: Vector2, color: Color) -> void:
@@ -36,6 +39,19 @@ func play_attack(index: int, direction: Vector2, duration: float) -> void:
 
 func cancel_attack() -> void:
 	attack_time = 0.0
+	queue_redraw()
+
+func play_roll(direction: Vector2, duration: float) -> void:
+	cancel_attack()
+	roll_direction = direction
+	roll_duration = maxf(0.001, duration)
+	roll_time = roll_duration
+	queue_redraw()
+
+func stop_roll() -> void:
+	roll_time = 0.0
+	rotation = 0.0
+	scale = Vector2.ONE
 	queue_redraw()
 
 func play_hurt() -> void:
@@ -63,6 +79,14 @@ func _physics_process(delta: float) -> void:
 		if death_age >= DEATH_DURATION:
 			queue_free()
 	else:
+		if roll_time > 0.0:
+			roll_time = maxf(0.0, roll_time - delta)
+			var spin: float = signf(roll_direction.x) if roll_direction.x != 0.0 else signf(roll_direction.y)
+			rotation = (1.0 - roll_time / roll_duration) * TAU * spin
+			scale = Vector2(1.0, 0.75)
+		else:
+			rotation = 0.0
+			scale = Vector2.ONE
 		if motion.length_squared() >= 1.0:
 			var stride: float = 72.0 if appearance == 0 else 44.0
 			walk_phase = fmod(walk_phase + motion.length() * delta / stride * TAU, TAU)
@@ -71,7 +95,9 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var moving: bool = motion.length_squared() >= 1.0 and not dying
+	var moving: bool = motion.length_squared() >= 1.0 and not dying and roll_time <= 0.0
+	if roll_time > 0.0:
+		draw_arc(Vector2.ZERO, 24.0, -1.8, 1.8, 24, Color(0.55, 0.92, 0.86, 0.5), 2.0, true)
 	var step: float = sin(walk_phase) * 4.0 if moving else 0.0
 	var bob: float = absf(sin(walk_phase)) * 1.5 if moving else 0.0
 	var recoil: float = attack_time / attack_duration if attack_time > 0.0 else 0.0

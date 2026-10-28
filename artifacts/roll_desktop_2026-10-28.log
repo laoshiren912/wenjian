@@ -1,0 +1,26 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+ROLL DESKTOP READY: Space free roll, Space into fixture wall, A then Space back left, HUD pause then Space Continue
+ROLL DESKTOP KEY: Space
+PASS: Physical Space roll 1 spends 30 stamina once
+PASS: Physical roll adds no immunity or attack and hides recovery drawing
+ROLL DESKTOP START: number=1 origin=(1280.0, 960.0) direction=(1.0, 0.0) stamina=70.000
+PASS: Stationary physical Space follows right-facing body for 150 units
+ROLL DESKTOP END: number=1 displacement=(149.9994, 0.0) stamina=70.000
+ROLL DESKTOP KEY: Space
+PASS: Physical Space roll 2 spends 30 stamina once
+PASS: Physical roll adds no immunity or attack and hides recovery drawing
+ROLL DESKTOP START: number=2 origin=(1429.999, 960.0) direction=(1.0, 0.0) stamina=70.000
+PASS: Second physical roll is stopped by a thin physics wall
+ROLL DESKTOP END: number=2 displacement=(57.99744, 0.0) stamina=70.000
+ROLL DESKTOP KEY: A
+ROLL DESKTOP KEY: A
+ROLL DESKTOP KEY: Space
+PASS: Physical Space roll 3 spends 30 stamina once
+PASS: Physical roll adds no immunity or attack and hides recovery drawing
+ROLL DESKTOP START: number=3 origin=(1484.174, 960.0) direction=(-1.0, 0.0) stamina=70.000
+PASS: Physical A turns the body; stationary Space then rolls left
+PASS: Physical roll ends with restored body and weapon
+ROLL DESKTOP END: number=3 displacement=(-149.9994, 0.0) stamina=70.000
+ROLL DESKTOP RESULT: 10 checks, 0 failures; starts=3 ends=3 finished=false

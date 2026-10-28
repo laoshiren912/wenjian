@@ -35,6 +35,8 @@ func select_weapon(index: int) -> void:
 
 func attack(direction: Vector2) -> bool:
 	var player = get_parent()
+	if player.is_rolling():
+		return false
 	var data: Dictionary = DATA[selected]
 	# Normal attacks use cooldown only; keep stamina and its recovery for future actions.
 	if cooldown > 0.0:

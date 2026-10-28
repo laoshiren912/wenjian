@@ -32,6 +32,8 @@ func _ready() -> void:
 	player.level_gained.connect(_queue_level)
 	player.hurt.connect(hud.flash_damage)
 	feedback.camera = player.camera
+	for panel in hud.root.find_children("*", "PanelContainer", true, false):
+		feedback.hud_obstacles.append(panel)
 	player.damage_received.connect(_on_player_damaged)
 	player.experience_received.connect(_on_experience_received)
 	hud.player = player
@@ -50,7 +52,7 @@ func _ready() -> void:
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -135,8 +137,8 @@ func _on_player_damaged(amount: float) -> void:
 	feedback.show_damage(player.global_position, amount, true)
 
 func _on_experience_received(amount: int) -> void:
-	feedback.show_experience(player.global_position, amount)
-	hud.show_notice("+%d 经验" % amount)
+	var displayed_total: int = feedback.show_experience(player.global_position, amount)
+	hud.show_notice("+%d 经验" % displayed_total)
 
 func _queue_level() -> void:
 	pending_levels += 1

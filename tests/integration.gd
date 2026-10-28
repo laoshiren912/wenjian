@@ -210,7 +210,7 @@ func _run() -> void:
 	check(not game.player.spend_stamina(1000.0) and is_equal_approx(game.player.stamina, stamina_before) and game.player.dry_attack_flash > 0.0, "Reserved API still rejects insufficient stamina without a deduction")
 	await frames(240)
 	check(is_equal_approx(game.player.stamina, game.player.max_stamina) and is_equal_approx(game.player.max_stamina, 100.0) and is_equal_approx(game.player.stamina_regen, 26.0), "Reserved stamina still recovers at the original rate and clamps to its original cap")
-	check(game.hud.stamina_bar.visible and game.hud.stamina_text.text.contains("预留"), "Existing stamina HUD remains implemented and identifies the reserved resource")
+	check(game.hud.stamina_bar.visible and game.hud.stamina_text.text.contains("翻滚"), "Existing stamina HUD remains implemented and identifies its roll usage")
 	# Real held mouse input at zero stamina, with no fixture resets between attacks.
 	clear_enemies()
 	for index in range(SurvivorWeapon.DATA.size()):
@@ -306,8 +306,9 @@ func _run() -> void:
 	game.player.knockback = Vector2.ZERO
 	game.player.health = 100.0
 	# Actual kill signal -> deferred pickup -> attraction -> XP -> modal UI.
+	# Both drops start within the current one-body attraction radius.
 	for index in range(2):
-		var victim := enemy_at(Vector2(25 + index * 5, 0))
+		var victim := enemy_at(Vector2(24 + index * 2, 0))
 		victim.take_damage(10000.0, Vector2.ZERO)
 	await frames(15)
 	check(game.kills >= 2 and game.player.total_experience == 20, "Enemy deaths drop pickups that grant experience")

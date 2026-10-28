@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+PASS: Native render 01_roll_start
+PASS: Native roll detail 01_roll_start
+PASS: Native render 02_roll_middle
+PASS: Native roll detail 02_roll_middle
+PASS: Native render 03_roll_finished
+PASS: Native roll detail 03_roll_finished
+PASS: Native render 04_roll_attributes
+PASS: Visible help, attributes and pause controls remain within the viewport: 04_roll_attributes
+PASS: Native render 05_pause
+PASS: Visible help, attributes and pause controls remain within the viewport: 05_pause
+PASS: Native render 06_start_help
+PASS: Visible help, attributes and pause controls remain within the viewport: 06_start_help
+ROLL VISUAL RESULT: 12 checks, 0 failures; controlled native renders, not input tests

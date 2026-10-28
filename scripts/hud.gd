@@ -92,7 +92,7 @@ func _ready() -> void:
 	notice = PrototypeUI.label("", 22, Color("9ae7d5"))
 	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layout.add_child(notice)
-	var footer := PrototypeUI.label("WASD 移动   ·   鼠标瞄准 / 按住左键攻击   ·   Tab 属性   ·   Esc 暂停\n金色圆形：受击后反击    /    红色菱形：主动追击    /    蓝色晶体：靠近拾取经验", 16, Color("bad0ce"))
+	var footer := PrototypeUI.label("WASD 移动   ·   鼠标瞄准 / 按住左键攻击   ·   Space 翻滚   ·   Tab 属性   ·   Esc 暂停\n金色圆形：受击后反击    /    红色菱形：主动追击    /    蓝色晶体：靠近拾取经验", 16, Color("bad0ce"))
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	layout.add_child(footer)
 	hurt_flash = ColorRect.new()
@@ -131,7 +131,7 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	health_text.text = "生命  %.0f / %.0f" % [player.health, player.max_health]
 	health_bar.max_value = player.max_health
 	health_bar.value = player.health
-	stamina_text.text = "体力（预留）  %.0f / %.0f" % [player.stamina, player.max_stamina]
+	stamina_text.text = "体力（翻滚）  %.0f / %.0f" % [player.stamina, player.max_stamina]
 	stamina_bar.max_value = player.max_stamina
 	stamina_bar.value = player.stamina
 	xp_text.text = "Lv.%d    经验  %d / %d" % [player.level, player.experience, player.next_level_xp]
@@ -173,7 +173,7 @@ func _screen(title: String, subtitle: String) -> VBoxContainer:
 
 func show_start() -> void:
 	var box := _screen("边境试炼", "2D 俯视角动作 RPG · 核心可玩性原型")
-	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击\n数字键 1 / 2 / 3 切换剑、长矛、弓箭 · Tab 属性 · Esc 暂停\n\n剑：高伤害，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可以同时穿刺范围内多只怪物。\n弓箭：远程射击，箭矢命中一只怪物或墙体后消失。\n普通攻击不消耗体力；红色弧线是攻击预警。\n金色圆形平时中立，受到攻击后反击；新刷出的怪物逐渐增血。", 19))
+	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n数字键 1 / 2 / 3 切换剑、长矛、弓箭 · Tab 属性 · Esc 暂停\n\n剑：高伤害，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可以同时穿刺范围内多只怪物。\n弓箭：远程射击，箭矢命中一只怪物或墙体后消失。\n普攻免费；翻滚耗 %.0f 体力。红弧是攻击预警。\n金色圆形平时中立，受到攻击后反击；新刷出的怪物逐渐增血。" % player.roll_stamina_cost, 19))
 	var button := PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()
@@ -193,6 +193,7 @@ func show_stats() -> void:
 	box.add_child(PrototypeUI.label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（消耗后延迟 0.42 秒）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 19))
 	for data in SurvivorWeapon.DATA:
 		box.add_child(PrototypeUI.label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
+	box.add_child(PrototypeUI.label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间不能攻击，无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	button.grab_focus()

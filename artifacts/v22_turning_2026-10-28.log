@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Right walk faces right while mouse aims left
+PASS: Reversing direction turns immediately without waiting to stop
+PASS: Moving the mouse cannot turn a left-walking body backwards
+PASS: Idle keeps the last walking direction instead of snapping to the cursor
+PASS: Wall contact keeps the intended facing without walking in place
+PASS: Knockback does not turn the resting body into its push direction
+PASS: Weapon 1 aims independently of the turned body
+PASS: Weapon 1 still hits at the original damage without stamina cost
+PASS: Weapon 2 aims independently of the turned body
+PASS: Weapon 2 still hits at the original damage without stamina cost
+PASS: Weapon 3 aims independently of the turned body
+PASS: Weapon 3 still hits at the original damage without stamina cost
+TURN REGRESSION RESULT: 12 checks, 0 failures
