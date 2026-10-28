@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Render the actual UI for review. These are controlled layout fixtures, not playthroughs.
-const OUTPUT: String = "res://artifacts/layout_review_final_2026-10-27/"
+const OUTPUT: String = "res://artifacts/stamina_layout_2026-10-28/"
 var game: SurvivorGame
 var failures: int = 0
 var captures: int = 0
@@ -78,6 +78,12 @@ func _run() -> void:
 				print("OVERLAP: floating labels %d / %d" % [index, other])
 	await capture("02_feedback_1280")
 	clear_enemies()
+	game.player.weapon.select_weapon(2)
+	game.player.weapon.cooldown = 0.0
+	game.player.stamina = 100.0
+	game.player.weapon.attack(Vector2.RIGHT)
+	await frames(3)
+	await capture("02b_bow_arrow_1280")
 	game.toggle_pause()
 	await capture("03_pause_1280")
 	game.resume_run()

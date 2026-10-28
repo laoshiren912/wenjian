@@ -6,7 +6,7 @@ var game: SurvivorGame
 var recovering: bool = false
 var hits_received: int = 0
 var upgrades: int = 0
-var weapon_uses: Array[int] = [0, 0]
+var weapon_uses: Array[int] = [0, 0, 0]
 var previous_attack_count: int = 0
 var last_report: int = -1
 var mode: String = "combat"

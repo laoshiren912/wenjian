@@ -25,6 +25,8 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	draw_line(-direction * 20.0, Vector2.ZERO, Color("7967bf"), 5.0, true)
-	draw_circle(Vector2.ZERO, 6.0, Color("c4b4ff"))
-	draw_circle(direction * 2.0, 2.5, Color("ffffff"))
+	var side := direction.orthogonal()
+	draw_line(-direction * 22.0, Vector2.ZERO, Color("d5ad70"), 3.0, true)
+	draw_colored_polygon(PackedVector2Array([direction * 6.0, -direction * 4.0 + side * 5.0, -direction * 4.0 - side * 5.0]), Color("f3ead0"))
+	draw_line(-direction * 22.0 + side * 4.0, -direction * 16.0, Color("d7e6dc"), 2.0, true)
+	draw_line(-direction * 22.0 - side * 4.0, -direction * 16.0, Color("d7e6dc"), 2.0, true)

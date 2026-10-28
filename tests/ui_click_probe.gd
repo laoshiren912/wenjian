@@ -93,7 +93,7 @@ func _run() -> void:
 	game.player.weapon.select_weapon(0)
 	mouse(true, Vector2(600, 450))
 	await frames(35)
-	check(game.player.weapon.attack_count >= 2 and game.player.stamina < 100.0, "World press still supports hold-to-attack")
+	check(game.player.weapon.attack_count >= 2 and game.player.stamina == 100.0, "World press still supports hold-to-attack without stamina cost")
 	var attacks: int = game.player.weapon.attack_count
 	mouse(false, button("暂停").get_global_rect().get_center())
 	await frames(40)

@@ -80,7 +80,7 @@ func _ready() -> void:
 	equipment.add_child(equipment_box)
 	weapon_text = PrototypeUI.label("1  剑", 23, Color("e5cd95"))
 	equipment_box.add_child(weapon_text)
-	equipment_box.add_child(PrototypeUI.label("1 剑 · 单体    2 长矛 · 群体", 16))
+	equipment_box.add_child(PrototypeUI.label("1 剑 · 单体    2 长矛 · 群体\n3 弓箭 · 远程", 16))
 	weapon_detail = PrototypeUI.label("", 15, Color("b4d1d4"))
 	equipment_box.add_child(weapon_detail)
 	equipment_box.add_child(PrototypeUI.button("角色属性  [Tab]", func(): stats_requested.emit(), 36))
@@ -131,7 +131,7 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	health_text.text = "生命  %.0f / %.0f" % [player.health, player.max_health]
 	health_bar.max_value = player.max_health
 	health_bar.value = player.health
-	stamina_text.text = "体力  %.0f / %.0f" % [player.stamina, player.max_stamina]
+	stamina_text.text = "体力（预留）  %.0f / %.0f" % [player.stamina, player.max_stamina]
 	stamina_bar.max_value = player.max_stamina
 	stamina_bar.value = player.stamina
 	xp_text.text = "Lv.%d    经验  %d / %d" % [player.level, player.experience, player.next_level_xp]
@@ -173,7 +173,7 @@ func _screen(title: String, subtitle: String) -> VBoxContainer:
 
 func show_start() -> void:
 	var box := _screen("边境试炼", "2D 俯视角动作 RPG · 核心可玩性原型")
-	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击\n数字键 1 / 2 切换剑与长矛 · Tab 属性 · Esc 暂停\n\n剑：高伤害，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可以同时穿刺范围内多只怪物。\n体力耗尽时先停止攻击，等待恢复。红色弧线是攻击预警。\n金色圆形平时中立，受到攻击后反击；新刷出的怪物逐渐增血。", 19))
+	box.add_child(PrototypeUI.label("在有限的遗迹地图中生存 3 分钟。击败敌人、拾取晶体并升级。\n\nWASD 移动 · 鼠标瞄准 · 按住左键攻击\n数字键 1 / 2 / 3 切换剑、长矛、弓箭 · Tab 属性 · Esc 暂停\n\n剑：高伤害，只命中面前最近的一只怪物。\n长矛：较低单体伤害，可以同时穿刺范围内多只怪物。\n弓箭：远程射击，箭矢命中一只怪物或墙体后消失。\n普通攻击不消耗体力；红色弧线是攻击预警。\n金色圆形平时中立，受到攻击后反击；新刷出的怪物逐渐增血。", 19))
 	var button := PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()
@@ -190,7 +190,7 @@ func show_pause() -> void:
 
 func show_stats() -> void:
 	var box := _screen("角色属性  /  Lv.%d" % player.level, "查看期间暂停战斗 · 数值包含当前升级效果")
-	box.add_child(PrototypeUI.label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（停手 0.42 秒后）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 19))
+	box.add_child(PrototypeUI.label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（消耗后延迟 0.42 秒）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 19))
 	for data in SurvivorWeapon.DATA:
 		box.add_child(PrototypeUI.label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
@@ -198,7 +198,7 @@ func show_stats() -> void:
 	button.grab_focus()
 
 func show_result(won: bool, elapsed: float, kills: int) -> void:
-	var box := _screen("试炼完成" if won else "试炼结束", "已生存 3 分钟！" if won else "生命耗尽。调整距离，留意体力，再试一次。")
+	var box := _screen("试炼完成" if won else "试炼结束", "已生存 3 分钟！" if won else "生命耗尽。调整距离，留意攻击预警，再试一次。")
 	box.add_child(PrototypeUI.label("存活时间  %02d:%02d\n击败敌人  %d\n最终等级  %d\n累计经验  %d" % [int(elapsed) / 60, int(elapsed) % 60, kills, player.level, player.total_experience], 24))
 	var button := PrototypeUI.button("重新开始  [Enter / R]", func(): restart_requested.emit(), 54)
 	box.add_child(button)

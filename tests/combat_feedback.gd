@@ -108,7 +108,7 @@ func _run() -> void:
 	check(is_equal_approx(far.health, far.max_health) and near.health < near.max_health, "Sword chooses nearest valid enemy rather than scene insertion order")
 	game.player.weapon.select_weapon(1)
 	await frames()
-	check(game.hud.weapon_detail.text.contains("群体穿刺") and SurvivorWeapon.DATA.size() == 2, "HUD shows current weapon role and current upgraded damage")
+	check(game.hud.weapon_detail.text.contains("群体穿刺") and SurvivorWeapon.DATA.size() == 3, "HUD shows current weapon role and current upgraded damage")
 	print("COMBAT FEEDBACK RESULT: %d checks, %d failures" % [checks, failures])
 	if OS.get_cmdline_user_args().has("--visual"):
 		game.restart_run()

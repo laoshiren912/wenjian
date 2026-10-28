@@ -50,7 +50,7 @@ func _ready() -> void:
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "weapon_1": KEY_1, "weapon_2": KEY_2, "weapon_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
