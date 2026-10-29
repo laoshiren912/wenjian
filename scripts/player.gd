@@ -65,6 +65,9 @@ var dead: bool = false
 var dry_attack_flash: float = 0.0
 var _attack_held: bool = false
 var _attack_pending: bool = false
+var _click_target: Node2D = null
+var _target_marker: Node2D = null
+var _target_marker_remaining: float = 0.0
 var _roll_requested: bool = false
 var _roll_remaining: float = 0.0
 var _roll_cooldown: float = 0.0
@@ -103,9 +106,7 @@ func is_bow_recovering() -> bool:
 	return weapon.selected == 2 and _bow_shot_remaining > 0.0 and not is_rolling()
 
 func movement_multiplier() -> float:
-	if weapon.selected == 2:
-		return bow_shot_move_multiplier if _bow_shot_remaining > 0.0 else 1.0
-	return 0.8 if _attack_held and Input.is_action_pressed("attack") else 1.0
+	return 0.0 if weapon.swing_time > 0.0 else 1.0
 
 func _on_weapon_selected(_index: int) -> void:
 	visual.cancel_attack()
@@ -123,8 +124,12 @@ func try_roll() -> bool:
 	_roll_remaining = maxf(0.001, roll_duration)
 	_roll_cooldown = roll_cooldown
 	_attack_pending = false
+	_click_target = null
+	_target_marker = null
+	_target_marker_remaining = 0.0
 	# Existing hits/arrows and shared cooldown survive; only the recovery drawing ends.
 	weapon.swing_time = 0.0
+	_bow_shot_remaining = 0.0
 	weapon.hide()
 	visual.play_roll(_roll_direction, _roll_remaining)
 	return true
@@ -140,6 +145,9 @@ func _physics_process(delta: float) -> void:
 	invulnerability = maxf(0.0, invulnerability - delta)
 	stamina_delay = maxf(0.0, stamina_delay - delta)
 	dry_attack_flash = maxf(0.0, dry_attack_flash - delta)
+	_target_marker_remaining = maxf(0.0, _target_marker_remaining - delta)
+	if _target_marker_remaining <= 0.0 or not is_instance_valid(_target_marker):
+		_target_marker = null
 	_bow_shot_remaining = maxf(0.0, _bow_shot_remaining - delta)
 	if stamina_delay <= 0.0:
 		stamina = minf(max_stamina, stamina + stamina_regen * delta)
@@ -149,36 +157,44 @@ func _physics_process(delta: float) -> void:
 		try_roll()
 	var movement := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var rolling_this_frame: bool = is_rolling()
-	if rolling_this_frame:
-		# Scale the final partial tick so unobstructed rolls cover the configured distance.
-		var step: float = minf(delta, _roll_remaining)
-		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
-	else:
-		# Bow recovery belongs to a fired shot, so releasing the button cannot cancel it.
-		velocity = movement * speed * movement_multiplier() + knockback
-	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
-	move_and_slide()
 	var world_aim: Vector2 = get_global_mouse_position()
 	if _has_aim_event:
 		world_aim = get_viewport().get_canvas_transform().affine_inverse() * _aim_viewport_position
 	var aim: Vector2 = world_aim - global_position
 	if aim.length_squared() > 1.0:
 		aim_direction = aim.normalized()
+	if not rolling_this_frame and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
+		var attack_direction := aim_direction
+		if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead:
+			var target_offset: Vector2 = _click_target.global_position - global_position
+			if target_offset.length_squared() > 1.0:
+				attack_direction = target_offset.normalized()
+		if weapon.attack(attack_direction):
+			_target_marker = _click_target if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead else null
+			_target_marker_remaining = 0.65 if is_instance_valid(_target_marker) else 0.0
+	_attack_pending = false
+	_click_target = null
+	if rolling_this_frame:
+		# Scale the final partial tick so unobstructed rolls cover the configured distance.
+		var step: float = minf(delta, _roll_remaining)
+		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
+	else:
+		velocity = movement * speed * movement_multiplier() + knockback
+	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
+	move_and_slide()
 	var color := Color("79e2d0")
 	if invulnerability > 0.0:
 		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
-	# Keep the torso aligned with the weapon while the feet follow movement input.
 	if not rolling_this_frame and not movement.is_zero_approx():
 		_movement_facing = Vector2(signf(movement.x), 0) if absf(movement.x) > absf(movement.y) else Vector2(0, signf(movement.y))
-	var body_look: Vector2 = aim_direction
+	var body_look: Vector2 = visual.facing
+	if weapon.swing_time > 0.0:
+		body_look = weapon.swing_direction
+	elif not movement.is_zero_approx():
+		body_look = movement
 	if rolling_this_frame:
 		body_look = _roll_direction
-	visual.update_pose(get_real_velocity(), body_look, color, _movement_facing)
-	# Preserve a GUI-approved short click even if it was released between physics ticks.
-	# Consume it once; a press rejected by cooldown is never queued for a later attack.
-	if not rolling_this_frame and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
-		weapon.attack(aim_direction)
-	_attack_pending = false
+	visual.update_pose(get_real_velocity(), body_look, color, body_look)
 	if rolling_this_frame:
 		_roll_remaining = maxf(0.0, _roll_remaining - delta)
 		if not is_rolling():
@@ -198,13 +214,34 @@ func _notification(what: int) -> void:
 		# A modal may swallow the release while the player is paused.
 		_attack_held = false
 		_attack_pending = false
+		_click_target = null
 		_roll_requested = false
+
+func _target_at_click(world_position: Vector2) -> Node2D:
+	var best: Node2D = null
+	var best_distance := INF
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.dead or enemy.is_queued_for_deletion():
+			continue
+		var distance: float = enemy.global_position.distance_squared_to(world_position)
+		# The enemy collision circle is 15 pixels; a small margin makes it clickable.
+		if distance <= 19.0 * 19.0 and distance < best_distance:
+			best = enemy
+			best_distance = distance
+	return best
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Only presses that survive GUI handling may start a world attack gesture.
 	if event.is_action_pressed("attack"):
 		_attack_held = true
 		_attack_pending = not is_rolling()
+		_click_target = null
+		if event is InputEventMouseButton:
+			_aim_viewport_position = event.position
+			_has_aim_event = true
+			if _attack_pending and weapon.selected != 0:
+				var point: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
+				_click_target = _target_at_click(point)
 		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("roll"):
 		_roll_requested = true
@@ -230,6 +267,8 @@ func take_damage(amount: float, direction: Vector2) -> bool:
 	damage_received.emit(actual_damage)
 	if health <= 0.0:
 		dead = true
+		_target_marker = null
+		_target_marker_remaining = 0.0
 		_roll_requested = false
 		_finish_roll()
 		died.emit()
@@ -250,7 +289,10 @@ func gain_experience(amount: int) -> void:
 		level_gained.emit()
 
 func _draw() -> void:
-	if is_bow_recovering():
-		draw_arc(Vector2.ZERO, 21.0, -PI * 0.5, -PI * 0.5 + TAU * _bow_shot_remaining / maxf(0.001, bow_shot_move_duration), 24, Color("e9cc83"), 2.0, true)
+	if is_instance_valid(_target_marker) and not _target_marker.dead and _target_marker_remaining > 0.0:
+		var center: Vector2 = to_local(_target_marker.global_position)
+		var color := Color("f9dd7a")
+		draw_arc(center, 27.0, PI - 0.62, PI + 0.62, 20, color, 3.5, true)
+		draw_arc(center, 27.0, -0.62, 0.62, 20, color, 3.5, true)
 	if dry_attack_flash > 0.0:
 		draw_arc(Vector2.ZERO, 24.0, 0, TAU, 24, Color("efb362"), 2.5, true)

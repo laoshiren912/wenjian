@@ -272,7 +272,7 @@ func show_start() -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		profession_layout.add_child(button)
 		profession_buttons.append(button)
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n剑/矛按住攻击减速 20%%；弓每次射击后 %.2f 秒移速为 %.0f%%\n翻滚耗 %.0f 体力；击败敌人获得经验，升级获得技能点（技能尚未开放）。" % [player.bow_shot_move_duration, player.bow_shot_move_multiplier * 100.0, player.roll_stamina_cost], 16))
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n攻击动作期间站立并朝向攻击方向；可翻滚脱离。\n翻滚耗 %.0f 体力；击败敌人获得经验，升级获得技能点（技能尚未开放）。" % [player.roll_stamina_cost], 16))
 	start_button = PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 48)
 	box.add_child(start_button)
 	select_profession(0)

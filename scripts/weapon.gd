@@ -6,7 +6,7 @@ signal selection_changed(index: int)
 
 const PROJECTILE_SCENE = preload("res://scenes/projectile.tscn")
 const DATA: Array[Dictionary] = [
-	{"name": "剑", "damage": 52.0, "reach": 90.0, "angle": 100.0, "cooldown": 0.48, "stamina": 0.0, "single_target": true, "role": "高伤单体"},
+	{"name": "剑", "damage": 52.0, "reach": 90.0, "angle": 100.0, "cooldown": 0.80, "stamina": 0.0, "single_target": true, "role": "单体刺击"},
 	{"name": "长矛", "damage": 32.0, "reach": 150.0, "angle": 56.0, "cooldown": 0.78, "stamina": 0.0, "single_target": false, "role": "群体穿刺"},
 	{"name": "弓箭", "damage": 21.0, "reach": 640.0, "angle": 0.0, "cooldown": 0.32, "stamina": 0.0, "single_target": true, "role": "远程单体"},
 ]
@@ -27,10 +27,15 @@ var swing_duration: float = 0.18
 var swing_direction: Vector2 = Vector2.RIGHT
 var swing_weapon: int = 0
 var attack_count: int = 0
+var sword_hit_targets: Array[Node2D] = []
+const SWORD_ASSIST_ANGLE: float = 15.0
 
 func _physics_process(delta: float) -> void:
 	cooldown = maxf(0.0, cooldown - delta)
+	var previous_time := swing_time
 	swing_time = maxf(0.0, swing_time - delta)
+	if swing_weapon == 0 and previous_time > 0.0 and not get_parent().dead:
+		_sword_sweep(1.0 - previous_time / swing_duration, 1.0 - swing_time / swing_duration)
 	queue_redraw()
 
 func select_weapon(index: int) -> void:
@@ -58,12 +63,15 @@ func attack(direction: Vector2) -> bool:
 	if cooldown > 0.0:
 		return false
 	cooldown = float(data.cooldown) / player.attack_speed_multiplier
-	swing_direction = direction.normalized()
+	swing_direction = _sword_assist(direction.normalized()) if selected == 0 else direction.normalized()
 	swing_weapon = selected
-	swing_duration = minf(0.18, cooldown)
+	swing_duration = 0.30 / player.attack_speed_multiplier if selected == 0 else minf(0.18, cooldown)
 	swing_time = swing_duration
+	sword_hit_targets.clear()
 	attack_count += 1
 	attack_started.emit(selected, swing_direction)
+	if selected == 0:
+		return true
 	var damage: float = float(data.damage) * player.damage_multiplier
 	if selected == 2:
 		for arrow in range(1 + player.extra_arrows):
@@ -106,9 +114,68 @@ func attack(direction: Vector2) -> bool:
 	queue_redraw()
 	return true
 
+func _sword_assist(direction: Vector2) -> Vector2:
+	var player = get_parent()
+	var best_angle := deg_to_rad(SWORD_ASSIST_ANGLE)
+	var best_distance := INF
+	var result := direction
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.dead or enemy.is_queued_for_deletion():
+			continue
+		var offset: Vector2 = enemy.global_position - player.global_position
+		var distance := offset.length()
+		if distance < 1.0 or distance > float(DATA[0].reach) + player.reach_bonus + 15.0:
+			continue
+		var angle := absf(direction.angle_to(offset))
+		if angle > best_angle or (is_equal_approx(angle, best_angle) and distance >= best_distance):
+			continue
+		var query := PhysicsRayQueryParameters2D.create(player.global_position, enemy.global_position, 1)
+		if not get_world_2d().direct_space_state.intersect_ray(query).is_empty():
+			continue
+		best_angle = angle
+		best_distance = distance
+		result = offset.normalized()
+	return result
+
+func _sword_tip(progress: float) -> float:
+	var extension := clampf((progress - 1.0 / 3.0) / (2.0 / 3.0), 0.0, 1.0)
+	return lerpf(28.0, float(DATA[0].reach) + get_parent().reach_bonus, extension)
+
+func _sword_sweep(from_progress: float, to_progress: float) -> void:
+	# 100 ms windup followed by a 200 ms thrust at base speed.
+	var start := 1.0 / 3.0
+	var finish := 1.0
+	if to_progress < start or from_progress > finish:
+		return
+	var player = get_parent()
+	var tip := _sword_tip(to_progress)
+	var candidates: Array[Node2D] = []
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.dead or sword_hit_targets.has(enemy):
+			continue
+		var offset: Vector2 = enemy.global_position - player.global_position
+		var along := offset.dot(swing_direction)
+		var nearest_point := swing_direction * clampf(along, 13.0, tip)
+		if offset.distance_squared_to(nearest_point) > 15.0 * 15.0:
+			continue
+		var query := PhysicsRayQueryParameters2D.create(player.global_position, enemy.global_position, 1)
+		if get_world_2d().direct_space_state.intersect_ray(query).is_empty():
+			candidates.append(enemy)
+	candidates.sort_custom(func(x, y): return x.global_position.distance_squared_to(player.global_position) < y.global_position.distance_squared_to(player.global_position))
+	for enemy in candidates:
+		if sword_hit_targets.size() >= 1 + player.extra_targets:
+			break
+		sword_hit_targets.append(enemy)
+		enemy.take_damage(float(DATA[0].damage) * player.damage_multiplier, swing_direction * 155.0)
+
+func display_direction() -> Vector2:
+	if swing_time > 0.0 and swing_weapon == selected:
+		return swing_direction
+	return get_parent().visual.facing
+
 func _draw() -> void:
 	var player = get_parent()
-	var aim: Vector2 = player.aim_direction
+	var aim: Vector2 = display_direction()
 	var active: bool = swing_time > 0.0 and swing_weapon == selected
 	var progress: float = 1.0 - swing_time / swing_duration if active else 1.0
 	if active:
@@ -124,11 +191,13 @@ func _draw() -> void:
 		draw_line(bow[0], bow[4], Color("eee4ca"), 1.0, true)
 	else:
 		var reach: float = lerpf(float(DATA[selected].reach) + player.reach_bonus, 40.0 if selected == 1 else 28.0, progress)
-		var blade: Vector2 = aim.rotated(progress * deg_to_rad(50.0)) if selected == 0 and active else aim
+		if selected == 0 and active:
+			reach = _sword_tip(progress)
+		var blade: Vector2 = aim
 		draw_line(blade * 13.0, blade * reach, color, 4.0, true)
 		if selected == 1:
 			draw_colored_polygon(PackedVector2Array([blade * (reach + 4.0), blade * (reach - 6.0) + blade.orthogonal() * 4.0, blade * (reach - 6.0) - blade.orthogonal() * 4.0]), color)
-	if not active or swing_weapon == 2:
+	if not active or swing_weapon == 2 or swing_weapon == 0:
 		return
 	var data: Dictionary = DATA[swing_weapon]
 	var fade: float = swing_time / swing_duration
