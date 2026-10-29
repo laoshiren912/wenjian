@@ -37,16 +37,9 @@ func run() -> void:
 		await process_frame
 		game.start_run()
 		game.player.gain_experience(game.player.next_level_xp)
-		game._open_level_up()
 		await process_frame
 		await process_frame
-		check(game.state == game.State.UPGRADE_PROMPT, "upgrade transition shown")
-		check(game.hud.modal_panel.size.x <= game.hud.root.size.x and game.hud.modal_panel.size.y <= game.hud.root.size.y, "upgrade transition fits")
-		game.open_upgrade_choices()
-		await process_frame
-		check(game.hud.level_ui.panel.size.y <= game.hud.root.size.y, "card panel fits")
-		game.hud.level_ui._process(1.0)
-		game.hud.level_ui._choose(0)
+		check(game.state == game.State.PLAYING and not paused and game.player.skill_points == 1, "level grants skill point without pausing")
 		game.state = game.State.SHOP
 		paused = true
 		game.show_shop()
@@ -67,6 +60,7 @@ func run() -> void:
 		game.gold = 0
 		game.show_shop()
 		find_button(game.hud.modal_panel, "轻行靴").pressed.emit()
+		game.hud.shop_buy_button.pressed.emit()
 		check(find_label(game.hud.modal_panel, "金币不足"), "insufficient funds visible")
 		paused = false
 		game.queue_free()

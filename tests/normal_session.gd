@@ -1,11 +1,10 @@
 extends SceneTree
 
 # Acceptance driver only: real main scene, normal stats, natural enemy spawns.
-# Sends input and chooses earned upgrades. Never grants HP, XP, or invulnerability.
+# Sends input only. Never grants HP, XP, or invulnerability; no equipment is bought.
 var game: SurvivorGame
 var recovering: bool = false
 var hits_received: int = 0
-var upgrades: int = 0
 var weapon_uses: Array[int] = [0, 0, 0]
 var previous_attack_count: int = 0
 var last_report: int = -1
@@ -47,11 +46,7 @@ func _run() -> void:
 	game.hud.start_requested.emit()
 	while game.state != SurvivorGame.State.DEAD and game.state != SurvivorGame.State.WON:
 		await physics_frame
-		if game.state == SurvivorGame.State.UPGRADE_PROMPT:
-			_release()
-			if not game.hud.transition_button.disabled:
-				game.hud.transition_button.pressed.emit()
-		elif game.state == SurvivorGame.State.SHOP_PROMPT:
+		if game.state == SurvivorGame.State.SHOP_PROMPT:
 			_release()
 			if not game.hud.transition_button.disabled:
 				game.hud.transition_button.pressed.emit()
@@ -60,18 +55,8 @@ func _run() -> void:
 			game.next_floor()
 			route = PackedVector2Array()
 			target_cell = Vector2i(-1, -1)
-		elif game.state == SurvivorGame.State.LEVEL_UP and game.hud.level_ui.accepting:
-			_release()
-			var choice: int = 2 if game.player.health < game.player.max_health * 0.65 else upgrades % 2
-			game.hud.level_ui.choices[choice].pressed.emit()
-			upgrades += 1
-			print("EARNED UPGRADE: choice=%d level=%d HP=%.0f/%.0f" % [choice + 1, game.player.level, game.player.health, game.player.max_health])
 		elif game.state == SurvivorGame.State.PLAYING and mode == "combat":
-			if game.pending_levels > 0:
-				_release()
-				game._open_level_up()
-			else:
-				_control()
+			_control()
 		elif game.state == SurvivorGame.State.PLAYING and mode == "kite":
 			if game.player.position.distance_to(patrol[patrol_index]) < 25.0:
 				patrol_index = (patrol_index + 1) % patrol.size()
@@ -85,7 +70,7 @@ func _run() -> void:
 			last_report = second
 			print("NORMAL: t=%ds HP=%.0f/%.0f stamina=%.0f level=%d kills=%d hits=%d position=%s" % [second, game.player.health, game.player.max_health, game.player.stamina, game.player.level, game.kills, hits_received, game.player.position])
 	_release()
-	print("NORMAL RESULT: %s, seconds=%.2f, HP=%.0f/%.0f, kills=%d, level=%d, earned_upgrades=%d, hits_received=%d, weapon_attacks=%s" % ["WON" if game.state == SurvivorGame.State.WON else "DEAD", game.elapsed, game.player.health, game.player.max_health, game.kills, game.player.level, upgrades, hits_received, weapon_uses])
+	print("NORMAL RESULT: %s, seconds=%.2f, HP=%.0f/%.0f, kills=%d, level=%d, skill_points=%d, hits_received=%d, weapon_attacks=%s" % ["WON" if game.state == SurvivorGame.State.WON else "DEAD", game.elapsed, game.player.health, game.player.max_health, game.kills, game.player.level, game.player.skill_points, hits_received, weapon_uses])
 	paused = false
 	quit()
 

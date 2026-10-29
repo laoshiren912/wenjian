@@ -4,6 +4,7 @@ extends Node2D
 # Presentation only. Never move an actor, change a collider, or resolve an attack here.
 @export_enum("Player", "Hostile", "Passive") var appearance: int = 0
 var facing: Vector2 = Vector2.DOWN
+var leg_facing: Vector2 = Vector2.DOWN
 var motion: Vector2 = Vector2.ZERO
 var tint := Color("79e2d0")
 var walk_phase: float = 0.0
@@ -19,13 +20,16 @@ var roll_duration: float = 0.24
 var roll_direction: Vector2 = Vector2.DOWN
 const DEATH_DURATION: float = 0.22
 
-func update_pose(actual_motion: Vector2, look: Vector2, color: Color) -> void:
+func update_pose(actual_motion: Vector2, look: Vector2, color: Color, leg_look: Vector2 = Vector2.ZERO) -> void:
 	if dying:
 		return
 	motion = actual_motion
 	tint = color
 	if look.length_squared() > 0.01:
 		facing = Vector2(signf(look.x), 0) if absf(look.x) > absf(look.y) else Vector2(0, signf(look.y))
+	var legs := leg_look if leg_look.length_squared() > 0.01 else look
+	if legs.length_squared() > 0.01:
+		leg_facing = Vector2(signf(legs.x), 0) if absf(legs.x) > absf(legs.y) else Vector2(0, signf(legs.y))
 	if motion.length_squared() < 1.0:
 		walk_phase = 0.0
 	queue_redraw()
@@ -111,11 +115,11 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, 16.0, Color(0, 0, 0, 0.25))
 	draw_set_transform(Vector2.ZERO)
 	var side_view: bool = facing.x != 0.0
-	var left_foot := Vector2(-5, 15 + step * facing.y)
-	var right_foot := Vector2(5, 15 - step * facing.y)
-	if side_view:
-		left_foot = Vector2(-2 + facing.x * step, 15)
-		right_foot = Vector2(2 - facing.x * step, 15)
+	var left_foot := Vector2(-5, 15 + step * leg_facing.y)
+	var right_foot := Vector2(5, 15 - step * leg_facing.y)
+	if leg_facing.x != 0.0:
+		left_foot = Vector2(-2 + leg_facing.x * step, 15)
+		right_foot = Vector2(2 - leg_facing.x * step, 15)
 	draw_line(Vector2(-4, 5) + offset, left_foot, boots, 5.0, true)
 	draw_line(Vector2(4, 5) + offset, right_foot, boots, 5.0, true)
 	draw_circle(left_foot, 3.0, boots)

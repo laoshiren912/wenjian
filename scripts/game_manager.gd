@@ -17,22 +17,20 @@ const EQUIPMENT: Array[Dictionary] = [
 	{"category": 3, "name": "灵巧靴", "price": 250, "effect": "移速 +8；翻滚冷却 -0.10 秒"},
 	{"category": 3, "name": "远行靴", "price": 450, "effect": "移速 +15；翻滚距离 +30"},
 ]
-enum State { START, PLAYING, LEVEL_UP, PAUSED, DEAD, WON, SHOP, UPGRADE_PROMPT, SHOP_PROMPT }
+enum State { START, PLAYING, PAUSED, DEAD, WON, SHOP, SHOP_PROMPT }
 var state: int = State.START
 var player: SurvivorPlayer
 var elapsed: float = 0.0
 var kills: int = 0
-var pending_levels: int = 0
 var spawn_timer: float = 4.0
 var stats_open: bool = false
 var selected_profession: int = 0
 var floor_number: int = 1
 var remaining: int = 0
 var gold: int = START_GOLD
-var floor_reward: bool = false
 var clear_pending: bool = false
 var purchased: Array[bool] = [false, false, false, false, false, false, false, false, false]
-var shop_category: int = 0
+var shop_category: int = 4
 var pending_wave: Array[Dictionary] = []
 var wave_delay: float = 0.0
 @onready var world: SurvivorWorld = $World
@@ -51,7 +49,7 @@ func _ready() -> void:
 	player.camera.limit_bottom = int(SurvivorWorld.SIZE.y)
 	player.camera.reset_smoothing()
 	player.died.connect(_on_death)
-	player.level_gained.connect(_queue_level)
+	player.level_gained.connect(_on_level_gained)
 	player.hurt.connect(hud.flash_damage)
 	feedback.camera = player.camera
 	feedback.hud_obstacles.assign(hud.combat_panels)
@@ -66,20 +64,15 @@ func _ready() -> void:
 	hud.resume_requested.connect(resume_run)
 	hud.purchase_requested.connect(buy_item)
 	hud.shop_category_requested.connect(select_shop_category)
-	hud.upgrade_continue_requested.connect(open_upgrade_choices)
 	hud.shop_continue_requested.connect(open_shop)
 	hud.next_floor_requested.connect(next_floor)
-	hud.level_ui.chosen.connect(choose_upgrade)
-	hud.level_ui.deferred.connect(defer_upgrade)
-	hud.upgrades_requested.connect(_open_level_up)
 	_spawn_floor()
 	hud.update_game(elapsed, kills, RUN_DURATION)
-	hud.update_pending_upgrades(pending_levels)
 	hud.show_start()
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "upgrade_1": KEY_1, "upgrade_2": KEY_2, "upgrade_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -202,55 +195,8 @@ func _on_player_damaged(amount: float) -> void:
 func _on_experience_received(amount: int) -> void:
 	feedback.show_experience(player.global_position, amount)
 
-func _queue_level() -> void:
-	pending_levels += 1
-	hud.update_pending_upgrades(pending_levels)
-
-func _open_level_up() -> void:
-	if pending_levels <= 0 or state != State.PLAYING:
-		return
-	state = State.UPGRADE_PROMPT
-	get_tree().paused = true
-	hud.show_upgrade_prompt("等级提升", "战斗已暂停 · 即将选择一项基础强化")
-
-func open_upgrade_choices() -> void:
-	if state != State.UPGRADE_PROMPT:
-		return
-	state = State.LEVEL_UP
-	hud.hide_screen()
-	hud.level_ui.reward_title = ""
-	hud.level_ui.allow_defer = remaining > 0 and not floor_reward
-	if floor_reward:
-		hud.level_ui.reward_title = "第 %d 层完成 / 选择奖励" % floor_number
-	hud.level_ui.show_choices(player)
-
-func defer_upgrade() -> void:
-	if state != State.LEVEL_UP or floor_reward or remaining <= 0:
-		return
-	hud.level_ui.hide()
-	hud.hide_screen()
-	state = State.PLAYING
-	get_tree().paused = false
-
-func choose_upgrade(index: int) -> void:
-	if state != State.LEVEL_UP or index < 0 or index > 5 or (floor_reward and index < 3) or (not floor_reward and index > 2):
-		return
-	player.apply_upgrade(index)
-	if floor_reward:
-		floor_reward = false
-		state = State.SHOP_PROMPT
-		hud.show_shop_prompt(floor_number, gold)
-		return
-	pending_levels -= 1
-	hud.update_pending_upgrades(pending_levels)
-	hud.level_ui.hide()
-	if pending_levels > 0:
-		state = State.PLAYING
-		_open_level_up()
-	else:
-		state = State.PLAYING
-		get_tree().paused = false
-		hud.show_notice("强化已生效")
+func _on_level_gained() -> void:
+	hud.show_notice("等级提升 · 获得 1 技能点（技能尚未开放）")
 
 func _spawn_floor() -> void:
 	var count: int = [8, 12, 16, 1][floor_number - 1]
@@ -295,15 +241,10 @@ func _floor_cleared() -> void:
 	if floor_number == 4:
 		_end_run(true)
 		return
-	if pending_levels > 0:
-		clear_pending = false
-		_open_level_up()
-		return
-	floor_reward = true
 	gold += FLOOR_GOLD
-	state = State.UPGRADE_PROMPT
+	state = State.SHOP_PROMPT
 	get_tree().paused = true
-	hud.show_upgrade_prompt("第 %d 层完成" % floor_number, "获得 %d 金币 · 先选择清层强化，再进入商店" % FLOOR_GOLD)
+	hud.show_shop_prompt(floor_number, gold)
 
 func open_shop() -> void:
 	if state != State.SHOP_PROMPT:
@@ -315,7 +256,7 @@ func show_shop(message: String = "") -> void:
 	hud.show_shop(gold, purchased, shop_category, message)
 
 func select_shop_category(index: int) -> void:
-	if state != State.SHOP or index < 0 or index > 3:
+	if state != State.SHOP or index < 0 or index > 4:
 		return
 	shop_category = index
 	show_shop()
@@ -412,7 +353,6 @@ func _on_death() -> void:
 func _end_run(won: bool) -> void:
 	state = State.WON if won else State.DEAD
 	get_tree().paused = true
-	hud.level_ui.hide()
 	hud.show_result(won, elapsed, kills)
 
 func restart_run() -> void:

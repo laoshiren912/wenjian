@@ -47,7 +47,7 @@ var extra_targets: int = 0
 var extra_arrows: int = 0
 var projectile_speed_bonus: float = 0.0
 var equipment_names: Array[String] = []
-var card_counts: Array[int] = [0, 0, 0, 0, 0, 0]
+var skill_points: int = 0
 var damage_reduction: float = 0.0
 var heal_on_kill: float = 0.0
 var stamina_on_kill: float = 0.0
@@ -58,6 +58,7 @@ var total_experience: int = 0
 var invulnerability: float = 0.0
 var knockback: Vector2 = Vector2.ZERO
 var aim_direction: Vector2 = Vector2.RIGHT
+var _movement_facing: Vector2 = Vector2.DOWN
 var _aim_viewport_position: Vector2 = Vector2.ZERO
 var _has_aim_event: bool = false
 var dead: bool = false
@@ -118,7 +119,7 @@ func try_roll() -> bool:
 	if not spend_stamina(roll_stamina_cost):
 		return false
 	var movement := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	_roll_direction = movement.normalized() if not movement.is_zero_approx() else visual.facing
+	_roll_direction = movement.normalized() if not movement.is_zero_approx() else _movement_facing
 	_roll_remaining = maxf(0.001, roll_duration)
 	_roll_cooldown = roll_cooldown
 	_attack_pending = false
@@ -166,12 +167,13 @@ func _physics_process(delta: float) -> void:
 	var color := Color("79e2d0")
 	if invulnerability > 0.0:
 		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
-	# Turn the body toward walking input; mouse aim only steers the weapon.
-	# Keep the last body direction at rest, including while pushed or aiming elsewhere.
-	var body_look: Vector2 = movement if not movement.is_zero_approx() else visual.facing
+	# Keep the torso aligned with the weapon while the feet follow movement input.
+	if not rolling_this_frame and not movement.is_zero_approx():
+		_movement_facing = Vector2(signf(movement.x), 0) if absf(movement.x) > absf(movement.y) else Vector2(0, signf(movement.y))
+	var body_look: Vector2 = aim_direction
 	if rolling_this_frame:
 		body_look = _roll_direction
-	visual.update_pose(get_real_velocity(), body_look, color)
+	visual.update_pose(get_real_velocity(), body_look, color, _movement_facing)
 	# Preserve a GUI-approved short click even if it was released between physics ticks.
 	# Consume it once; a press rejected by cooldown is never queued for a later attack.
 	if not rolling_this_frame and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
@@ -243,33 +245,9 @@ func gain_experience(amount: int) -> void:
 	while experience >= next_level_xp:
 		experience -= next_level_xp
 		level += 1
+		skill_points += 1
 		next_level_xp = XP_BASE + (level - 1) * XP_STEP
 		level_gained.emit()
-
-func apply_upgrade(index: int) -> void:
-	if index < 0 or index >= card_counts.size():
-		return
-	card_counts[index] += 1
-	match index:
-		0:
-			damage_multiplier += 0.2
-		1:
-			attack_speed_multiplier += 0.15
-		2:
-			max_health += 25.0
-			health = minf(max_health, health + 40.0)
-		3:
-			match profession_index:
-				0: extra_targets += 1
-				1: reach_bonus += 25.0
-				2: extra_arrows += 1
-		4:
-			match profession_index:
-				0: angle_bonus += 30.0
-				1: angle_bonus += 20.0
-				2: projectile_speed_bonus += 120.0
-		5:
-			roll_distance += 35.0
 
 func _draw() -> void:
 	if is_bow_recovering():

@@ -57,7 +57,7 @@ func visuals() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ROLL_OUTPUT))
 	await fresh()
 	game.player.camera.position_smoothing_enabled = false
-	game.player.visual.facing = Vector2.RIGHT
+	game.player._movement_facing = Vector2.RIGHT
 	game.player.try_roll()
 	await frames(3)
 	await capture_roll("01_roll_start")
@@ -113,13 +113,13 @@ func _run() -> void:
 		check(not player.try_roll(), "Cooldown still blocks a new roll after movement ends")
 	await fresh()
 	var player: SurvivorPlayer = game.player
-	player.visual.facing = Vector2.LEFT
+	player._movement_facing = Vector2.LEFT
 	await aim(Vector2.RIGHT)
 	var before: Vector2 = player.position
 	space(true)
 	space(false)
 	await frames(3)
-	check(player.is_rolling() and player._roll_direction == Vector2.LEFT and player.stamina == 70, "A same-frame Space tap rolls toward body facing, not the mouse")
+	check(player.is_rolling() and player._roll_direction == Vector2.LEFT and player.stamina == 70, "A same-frame Space tap rolls toward last movement direction")
 	movement(Vector2.RIGHT)
 	await frames(3)
 	check(player._roll_direction == Vector2.LEFT and player.visual.facing == Vector2.LEFT, "Changing WASD mid-roll cannot steer or turn the roll")
@@ -316,13 +316,10 @@ func _run() -> void:
 	check(not player.is_rolling() and player.stamina == 100, "Pause clears an unprocessed roll press before resume")
 	game.player.gain_experience(game.player.next_level_xp - game.player.experience)
 	await frames(2)
-	game._open_level_up()
-	game.open_upgrade_choices()
-	game.hud.level_ui._process(1.0)
 	space(true)
 	space(false)
 	await frames(3)
-	check(not paused and not player.is_rolling() and player.stamina == 100, "Space accepts an upgrade without also rolling")
+	check(not paused and player.is_rolling() and player.skill_points == 1, "Space rolls normally immediately after gaining a skill point")
 	await fresh()
 	player = game.player
 	player.try_roll()

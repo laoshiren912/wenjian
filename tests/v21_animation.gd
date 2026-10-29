@@ -118,20 +118,19 @@ func _run() -> void:
 	var player: SurvivorPlayer = game.player
 	check(player.visual.get_parent() == player and player.get_node("CollisionShape2D").shape.radius == 14.0, "Player animation is a separate non-physical child; collider radius stays 14")
 	for direction in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP, Vector2(1, 1), Vector2(-1, 1), Vector2(-1, -1), Vector2(1, -1)]:
-		var resting_facing: Vector2 = player.visual.facing
 		await aim(direction.normalized())
-		check(player.visual.facing == resting_facing and player.aim_direction.dot(direction.normalized()) > 0.99, "Resting body keeps its direction while the mouse independently aims %s" % direction)
+		check(player.visual.facing.dot(direction.normalized()) > 0.70 and player.aim_direction.dot(direction.normalized()) > 0.99, "Resting body follows aim %s" % direction)
 	for direction in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP, Vector2(1, 1), Vector2(-1, 1), Vector2(-1, -1), Vector2(1, -1)]:
 		player.position = SurvivorWorld.SPAWN
 		await aim(-direction.normalized())
 		var before: Vector2 = player.position
 		movement(direction)
 		await frames(8)
-		check((player.position - before).dot(direction.normalized()) > 20.0 and player.visual.walk_phase > 0.0 and player.visual.facing.dot(direction.normalized()) > 0.70 and player.aim_direction.dot(-direction.normalized()) > 0.98, "Walking turns the body toward %s despite opposite mouse aim" % direction)
+		check((player.position - before).dot(direction.normalized()) > 20.0 and player.visual.walk_phase > 0.0 and player.visual.leg_facing.dot(direction.normalized()) > 0.70 and player.visual.facing.dot(-direction.normalized()) > 0.70 and player.aim_direction.dot(-direction.normalized()) > 0.98, "Legs follow movement %s while body follows opposite aim" % direction)
 		var walking_facing: Vector2 = player.visual.facing
 		movement(Vector2.ZERO)
 		await frames(2)
-		check(player.visual.walk_phase == 0.0 and player.visual.motion.is_zero_approx() and player.visual.facing == walking_facing, "Stopping clears gait and keeps the last walking direction for %s" % direction)
+		check(player.visual.walk_phase == 0.0 and player.visual.motion.is_zero_approx() and player.visual.facing == walking_facing, "Stopping clears gait and keeps aim direction for %s" % direction)
 	player.position = Vector2(79, 640)
 	movement(Vector2.LEFT)
 	await frames(25)

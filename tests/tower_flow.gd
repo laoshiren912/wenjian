@@ -46,26 +46,14 @@ func run() -> void:
 			check(get_nodes_in_group("pickups").is_empty(), "no XP pickups created")
 			await process_frame
 			await process_frame
-			while game.state == game.State.UPGRADE_PROMPT and not game.floor_reward:
-				game.open_upgrade_choices()
-				check(game.hud.level_ui.offered.all(func(i): return i < 3), "normal card pool")
-				game.hud.level_ui._process(1.0)
-				game.hud.level_ui._choose(0)
-				await process_frame
-				await process_frame
 			if floor_index == 4:
 				check(game.state == game.State.WON, "boss victory")
 				break
-			check(game.state == game.State.UPGRADE_PROMPT and game.floor_reward, "floor reward")
+			check(game.state == game.State.SHOP_PROMPT and paused, "floor clear goes directly to shop prompt")
 			check(game.gold == gold_before + 250, "floor reward exactly once")
-			game.open_upgrade_choices()
-			check(game.hud.level_ui.offered.all(func(i): return i >= 3), "floor card pool")
-			game.hud.level_ui._process(1.0)
-			game.hud.level_ui._choose(0)
-			check(game.state == game.State.SHOP_PROMPT, "shop transition")
 			game.open_shop()
 			check(game.state == game.State.SHOP, "shop after reward")
-			check(not game.hud.level_ui.visible, "reward card closes before shop")
+			check(game.hud.get_node_or_null("LevelUpUI") == null, "no card UI")
 			var before: int = game.gold
 			if floor_index == 1:
 				game.buy_item(0)
@@ -77,6 +65,7 @@ func run() -> void:
 			game.next_floor()
 			check(game.state == game.State.PLAYING, "next floor")
 		check(game.player.level == 6 and game.player.total_experience == 360, "360 XP gives five ordinary levels")
+		check(game.player.skill_points == 5, "five levels grant five unspent skill points")
 		check(game.gold == 850, "three clear rewards minus one purchase")
 		paused = false
 		game.queue_free()

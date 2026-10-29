@@ -113,18 +113,15 @@ func _run() -> void:
 	check(game.player.weapon.attack_count == attacks, "Pause clears a held world attack; resume requires a new press")
 	mouse(false, Vector2(600, 450))
 	await frames(240)
-	for index in range(3):
-		mouse(true, Vector2(600, 450))
-		game.player.gain_experience(game.player.next_level_xp)
-		await frames()
-		mouse(false, Vector2(600, 450))
-		await frames()
-		attacks = game.player.weapon.attack_count
-		var stamina: float = game.player.stamina
-		await click(game.hud.level_ui.choices[index])
-		check(not paused and game.player.weapon.attack_count == attacks and game.player.stamina >= stamina, "Upgrade choice %d resumes without attack or stamina loss" % (index + 1))
-		await frames(40)
-		check(game.player.weapon.attack_count == attacks, "Upgrade choice %d does not retain old attack hold" % (index + 1))
+	mouse(true, Vector2(600, 450))
+	game.player.gain_experience(game.player.next_level_xp)
+	await frames()
+	check(not paused and game.player.skill_points == 1, "Earning a skill point does not interrupt held attack")
+	mouse(false, Vector2(600, 450))
+	await frames()
+	attacks = game.player.weapon.attack_count
+	await frames(40)
+	check(game.player.weapon.attack_count == attacks, "Attack ends after release following a level gain")
 	await click(button("暂停"))
 	await click(button("重新开始"))
 	await reloaded()

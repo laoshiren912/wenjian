@@ -54,35 +54,8 @@ func run() -> void:
 	game.player.gain_experience(40)
 	await process_frame
 	await process_frame
-	check(game.state == game.State.PLAYING and game.pending_levels == 1, "level gain does not interrupt battle")
-	game._open_level_up()
-	check(game.state == game.State.UPGRADE_PROMPT and game.hud.transition_button.disabled, "upgrade intro blocks immediate input")
-	var mouse := InputEventMouseButton.new()
-	mouse.button_index = MOUSE_BUTTON_LEFT
-	mouse.pressed = true
-	Input.parse_input_event(mouse)
-	await process_frame
-	game.hud._process(0.5)
-	check(game.hud.transition_button.disabled, "held mouse keeps intro blocked")
-	mouse = InputEventMouseButton.new()
-	mouse.button_index = MOUSE_BUTTON_LEFT
-	mouse.pressed = false
-	Input.parse_input_event(mouse)
-	await process_frame
-	game.hud._process(0.5)
-	check(not game.hud.transition_button.disabled, "intro enables after delay and release")
-	game.hud.transition_button.pressed.emit()
-	check(game.state == game.State.LEVEL_UP and not game.hud.level_ui.accepting, "card choice initially blocked")
-	game.defer_upgrade()
-	check(game.state == game.State.PLAYING and game.pending_levels == 1, "closing cards keeps earned choice")
-	game._open_level_up()
-	game.open_upgrade_choices()
-	var previous_level: int = game.pending_levels
-	game.hud.level_ui._choose(0)
-	check(game.pending_levels == previous_level, "immediate card selection ignored")
-	game.hud.level_ui._process(0.5)
-	game.hud.level_ui._choose(0)
-	check(game.state == game.State.PLAYING and game.pending_levels == 0, "card accepted after delay")
+	check(game.state == game.State.PLAYING and not paused and game.player.skill_points == 1, "level gain grants a point without interrupting battle")
+	check(game.hud.get_node_or_null("LevelUpUI") == null, "no card interface is created")
 	paused = false
 	game.queue_free()
 	await process_frame
