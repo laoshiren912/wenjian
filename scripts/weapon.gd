@@ -66,12 +66,14 @@ func attack(direction: Vector2) -> bool:
 	attack_started.emit(selected, swing_direction)
 	var damage: float = float(data.damage) * player.damage_multiplier
 	if selected == 2:
-		var projectile = PROJECTILE_SCENE.instantiate()
-		projectile.direction = swing_direction
-		projectile.damage = damage
-		projectile.max_distance = float(data.reach)
-		player.get_parent().add_child(projectile)
-		projectile.global_position = player.global_position + swing_direction * 23.0
+		for arrow in range(1 + player.extra_arrows):
+			var projectile = PROJECTILE_SCENE.instantiate()
+			projectile.direction = swing_direction.rotated((float(arrow) - player.extra_arrows * 0.5) * 0.15)
+			projectile.damage = damage
+			projectile.speed += player.projectile_speed_bonus
+			projectile.max_distance = float(data.reach) + player.reach_bonus
+			player.get_parent().add_child(projectile)
+			projectile.global_position = player.global_position + projectile.direction * 23.0
 		queue_redraw()
 		return true
 	var targets: Array[Node2D] = []
@@ -81,14 +83,14 @@ func attack(direction: Vector2) -> bool:
 		if enemy.dead:
 			continue
 		var offset: Vector2 = enemy.global_position - player.global_position
-		if offset.length() > float(data.reach) + 12.0:
+		if offset.length() > float(data.reach) + player.reach_bonus + 12.0:
 			continue
-		if absf(direction.angle_to(offset)) > deg_to_rad(float(data.angle) * 0.5):
+		if absf(direction.angle_to(offset)) > deg_to_rad((float(data.angle) + player.angle_bonus) * 0.5):
 			continue
 		var query := PhysicsRayQueryParameters2D.create(player.global_position, enemy.global_position, 1)
 		if not get_world_2d().direct_space_state.intersect_ray(query).is_empty():
 			continue
-		if bool(data.single_target):
+		if bool(data.single_target) and player.extra_targets == 0:
 			if offset.length_squared() < nearest_distance:
 				nearest = enemy
 				nearest_distance = offset.length_squared()
@@ -96,6 +98,9 @@ func attack(direction: Vector2) -> bool:
 			targets.append(enemy)
 	if is_instance_valid(nearest):
 		targets.append(nearest)
+	if bool(data.single_target) and player.extra_targets > 0:
+		targets.sort_custom(func(a, b): return a.global_position.distance_squared_to(player.global_position) < b.global_position.distance_squared_to(player.global_position))
+		targets.resize(mini(targets.size(), 1 + player.extra_targets))
 	for enemy in targets:
 		enemy.take_damage(damage, direction * 155.0)
 	queue_redraw()
@@ -118,7 +123,7 @@ func _draw() -> void:
 		draw_polyline(bow, Color("d5ad70"), 3.0, true)
 		draw_line(bow[0], bow[4], Color("eee4ca"), 1.0, true)
 	else:
-		var reach: float = lerpf(float(DATA[selected].reach), 40.0 if selected == 1 else 28.0, progress)
+		var reach: float = lerpf(float(DATA[selected].reach) + player.reach_bonus, 40.0 if selected == 1 else 28.0, progress)
 		var blade: Vector2 = aim.rotated(progress * deg_to_rad(50.0)) if selected == 0 and active else aim
 		draw_line(blade * 13.0, blade * reach, color, 4.0, true)
 		if selected == 1:
@@ -131,9 +136,9 @@ func _draw() -> void:
 	if swing_weapon == 1:
 		attack_color = Color(0.6, 0.85, 1.0, fade * 0.35)
 	var points := PackedVector2Array([Vector2.ZERO])
-	var half: float = deg_to_rad(float(data.angle) * 0.5)
+	var half: float = deg_to_rad((float(data.angle) + player.angle_bonus) * 0.5)
 	for i in range(19):
 		var angle: float = swing_direction.angle() - half + 2.0 * half * float(i) / 18.0
-		points.append(Vector2.from_angle(angle) * float(data.reach))
+		points.append(Vector2.from_angle(angle) * (float(data.reach) + player.reach_bonus))
 	draw_colored_polygon(points, attack_color)
 	draw_polyline(points, Color(1.0, 0.9, 0.65, fade), 2.0, true)

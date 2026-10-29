@@ -3,16 +3,18 @@ extends CharacterBody2D
 
 signal killed(location: Vector2, experience_value: int)
 signal damaged(location: Vector2, amount: float)
-enum Kind { PASSIVE, HOSTILE }
+enum Kind { PASSIVE, HOSTILE, RANGED, BOSS }
+const PROJECTILE_SCENE = preload("res://scenes/projectile.tscn")
 var kind: int = Kind.HOSTILE
 var player: CharacterBody2D
 var world: SurvivorWorld
 var health_multiplier: float = 1.0
 var max_health: float = 180.0
 var health: float = 180.0
-var speed: float = 105.0
+var speed: float = 175.0
+var fast_chaser: bool = false
 var damage: float = 12.0
-var experience_value: int = 10
+var experience_value: int = SurvivorPlayer.XP_ENEMY
 var aggro: bool = false
 var dead: bool = false
 var flash: float = 0.0
@@ -25,6 +27,8 @@ var path_index: int = 0
 var repath: float = 0.0
 var wander_target: Vector2
 var wander_timer: float = 2.0
+var special_cooldown: float = 4.0
+var special_windup: float = 0.0
 @onready var visual: ActorVisual = $VisualRoot
 
 func _ready() -> void:
@@ -33,7 +37,18 @@ func _ready() -> void:
 		max_health = 120.0
 		speed = 85.0
 		damage = 9.0
-		experience_value = 8
+		experience_value = SurvivorPlayer.XP_PASSIVE
+	elif kind == Kind.RANGED:
+		max_health = 120.0
+		speed = 105.0
+		damage = 10.0
+	elif kind == Kind.BOSS:
+		max_health = 1200.0
+		speed = 115.0
+		damage = 16.0
+		experience_value = SurvivorPlayer.XP_BOSS
+	if fast_chaser and kind == Kind.HOSTILE:
+		speed = 265.0
 	max_health *= health_multiplier
 	health = max_health
 	wander_target = global_position
@@ -49,21 +64,48 @@ func _physics_process(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	repath -= delta
 	var distance: float = global_position.distance_to(player.global_position)
-	if kind == Kind.HOSTILE and distance < 640.0:
+	if kind != Kind.PASSIVE:
 		aggro = true
 	var movement := Vector2.ZERO
-	if windup > 0.0:
+	var ranged_has_sight := true
+	if kind == Kind.RANGED and distance < 420.0:
+		var sight_ray := PhysicsRayQueryParameters2D.create(global_position, player.global_position, 1)
+		ranged_has_sight = get_world_2d().direct_space_state.intersect_ray(sight_ray).is_empty()
+	special_cooldown = maxf(0.0, special_cooldown - delta)
+	if special_windup > 0.0:
+		special_windup -= delta
+		if special_windup <= 0.0:
+			if distance < 125.0:
+				var ray := PhysicsRayQueryParameters2D.create(global_position, player.global_position, 1)
+				if get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
+					player.take_damage(24.0, (player.global_position - global_position).normalized())
+			special_cooldown = 5.0
+	elif kind == Kind.BOSS and special_cooldown <= 0.0 and distance < 160.0:
+		special_windup = 0.9
+	elif kind == Kind.RANGED and distance < 420.0 and ranged_has_sight:
+		if attack_cooldown <= 0.0:
+			var shot = PROJECTILE_SCENE.instantiate()
+			shot.direction = (player.global_position - global_position).normalized()
+			shot.damage = damage
+			shot.speed = 300.0
+			shot.max_distance = 500.0
+			shot.collision_mask = 3
+			shot.hostile = true
+			get_parent().add_child(shot)
+			shot.global_position = global_position + shot.direction * 23.0
+			attack_cooldown = 1.7
+	elif windup > 0.0:
 		windup -= delta
 		if windup <= 0.0:
 			var offset: Vector2 = player.global_position - global_position
 			var ray := PhysicsRayQueryParameters2D.create(global_position, player.global_position, 1)
 			if offset.length() < 63.0 and absf(attack_direction.angle_to(offset)) < 1.3 and get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 				player.take_damage(damage, offset.normalized())
-			attack_cooldown = 0.95
+			attack_cooldown = 0.65
 	elif aggro:
 		if distance < 45.0:
 			if attack_cooldown <= 0.0:
-				windup = 0.34
+				windup = 0.25
 				attack_direction = (player.global_position - global_position).normalized()
 		else:
 			movement = _follow_path(player.global_position)
@@ -97,7 +139,7 @@ func _follow_path(target: Vector2) -> Vector2:
 	if global_position.distance_to(target) < 130.0 and get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 		# Short final approach; obstacle avoidance still uses physical collision.
 		return (target - global_position).normalized()
-	if path.is_empty() or (repath <= 0.0 and (path_index >= path.size() or global_position.distance_to(path[path_index]) < 18.0)):
+	if path.is_empty() or repath <= 0.0:
 		path = world.path_between(global_position, target)
 		path_index = 0
 		repath = 0.55
@@ -141,3 +183,12 @@ func _draw() -> void:
 	if windup > 0.0:
 		var center: float = attack_direction.angle()
 		draw_arc(Vector2.ZERO, 48.0, center - 1.1, center + 1.1, 18, Color(1.0, 0.38, 0.25, 0.9), 3.0, true)
+	if special_windup > 0.0:
+		draw_circle(Vector2.ZERO, 125.0, Color(1.0, 0.2, 0.1, 0.18))
+		draw_arc(Vector2.ZERO, 125.0, 0.0, TAU, 48, Color("ff654f"), 3.0, true)
+	if kind == Kind.RANGED:
+		draw_circle(Vector2(0, -25), 5, Color("a77aff"))
+	elif kind == Kind.BOSS:
+		draw_arc(Vector2.ZERO, 24.0, 0.0, TAU, 32, Color("ffcc57"), 4.0, true)
+	if fast_chaser:
+		draw_arc(Vector2.ZERO, 21.0, 0.0, TAU, 24, Color("ffbd55"), 3.0, true)

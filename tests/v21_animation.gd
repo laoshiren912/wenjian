@@ -194,6 +194,7 @@ func _run() -> void:
 	var victim := target_at(80.0)
 	var victim_position: Vector2 = victim.position
 	var kills: int = game.kills
+	var xp_before_death: int = player.total_experience
 	var ghost: ActorVisual = victim.visual
 	victim.take_damage(10000.0, Vector2.ZERO)
 	victim.take_damage(10000.0, Vector2.ZERO)
@@ -201,7 +202,7 @@ func _run() -> void:
 	check(ghost.get_parent() == game.world.actors and ghost.dying and ghost.global_position.is_equal_approx(victim_position), "Only the visual detaches at the original world position")
 	check(not ghost.is_in_group("enemies") and ghost.find_children("*", "CollisionObject2D", true, false).is_empty(), "Death residual has no enemy membership or colliders")
 	await frames(2)
-	check(not is_instance_valid(victim) and get_nodes_in_group("pickups").size() == 1 and is_instance_valid(ghost), "Enemy and XP lifecycle are independent of the fading residual")
+	check(not is_instance_valid(victim) and get_nodes_in_group("pickups").is_empty() and player.total_experience == xp_before_death + SurvivorPlayer.XP_ENEMY and is_instance_valid(ghost), "Enemy removal and immediate XP are independent of the fading residual")
 	game.toggle_pause()
 	var death_age: float = ghost.death_age
 	await frames(30)

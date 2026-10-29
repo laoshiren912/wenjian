@@ -6,6 +6,7 @@ var speed: float = 540.0
 var max_distance: float = 640.0
 var traveled: float = 0.0
 var spent: bool = false
+var hostile: bool = false
 
 func _physics_process(delta: float) -> void:
 	if spent:
@@ -16,7 +17,7 @@ func _physics_process(delta: float) -> void:
 	if collision:
 		var body = collision.get_collider()
 		if is_instance_valid(body) and body.has_method("take_damage"):
-			body.take_damage(damage, direction * 95.0)
+			body.take_damage(damage, direction if hostile else direction * 95.0)
 		spent = true
 		queue_free()
 	elif traveled >= max_distance:
@@ -25,6 +26,9 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if hostile:
+		draw_circle(Vector2.ZERO, 7.0, Color("d695ff"))
+		return
 	var side := direction.orthogonal()
 	draw_line(-direction * 22.0, Vector2.ZERO, Color("d5ad70"), 3.0, true)
 	draw_colored_polygon(PackedVector2Array([direction * 6.0, -direction * 4.0 + side * 5.0, -direction * 4.0 - side * 5.0]), Color("f3ead0"))

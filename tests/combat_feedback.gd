@@ -58,8 +58,10 @@ func _run() -> void:
 	var popup_count: int = game.feedback.popups.size()
 	game.player.take_damage(12.0, Vector2.ZERO)
 	check(game.feedback.popups.size() == popup_count, "Blocked damage during invulnerability creates no false damage popup")
+	# This fixture tests popup lifetimes independently of level-up pauses.
+	game.player.next_level_xp = 100
 	game.player.gain_experience(8)
-	check(has_popup("experience", 8.0) and game.hud.notice.text == "+8 经验", "Experience gain displays +8 XP in the world and HUD")
+	check(has_popup("experience", 8.0) and game.hud.notice.text != "+8 经验", "Experience appears in the world without a duplicate HUD notice")
 	var all_ignore: bool = true
 	for popup in game.feedback.popups:
 		all_ignore = all_ignore and popup.label.mouse_filter == Control.MOUSE_FILTER_IGNORE
@@ -67,10 +69,7 @@ func _run() -> void:
 	var remaining: float = early.health
 	early.take_damage(10000.0, Vector2.ZERO)
 	check(has_popup("enemy_damage", remaining), "Lethal popup reports remaining HP lost and survives enemy removal")
-	# Keep this visual-expiry fixture from earning another level and pausing itself.
 	await frames(2)
-	for pickup in get_nodes_in_group("pickups"):
-		pickup.free()
 	await frames(70)
 	check(game.feedback.popups.is_empty() and game.feedback.bursts.is_empty(), "Damage and XP visuals expire without orphan labels")
 	game.feedback.show_damage(game.player.position, 5.0, false)
@@ -87,10 +86,11 @@ func _run() -> void:
 	for upgrade in range(6):
 		game.player.apply_upgrade(0)
 	game.elapsed = 180.0
+	game.floor_number = 3
 	var late := enemy_at(Vector2(70, 0))
 	var late_passive := enemy_at(Vector2(230, 0), SurvivorEnemy.Kind.PASSIVE)
 	game.elapsed = 0.0
-	check(is_equal_approx(late.max_health, 450.0) and is_equal_approx(late_passive.max_health, 300.0), "Late spawn HP reaches 450 hostile / 300 passive at 180 seconds")
+	check(is_equal_approx(late.max_health, 234.0) and is_equal_approx(late_passive.max_health, 156.0), "Floor 3 HP increases by 30 percent")
 	game.player.weapon.select_weapon(0)
 	game.player.weapon.cooldown = 0.0
 	game.player.weapon.attack(Vector2.RIGHT)

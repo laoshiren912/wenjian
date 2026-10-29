@@ -47,14 +47,31 @@ func _run() -> void:
 	game.hud.start_requested.emit()
 	while game.state != SurvivorGame.State.DEAD and game.state != SurvivorGame.State.WON:
 		await physics_frame
-		if game.state == SurvivorGame.State.LEVEL_UP:
+		if game.state == SurvivorGame.State.UPGRADE_PROMPT:
+			_release()
+			if not game.hud.transition_button.disabled:
+				game.hud.transition_button.pressed.emit()
+		elif game.state == SurvivorGame.State.SHOP_PROMPT:
+			_release()
+			if not game.hud.transition_button.disabled:
+				game.hud.transition_button.pressed.emit()
+		elif game.state == SurvivorGame.State.SHOP:
+			_release()
+			game.next_floor()
+			route = PackedVector2Array()
+			target_cell = Vector2i(-1, -1)
+		elif game.state == SurvivorGame.State.LEVEL_UP and game.hud.level_ui.accepting:
 			_release()
 			var choice: int = 2 if game.player.health < game.player.max_health * 0.65 else upgrades % 2
 			game.hud.level_ui.choices[choice].pressed.emit()
 			upgrades += 1
 			print("EARNED UPGRADE: choice=%d level=%d HP=%.0f/%.0f" % [choice + 1, game.player.level, game.player.health, game.player.max_health])
 		elif game.state == SurvivorGame.State.PLAYING and mode == "combat":
-			_control()
+			if game.pending_levels > 0:
+				_release()
+				game._open_level_up()
+			else:
+				_control()
 		elif game.state == SurvivorGame.State.PLAYING and mode == "kite":
 			if game.player.position.distance_to(patrol[patrol_index]) < 25.0:
 				patrol_index = (patrol_index + 1) % patrol.size()

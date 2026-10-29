@@ -51,6 +51,23 @@ func build(seed_value: int = 0) -> void:
 	add_child(actors)
 	queue_redraw()
 
+func rebuild_floor(player: Node2D) -> void:
+	for child in actors.get_children():
+		if child != player:
+			child.free()
+	actors.remove_child(player)
+	actors.free()
+	for child in get_children():
+		if child is StaticBody2D:
+			child.free()
+	blocked.clear()
+	floor_cells.clear()
+	grid = AStarGrid2D.new()
+	build()
+	actors.add_child(player)
+	player.global_position = SPAWN
+	player.camera.reset_smoothing()
+
 func _add_wall(cell: Vector2i) -> void:
 	blocked[cell] = true
 	grid.set_point_solid(cell, true)
@@ -92,6 +109,24 @@ func random_spawn(away_from: Vector2, minimum_distance: float = 300.0) -> Vector
 					break
 			if not occupied:
 				return point
+	return Vector2.ZERO
+
+func rear_spawn(origin: Vector2, facing: Vector2) -> Vector2:
+	var candidates: Array[Vector2i] = floor_cells.duplicate()
+	candidates.shuffle()
+	for cell in candidates:
+		var point := cell_center(cell)
+		var offset := point - origin
+		if offset.length() < 350.0 or offset.length() > 700.0 or offset.normalized().dot(facing) > -0.35:
+			continue
+		var occupied := false
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			if enemy.global_position.distance_to(point) < 45.0:
+				occupied = true
+				break
+		if not occupied and not path_between(point, origin).is_empty():
+			return point
+	# Keep the rear guarantee near walls: retry later rather than spawn in front.
 	return Vector2.ZERO
 
 func _draw() -> void:

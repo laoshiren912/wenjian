@@ -12,6 +12,11 @@ const PROFESSIONS: Array[Dictionary] = [
 	{"name": "枪兵", "weapon": 1, "health": 150.0, "speed": 180.0},
 	{"name": "弓箭手", "weapon": 2, "health": 80.0, "speed": 240.0},
 ]
+const XP_BASE: int = 40
+const XP_STEP: int = 10
+const XP_ENEMY: int = 10
+const XP_PASSIVE: int = 8
+const XP_BOSS: int = 0
 var _profession_index: int = 0
 var profession_index: int:
 	get:
@@ -23,6 +28,10 @@ var profession_index: int:
 @export_range(0.0, 200.0, 1.0) var roll_stamina_cost: float = 30.0
 @export_range(0.0, 5.0, 0.01) var roll_cooldown: float = 0.65
 
+@export_group("Bow movement")
+@export_range(0.1, 1.0, 0.01) var bow_shot_move_multiplier: float = 0.55
+@export_range(0.0, 1.0, 0.01) var bow_shot_move_duration: float = 0.24
+
 var max_health: float = 100.0
 var health: float = 100.0
 var max_stamina: float = 100.0
@@ -32,13 +41,25 @@ var stamina_delay: float = 0.0
 var speed: float = 225.0
 var damage_multiplier: float = 1.0
 var attack_speed_multiplier: float = 1.0
+var reach_bonus: float = 0.0
+var angle_bonus: float = 0.0
+var extra_targets: int = 0
+var extra_arrows: int = 0
+var projectile_speed_bonus: float = 0.0
+var equipment_names: Array[String] = []
+var card_counts: Array[int] = [0, 0, 0, 0, 0, 0]
+var damage_reduction: float = 0.0
+var heal_on_kill: float = 0.0
+var stamina_on_kill: float = 0.0
 var level: int = 1
 var experience: int = 0
-var next_level_xp: int = 18
+var next_level_xp: int = XP_BASE
 var total_experience: int = 0
 var invulnerability: float = 0.0
 var knockback: Vector2 = Vector2.ZERO
 var aim_direction: Vector2 = Vector2.RIGHT
+var _aim_viewport_position: Vector2 = Vector2.ZERO
+var _has_aim_event: bool = false
 var dead: bool = false
 var dry_attack_flash: float = 0.0
 var _attack_held: bool = false
@@ -47,6 +68,7 @@ var _roll_requested: bool = false
 var _roll_remaining: float = 0.0
 var _roll_cooldown: float = 0.0
 var _roll_direction: Vector2 = Vector2.DOWN
+var _bow_shot_remaining: float = 0.0
 @onready var weapon: SurvivorWeapon = $Weapon
 @onready var camera: Camera2D = $Camera2D
 @onready var visual: ActorVisual = $VisualRoot
@@ -72,7 +94,17 @@ func initialize_profession(index: int) -> bool:
 	return true
 
 func _on_attack_started(index: int, direction: Vector2) -> void:
+	if index == 2:
+		_bow_shot_remaining = bow_shot_move_duration
 	visual.play_attack(index, direction, weapon.swing_duration)
+
+func is_bow_recovering() -> bool:
+	return weapon.selected == 2 and _bow_shot_remaining > 0.0 and not is_rolling()
+
+func movement_multiplier() -> float:
+	if weapon.selected == 2:
+		return bow_shot_move_multiplier if _bow_shot_remaining > 0.0 else 1.0
+	return 0.8 if _attack_held and Input.is_action_pressed("attack") else 1.0
 
 func _on_weapon_selected(_index: int) -> void:
 	visual.cancel_attack()
@@ -107,6 +139,7 @@ func _physics_process(delta: float) -> void:
 	invulnerability = maxf(0.0, invulnerability - delta)
 	stamina_delay = maxf(0.0, stamina_delay - delta)
 	dry_attack_flash = maxf(0.0, dry_attack_flash - delta)
+	_bow_shot_remaining = maxf(0.0, _bow_shot_remaining - delta)
 	if stamina_delay <= 0.0:
 		stamina = minf(max_stamina, stamina + stamina_regen * delta)
 	_roll_cooldown = maxf(0.0, _roll_cooldown - delta)
@@ -120,10 +153,14 @@ func _physics_process(delta: float) -> void:
 		var step: float = minf(delta, _roll_remaining)
 		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
 	else:
-		velocity = movement * speed + knockback
+		# Bow recovery belongs to a fired shot, so releasing the button cannot cancel it.
+		velocity = movement * speed * movement_multiplier() + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
 	move_and_slide()
-	var aim: Vector2 = get_global_mouse_position() - global_position
+	var world_aim: Vector2 = get_global_mouse_position()
+	if _has_aim_event:
+		world_aim = get_viewport().get_canvas_transform().affine_inverse() * _aim_viewport_position
+	var aim: Vector2 = world_aim - global_position
 	if aim.length_squared() > 1.0:
 		aim_direction = aim.normalized()
 	var color := Color("79e2d0")
@@ -147,6 +184,9 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_aim_viewport_position = event.position
+		_has_aim_event = true
 	# Releases must clear the gesture even when a GUI control consumes them later.
 	if event.is_action_released("attack"):
 		_attack_held = false
@@ -179,8 +219,8 @@ func spend_stamina(amount: float) -> bool:
 func take_damage(amount: float, direction: Vector2) -> bool:
 	if dead or invulnerability > 0.0:
 		return false
-	var actual_damage: float = minf(health, amount)
-	health = maxf(0.0, health - amount)
+	var actual_damage: float = minf(health, amount * (1.0 - damage_reduction))
+	health = maxf(0.0, health - actual_damage)
 	invulnerability = 0.7
 	knockback = direction * 180.0
 	visual.play_hurt()
@@ -203,10 +243,13 @@ func gain_experience(amount: int) -> void:
 	while experience >= next_level_xp:
 		experience -= next_level_xp
 		level += 1
-		next_level_xp = 18 + (level - 1) * 10
+		next_level_xp = XP_BASE + (level - 1) * XP_STEP
 		level_gained.emit()
 
 func apply_upgrade(index: int) -> void:
+	if index < 0 or index >= card_counts.size():
+		return
+	card_counts[index] += 1
 	match index:
 		0:
 			damage_multiplier += 0.2
@@ -215,7 +258,21 @@ func apply_upgrade(index: int) -> void:
 		2:
 			max_health += 25.0
 			health = minf(max_health, health + 40.0)
+		3:
+			match profession_index:
+				0: extra_targets += 1
+				1: reach_bonus += 25.0
+				2: extra_arrows += 1
+		4:
+			match profession_index:
+				0: angle_bonus += 30.0
+				1: angle_bonus += 20.0
+				2: projectile_speed_bonus += 120.0
+		5:
+			roll_distance += 35.0
 
 func _draw() -> void:
+	if is_bow_recovering():
+		draw_arc(Vector2.ZERO, 21.0, -PI * 0.5, -PI * 0.5 + TAU * _bow_shot_remaining / maxf(0.001, bow_shot_move_duration), 24, Color("e9cc83"), 2.0, true)
 	if dry_attack_flash > 0.0:
 		draw_arc(Vector2.ZERO, 24.0, 0, TAU, 24, Color("efb362"), 2.5, true)

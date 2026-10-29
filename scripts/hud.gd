@@ -6,6 +6,12 @@ signal restart_requested
 signal stats_requested
 signal pause_requested
 signal resume_requested
+signal purchase_requested(index: int)
+signal shop_category_requested(index: int)
+signal upgrade_continue_requested
+signal shop_continue_requested
+signal next_floor_requested
+signal upgrades_requested
 
 var player: SurvivorPlayer
 var root: Control
@@ -29,6 +35,11 @@ var profession_buttons: Array[Button] = []
 var profession_layout: BoxContainer
 var start_button: Button
 var modal_panel: PanelContainer
+var tower_floor: int = 1
+var tower_gold: int = 0
+var transition_button: Button
+var transition_delay: float = 0.0
+var upgrades_button: Button
 @onready var level_ui = $LevelUpUI
 
 func _ready() -> void:
@@ -89,6 +100,10 @@ func _ready() -> void:
 	for button in [PrototypeUI.button("角色属性  [Tab]", func(): stats_requested.emit(), 32), PrototypeUI.button("暂停  [Esc]", func(): pause_requested.emit(), 32)]:
 		button.add_theme_font_size_override("font_size", 16)
 		action_box.add_child(button)
+	upgrades_button = PrototypeUI.button("待选强化", func(): upgrades_requested.emit(), 32)
+	upgrades_button.add_theme_font_size_override("font_size", 16)
+	action_box.add_child(upgrades_button)
+	upgrades_button.hide()
 	var spacer := Control.new()
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -197,10 +212,25 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	weapon_text.text = "%s · %s" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, SurvivorWeapon.DATA[player.weapon.selected].name]
 	var weapon_data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	weapon_detail.text = "%s · 每目标伤害 %.0f" % [weapon_data.role, float(weapon_data.damage) * player.damage_multiplier]
-	timer_text.text = "%02d:%02d / %02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60, int(duration) / 60, int(duration) % 60]
-	status_text.text = "击败 %d 个敌人 · 生存至 03:00" % kills
+	if player.weapon.selected == 2:
+		weapon_detail.text += " · 射后慢移" if player.is_bow_recovering() else " · 停火可全速移动"
+
+func update_tower(floor_number: int, remaining: int, gold: int, direction: Vector2, pending: int = 0) -> void:
+	tower_floor = floor_number
+	tower_gold = gold
+	var arrow := ""
+	if not direction.is_zero_approx():
+		var arrows := ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"]
+		arrow = arrows[posmod(roundi(direction.angle() / (PI / 4.0)), 8)]
+	timer_text.text = "第 %d 层  ·  剩余 %d" % [floor_number, remaining]
+	status_text.text = "金币 %d  ·  最近敌人 %s%s" % [gold, arrow, "  ·  待出现 %d" % pending if pending > 0 else ""]
 
 func _process(delta: float) -> void:
+	if is_instance_valid(transition_button) and transition_button.disabled:
+		transition_delay = maxf(0.0, transition_delay - delta)
+		if transition_delay <= 0.0 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			transition_button.disabled = false
+			transition_button.grab_focus()
 	hurt_flash.color.a = maxf(0.0, hurt_flash.color.a - delta * 0.8)
 	if notice_time > 0.0:
 		notice_time -= delta
@@ -211,10 +241,15 @@ func show_notice(text: String) -> void:
 	notice.text = text
 	notice_time = 2.5
 
+func update_pending_upgrades(count: int) -> void:
+	upgrades_button.visible = count > 0
+	upgrades_button.text = "待选强化 ×%d" % count
+
 func flash_damage() -> void:
 	hurt_flash.color.a = 0.18
 
 func _screen(title: String, subtitle: String) -> VBoxContainer:
+	transition_button = null
 	profession_buttons.clear()
 	profession_layout = null
 	start_button = null
@@ -232,7 +267,7 @@ func _screen(title: String, subtitle: String) -> VBoxContainer:
 	return box
 
 func show_start() -> void:
-	var box := _screen("边境试炼 · 选择职业", "生存 3 分钟 · 点击或按 1 / 2 / 3 选择 · 本局武器固定")
+	var box := _screen("通天塔 · 选择职业", "清理每层敌人，获得强化与装备，挑战第 4 层 Boss · 本局武器固定")
 	profession_layout = BoxContainer.new()
 	profession_layout.add_theme_constant_override("separation", 10)
 	box.add_child(profession_layout)
@@ -246,7 +281,7 @@ func show_start() -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		profession_layout.add_child(button)
 		profession_buttons.append(button)
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 属性 · Esc 暂停 · 普攻免费，翻滚耗 %.0f 体力且无额外无敌帧\n击败怪物后贴近蓝色晶体升级，升级时按 1 / 2 / 3 选强化。" % player.roll_stamina_cost, 16))
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n剑/矛按住攻击减速 20%%；弓每次射击后 %.2f 秒移速为 %.0f%%\n翻滚耗 %.0f 体力且无额外无敌帧；击败敌人直接获得经验。" % [player.bow_shot_move_duration, player.bow_shot_move_multiplier * 100.0, player.roll_stamina_cost], 16))
 	start_button = PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 48)
 	box.add_child(start_button)
 	select_profession(0)
@@ -265,9 +300,25 @@ func select_profession(index: int) -> void:
 func hide_screen() -> void:
 	overlay.hide()
 
+func show_upgrade_prompt(title: String, subtitle: String) -> void:
+	var box := _screen(title, subtitle)
+	box.add_child(_modal_label("松开攻击键，准备好后继续。", 18))
+	transition_button = PrototypeUI.button("继续选择强化", func(): upgrade_continue_requested.emit())
+	transition_button.disabled = true
+	transition_delay = 0.4
+	box.add_child(transition_button)
+
+func show_shop_prompt(floor_number: int, gold: int) -> void:
+	var box := _screen("第 %d 层结算" % floor_number, "清层强化已选择 · 当前金币 %d" % gold)
+	box.add_child(_modal_label("准备好后进入商店，选择装备或保留金币。", 18))
+	transition_button = PrototypeUI.button("进入商店", func(): shop_continue_requested.emit())
+	transition_button.disabled = true
+	transition_delay = 0.4
+	box.add_child(transition_button)
+
 func show_pause() -> void:
-	var box := _screen("已暂停", "战斗与存活计时已暂停。")
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 查看属性 · Esc 继续战斗 · 本局武器固定\n\n红弧是攻击预警；金色圆形受击后反击，红色菱形主动追击。\n贴近蓝色晶体拾取经验，升级时点击或按 1 / 2 / 3 选择强化。", 18))
+	var box := _screen("已暂停", "战斗已暂停。")
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 查看属性 · Esc 继续战斗 · 本局武器固定\n\n红弧与红圈是攻击预警；紫色标记是远程怪。\n击败敌人直接获得经验，升级时点击或按 1 / 2 / 3 选择强化。", 18))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
@@ -279,13 +330,44 @@ func show_stats() -> void:
 	var data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	box.add_child(_modal_label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
 	box.add_child(_modal_label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间不能攻击，无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
+	if player.weapon.selected == 2:
+		box.add_child(_modal_label("射箭后 %.2f 秒，移动速度为 %.0f%%；松开左键也需完成恢复。" % [player.bow_shot_move_duration, player.bow_shot_move_multiplier * 100.0], 16))
+	box.add_child(_modal_label("楼层 %d · 金币 %d\n装备：%s\n卡牌次数（力量 / 迅捷 / 活力 / 职业1 / 职业2 / 远行）：%s" % [tower_floor, tower_gold, "、".join(player.equipment_names) if not player.equipment_names.is_empty() else "无", str(player.card_counts)], 16))
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	button.grab_focus()
 
 func show_result(won: bool, elapsed: float, kills: int) -> void:
-	var box := _screen("试炼完成" if won else "试炼结束", "已生存 3 分钟！" if won else "生命耗尽。调整距离，留意攻击预警，再试一次。")
-	box.add_child(_modal_label("本局职业  %s\n存活时间  %02d:%02d\n击败敌人  %d\n最终等级  %d\n累计经验  %d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, int(elapsed) / 60, int(elapsed) % 60, kills, player.level, player.total_experience], 24))
+	var box := _screen("通天塔完成" if won else "挑战结束", "击败了塔顶 Boss！" if won else "生命耗尽，再试一次。")
+	box.add_child(_modal_label("本局职业  %s\n抵达第 %d 层 · 金币 %d\n击败敌人  %d · 等级 %d\n累计经验  %d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, tower_floor, tower_gold, kills, player.level, player.total_experience], 24))
 	var button := PrototypeUI.button("重新开始  [Enter / R]", func(): restart_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()
+
+func show_shop(gold: int, purchased: Array[bool], category: int, message: String = "") -> void:
+	var box := _screen("层间商店", "金币 %d · 每件装备本局限购一次 · AP 暂未开放" % gold)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 5)
+	box.add_child(tabs)
+	for tab in range(4):
+		var label: String = ["AD", "AP（未开放）", "防御", "机动"][tab]
+		var tab_button := PrototypeUI.button(("● " if tab == category else "") + label, func(): shop_category_requested.emit(tab), 38)
+		tab_button.add_theme_font_size_override("font_size", 16)
+		tab_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(tab_button)
+	for index in range(SurvivorGame.EQUIPMENT.size()):
+		var item: Dictionary = SurvivorGame.EQUIPMENT[index]
+		if int(item.category) != category:
+			continue
+		var text := "%s · %d 金币%s\n%s" % [item.name, item.price, " · 已购买" if purchased[index] else "", item.effect]
+		var button := PrototypeUI.button(text, func(): purchase_requested.emit(index), 55)
+		button.add_theme_font_size_override("font_size", 15)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.disabled = purchased[index]
+		box.add_child(button)
+	if category == 1:
+		box.add_child(_modal_label("暂未开放：技能系统尚未实现。", 17))
+	box.add_child(_modal_label(message if not message.is_empty() else "金币不足的商品可以点击查看提示。", 15, Color("e1cd9b")))
+	var next := PrototypeUI.button("进入下一层", func(): next_floor_requested.emit(), 42)
+	box.add_child(next)
+	next.grab_focus()
