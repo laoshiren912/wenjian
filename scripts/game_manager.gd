@@ -31,6 +31,8 @@ var gold: int = START_GOLD
 var clear_pending: bool = false
 var purchased: Array[bool] = [false, false, false, false, false, false, false, false, false]
 var shop_category: int = 4
+var manual_claimed_floor: int = 0
+var gm_bonus_granted: bool = false
 var pending_wave: Array[Dictionary] = []
 var wave_delay: float = 0.0
 @onready var world: SurvivorWorld = $World
@@ -66,13 +68,17 @@ func _ready() -> void:
 	hud.shop_category_requested.connect(select_shop_category)
 	hud.shop_continue_requested.connect(open_shop)
 	hud.next_floor_requested.connect(next_floor)
+	hud.manual_requested.connect(claim_manual)
+	hud.manual_upgrade_requested.connect(upgrade_manual)
+	hud.gm_toggle_requested.connect(set_gm_mode)
+	hud.gm_gold_requested.connect(add_gm_gold)
 	_spawn_floor()
 	hud.update_game(elapsed, kills, RUN_DURATION)
 	hud.show_start()
 	get_tree().paused = true
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE, "skill_1": KEY_Q, "skill_2": KEY_E}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -95,11 +101,34 @@ func select_profession(index: int) -> void:
 	selected_profession = index
 	hud.select_profession(index)
 
+func set_gm_mode(enabled: bool) -> void:
+	if state != State.START and state != State.PAUSED:
+		return
+	player.gm_invulnerable = enabled
+	if enabled:
+		player.health = player.max_health
+		if state == State.PAUSED:
+			_grant_gm_bonus()
+	if state == State.PAUSED:
+		hud.show_pause(gold)
+
+func add_gm_gold() -> void:
+	if state == State.PAUSED and player.gm_invulnerable:
+		gold += 1000
+		hud.show_pause(gold)
+
+func _grant_gm_bonus() -> void:
+	if not gm_bonus_granted:
+		gold += 5000
+		gm_bonus_granted = true
+
 func start_run() -> void:
 	if state != State.START:
 		return
 	if not player.initialize_profession(selected_profession):
 		return
+	if player.gm_invulnerable:
+		_grant_gm_bonus()
 	state = State.PLAYING
 	hud.hide_screen()
 	hud.update_game(elapsed, kills, RUN_DURATION)
@@ -196,7 +225,7 @@ func _on_experience_received(amount: int) -> void:
 	feedback.show_experience(player.global_position, amount)
 
 func _on_level_gained() -> void:
-	hud.show_notice("等级提升 · 获得 1 技能点（技能尚未开放）")
+	hud.show_notice("等级提升 · 获得 1 技能点，可在 Tab 属性页修炼秘籍")
 
 func _spawn_floor() -> void:
 	var count: int = [8, 12, 16, 1][floor_number - 1]
@@ -253,7 +282,22 @@ func open_shop() -> void:
 	show_shop()
 
 func show_shop(message: String = "") -> void:
-	hud.show_shop(gold, purchased, shop_category, message)
+	hud.show_shop(gold, purchased, shop_category, message, floor_number <= 2 and manual_claimed_floor != floor_number)
+
+func claim_manual(index: int) -> void:
+	if state != State.SHOP or player.profession_index != 0 or floor_number > 2 or manual_claimed_floor == floor_number:
+		return
+	if index < 0 or index >= player.MANUAL_NAMES.size() or player.manuals.has(index) or player.manuals.size() >= 2:
+		return
+	player.manuals.append(index)
+	manual_claimed_floor = floor_number
+	show_shop("已获得：%s" % player.MANUAL_NAMES[index])
+
+func upgrade_manual(slot: int) -> void:
+	if state != State.PAUSED or not stats_open:
+		return
+	if player.upgrade_manual(slot):
+		hud.show_stats()
 
 func select_shop_category(index: int) -> void:
 	if state != State.SHOP or index < 0 or index > 4:
@@ -337,7 +381,7 @@ func toggle_pause() -> void:
 		state = State.PAUSED
 		stats_open = false
 		get_tree().paused = true
-		hud.show_pause()
+		hud.show_pause(gold)
 
 func resume_run() -> void:
 	if state != State.PAUSED:

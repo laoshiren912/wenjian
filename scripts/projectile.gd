@@ -7,6 +7,7 @@ var max_distance: float = 640.0
 var traveled: float = 0.0
 var spent: bool = false
 var hostile: bool = false
+var sword_energy: bool = false
 
 func _physics_process(delta: float) -> void:
 	if spent:
@@ -28,6 +29,11 @@ func _physics_process(delta: float) -> void:
 func _draw() -> void:
 	if hostile:
 		draw_circle(Vector2.ZERO, 7.0, Color("d695ff"))
+		return
+	if sword_energy:
+		var side := direction.orthogonal()
+		draw_line(-direction * 28.0, direction * 6.0, Color(0.5, 0.9, 1.0, 0.55), 5.0, true)
+		draw_line(-side * 15.0, side * 15.0, Color("b5f7ff"), 5.0, true)
 		return
 	var side := direction.orthogonal()
 	draw_line(-direction * 22.0, Vector2.ZERO, Color("d5ad70"), 3.0, true)

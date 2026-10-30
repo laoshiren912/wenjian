@@ -275,7 +275,7 @@ func _run() -> void:
 	mouse(true)
 	mouse(false)
 	await frames(40)
-	check(player.weapon.attack_count == 0, "A short attack clicked only during roll is not buffered for later")
+	check(player.weapon.attack_count == 1, "A sword attack clicked during roll starts after the roll")
 	await fresh(2)
 	player = game.player
 	var enemy := target_at(70)

@@ -10,6 +10,10 @@ signal purchase_requested(index: int)
 signal shop_category_requested(index: int)
 signal shop_continue_requested
 signal next_floor_requested
+signal manual_requested(index: int)
+signal manual_upgrade_requested(index: int)
+signal gm_toggle_requested(enabled: bool)
+signal gm_gold_requested
 
 var player: SurvivorPlayer
 var root: Control
@@ -23,6 +27,7 @@ var stamina_text: Label
 var xp_text: Label
 var weapon_text: Label
 var weapon_detail: Label
+var manual_text: Label
 var timer_text: Label
 var status_text: Label
 var hurt_flash: ColorRect
@@ -41,6 +46,7 @@ var shop_selected: int = -1
 var shop_grid: GridContainer
 var shop_detail: VBoxContainer
 var shop_buy_button: Button
+var shop_manual_available: bool = false
 
 func _ready() -> void:
 	root = Control.new()
@@ -125,6 +131,8 @@ func _ready() -> void:
 	detail_row.add_child(weapon_text)
 	weapon_detail = PrototypeUI.label("", 15, Color("b4d1d4"))
 	detail_row.add_child(weapon_detail)
+	manual_text = PrototypeUI.label("", 14, Color("96e5cf"))
+	equipment_box.add_child(manual_text)
 	var experience := HBoxContainer.new()
 	experience.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	experience.add_theme_constant_override("separation", 12)
@@ -205,6 +213,10 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	xp_bar.max_value = player.next_level_xp
 	xp_bar.value = player.experience
 	weapon_text.text = "%s · %s" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, SurvivorWeapon.DATA[player.weapon.selected].name]
+	var manual_parts: Array[String] = []
+	for i in range(player.manuals.size()):
+		manual_parts.append("%s %s Lv%d %.1f秒" % [["Q", "E"][i], player.MANUAL_NAMES[player.manuals[i]], player.manual_levels[i], player.manual_cooldowns[i]])
+	manual_text.text = "   ".join(manual_parts)
 	var weapon_data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	weapon_detail.text = "%s · 每目标伤害 %.0f" % [weapon_data.role, float(weapon_data.damage) * player.damage_multiplier]
 	if player.weapon.selected == 2:
@@ -218,7 +230,7 @@ func update_tower(floor_number: int, remaining: int, gold: int, direction: Vecto
 		var arrows := ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"]
 		arrow = arrows[posmod(roundi(direction.angle() / (PI / 4.0)), 8)]
 	timer_text.text = "第 %d 层  ·  剩余 %d" % [floor_number, remaining]
-	status_text.text = "金币 %d  ·  最近敌人 %s%s" % [gold, arrow, "  ·  待出现 %d" % pending if pending > 0 else ""]
+	status_text.text = "%s金币 %d  ·  最近敌人 %s%s" % ["GM 锁血  ·  " if player.gm_invulnerable else "", gold, arrow, "  ·  待出现 %d" % pending if pending > 0 else ""]
 
 func _process(delta: float) -> void:
 	if is_instance_valid(transition_button) and transition_button.disabled:
@@ -272,7 +284,12 @@ func show_start() -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		profession_layout.add_child(button)
 		profession_buttons.append(button)
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n攻击动作期间站立并朝向攻击方向；可翻滚脱离。\n翻滚耗 %.0f 体力；击败敌人获得经验，升级获得技能点（技能尚未开放）。" % [player.roll_stamina_cost], 16))
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n攻击动作期间站立；可翻滚脱离。Q/E 使用秘籍，可在翻滚中释放。\n翻滚耗 %.0f 体力；升级获得技能点，在 Tab 属性页修炼秘籍。" % [player.roll_stamina_cost], 16))
+	var gm_check := CheckBox.new()
+	gm_check.text = "GM 测试模式：锁血并获得 5000 金币（本局）"
+	gm_check.button_pressed = player.gm_invulnerable
+	gm_check.toggled.connect(func(enabled: bool): gm_toggle_requested.emit(enabled))
+	box.add_child(gm_check)
 	start_button = PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 48)
 	box.add_child(start_button)
 	select_profession(0)
@@ -299,9 +316,13 @@ func show_shop_prompt(floor_number: int, gold: int) -> void:
 	transition_delay = 0.4
 	box.add_child(transition_button)
 
-func show_pause() -> void:
-	var box := _screen("已暂停", "战斗已暂停。")
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 查看属性 · Esc 继续战斗 · 本局武器固定\n\n红弧与红圈是攻击预警；紫色标记是远程怪。\n升级获得技能点，技能系统尚未开放。", 18))
+func show_pause(gold: int = -1) -> void:
+	var box := _screen("已暂停", "战斗已暂停。" if gold < 0 else "战斗已暂停 · 金币 %d" % gold)
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nQ/E 使用秘籍 · Tab 修炼秘籍 · Esc 继续战斗\n\n红色区域是攻击预警；紫色标记是远程怪。", 18))
+	var gm_button := PrototypeUI.button("GM 锁血：%s（首次开启送 5000 金币）" % ("开" if player.gm_invulnerable else "关"), func(): gm_toggle_requested.emit(not player.gm_invulnerable), 38)
+	box.add_child(gm_button)
+	if player.gm_invulnerable:
+		box.add_child(PrototypeUI.button("GM 增加 1000 金币", func(): gm_gold_requested.emit(), 38))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
@@ -312,10 +333,17 @@ func show_stats() -> void:
 	box.add_child(_modal_label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（消耗后延迟 0.42 秒）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 18))
 	var data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	box.add_child(_modal_label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
-	box.add_child(_modal_label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间不能攻击，无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
+	box.add_child(_modal_label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间可释放秘籍；无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
 	if player.weapon.selected == 2:
 		box.add_child(_modal_label("射箭后 %.2f 秒，移动速度为 %.0f%%；松开左键也需完成恢复。" % [player.bow_shot_move_duration, player.bow_shot_move_multiplier * 100.0], 16))
-	box.add_child(_modal_label("楼层 %d · 金币 %d · 技能点 %d（技能尚未开放）\n装备：%s" % [tower_floor, tower_gold, player.skill_points, "、".join(player.equipment_names) if not player.equipment_names.is_empty() else "无"], 16))
+	box.add_child(_modal_label("楼层 %d · 金币 %d · 可用技能点 %d\n装备：%s" % [tower_floor, tower_gold, player.skill_points, "、".join(player.equipment_names) if not player.equipment_names.is_empty() else "无"], 16))
+	for i in range(player.manuals.size()):
+		var slot := i
+		var rank: int = player.manual_levels[slot]
+		var benefits: Array[String] = ["伤害 +15、冷却 -0.4秒", "伤害 +20", "强化倍率 +25个百分点"]
+		var upgrade := PrototypeUI.button("%s %s Lv.%d / %d · %s · 修炼 +1" % [["Q", "E"][slot], player.MANUAL_NAMES[player.manuals[slot]], rank, player.MANUAL_MAX_LEVEL, benefits[player.manuals[slot]]], func(): manual_upgrade_requested.emit(slot), 34)
+		upgrade.disabled = player.skill_points <= 0 or rank >= player.MANUAL_MAX_LEVEL
+		box.add_child(upgrade)
 	var button := PrototypeUI.button("返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	button.grab_focus()
@@ -327,9 +355,18 @@ func show_result(won: bool, elapsed: float, kills: int) -> void:
 	box.add_child(button)
 	button.grab_focus()
 
-func show_shop(gold: int, purchased: Array[bool], category: int, message: String = "") -> void:
+func show_shop(gold: int, purchased: Array[bool], category: int, message: String = "", manual_available: bool = false) -> void:
+	shop_manual_available = manual_available
 	var box := _screen("层间商店", "金币 %d  ·  选择装备查看详情  ·  本局限购一次" % gold)
 	box.add_theme_constant_override("separation", 8)
+	if manual_available and player.profession_index == 0 and player.manuals.size() < 2:
+		box.add_child(_modal_label("免费选择一本：旋风斩（范围） / 剑气（远程） / 乘势（翻滚后强化刺击）。可在翻滚中释放。", 14))
+		var manual_row := HBoxContainer.new()
+		box.add_child(manual_row)
+		for index in range(player.MANUAL_NAMES.size()):
+			var manual_button := PrototypeUI.button(player.MANUAL_NAMES[index], func(): manual_requested.emit(index), 32)
+			manual_button.disabled = player.manuals.has(index)
+			manual_row.add_child(manual_button)
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
 	box.add_child(tabs)
@@ -363,7 +400,7 @@ func show_shop(gold: int, purchased: Array[bool], category: int, message: String
 		var text := "%s  %s\n%d%s" % [icon, item.name, item.price, "  已购买" if purchased[index] else ""]
 		var button := PrototypeUI.button(text, func():
 			shop_selected = index
-			show_shop(gold, purchased, category)
+			show_shop(gold, purchased, category, "", shop_manual_available)
 		, 72)
 		button.name = "Item%d" % index
 		button.add_theme_font_size_override("font_size", 15)

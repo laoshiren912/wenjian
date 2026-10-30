@@ -29,6 +29,21 @@ var wander_target: Vector2
 var wander_timer: float = 2.0
 var special_cooldown: float = 4.0
 var special_windup: float = 0.0
+enum BossState { APPROACH, CIRCLE_WINDUP, COMBO_WINDUP, CHARGE_WINDUP, CHARGING, RECOVERY }
+const BOSS_CIRCLE_RADIUS := 290.0
+const BOSS_COMBO_RADIUS := 80.0
+const BOSS_COMBO_HALF_ANGLE := 0.85
+const BOSS_CHARGE_DISTANCE := 320.0
+const BOSS_CHARGE_SPEED := 500.0
+const BOSS_CHARGE_WIDTH := 29.0
+var boss_state: int = BossState.APPROACH
+var boss_timer: float = 1.0
+var boss_next_attack: int = 0
+var boss_combo_hits: int = 0
+var boss_charge_remaining: float = 0.0
+var boss_charge_aim: Vector2 = Vector2.RIGHT
+var boss_charge_hit: bool = false
+var boss_charge_distance: float = BOSS_CHARGE_DISTANCE
 @onready var visual: ActorVisual = $VisualRoot
 
 func _ready() -> void:
@@ -59,6 +74,9 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if dead or not is_instance_valid(player) or player.dead:
+		return
+	if kind == Kind.BOSS:
+		_boss_process(delta)
 		return
 	flash = maxf(0.0, flash - delta)
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
@@ -134,6 +152,93 @@ func _physics_process(delta: float) -> void:
 	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
 	queue_redraw()
 
+func _boss_process(delta: float) -> void:
+	flash = maxf(0.0, flash - delta)
+	repath -= delta
+	boss_timer -= delta
+	var offset: Vector2 = player.global_position - global_position
+	var movement := Vector2.ZERO
+	match boss_state:
+		BossState.APPROACH:
+			if boss_timer <= 0.0 and (offset.length() < 300.0 or boss_next_attack == 2):
+				boss_charge_aim = offset.normalized() if offset.length_squared() > 0.01 else Vector2.RIGHT
+				if boss_next_attack == 0:
+					boss_state = BossState.CIRCLE_WINDUP
+					boss_timer = 0.9
+				elif boss_next_attack == 1:
+					if offset.length() > BOSS_COMBO_RADIUS:
+						movement = _follow_path(player.global_position)
+					else:
+						boss_state = BossState.COMBO_WINDUP
+						boss_combo_hits = 0
+						boss_timer = 0.4
+				else:
+					boss_state = BossState.CHARGE_WINDUP
+					boss_timer = 1.0
+					boss_charge_distance = _boss_open_charge_distance()
+			else:
+				movement = _follow_path(player.global_position)
+		BossState.CIRCLE_WINDUP:
+			if boss_timer <= 0.0:
+				if offset.length() <= BOSS_CIRCLE_RADIUS:
+					player.take_damage(24.0, offset.normalized())
+				_boss_recover(1)
+		BossState.COMBO_WINDUP:
+			if boss_timer <= 0.0:
+				if offset.length() <= BOSS_COMBO_RADIUS and absf(boss_charge_aim.angle_to(offset)) <= BOSS_COMBO_HALF_ANGLE:
+					player.take_damage(damage, offset.normalized())
+				boss_combo_hits += 1
+				if boss_combo_hits >= 3:
+					_boss_recover(2)
+				else:
+					boss_charge_aim = offset.normalized() if offset.length_squared() > 0.01 else boss_charge_aim
+					boss_timer = 0.55
+		BossState.CHARGE_WINDUP:
+			if boss_timer <= 0.0:
+				boss_state = BossState.CHARGING
+				boss_charge_remaining = boss_charge_distance
+				boss_charge_hit = false
+		BossState.CHARGING:
+			var start := global_position
+			var distance := minf(boss_charge_remaining, BOSS_CHARGE_SPEED * delta)
+			var collision := move_and_collide(boss_charge_aim * distance)
+			var end := global_position
+			var closest := Geometry2D.get_closest_point_to_segment(player.global_position, start, end)
+			if not boss_charge_hit and closest.distance_to(player.global_position) <= BOSS_CHARGE_WIDTH and _boss_has_sight(player.global_position):
+				boss_charge_hit = true
+				player.take_damage(damage, boss_charge_aim)
+			boss_charge_remaining -= distance
+			if collision or boss_charge_remaining <= 0.0:
+				_boss_recover(0)
+		BossState.RECOVERY:
+			if boss_timer <= 0.0:
+				boss_state = BossState.APPROACH
+				boss_timer = 0.35
+	if boss_state == BossState.APPROACH:
+		velocity = movement * speed
+		move_and_slide()
+	visual.update_pose(velocity if boss_state == BossState.APPROACH else Vector2.ZERO, boss_charge_aim, Color("d4bb76"))
+	queue_redraw()
+
+func _boss_has_sight(target: Vector2) -> bool:
+	var ray := PhysicsRayQueryParameters2D.create(global_position, target, 1)
+	return get_world_2d().direct_space_state.intersect_ray(ray).is_empty()
+
+func _boss_open_charge_distance() -> float:
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = $CollisionShape2D.shape
+	query.transform = global_transform
+	query.motion = boss_charge_aim * BOSS_CHARGE_DISTANCE
+	query.collision_mask = 1
+	var result := get_world_2d().direct_space_state.cast_motion(query)
+	return BOSS_CHARGE_DISTANCE * result[0]
+
+func _boss_recover(next_attack: int) -> void:
+	boss_next_attack = next_attack
+	boss_state = BossState.RECOVERY
+	boss_timer = 1.0
+	velocity = Vector2.ZERO
+
 func _follow_path(target: Vector2) -> Vector2:
 	var ray := PhysicsRayQueryParameters2D.create(global_position, target, 1)
 	if global_position.distance_to(target) < 130.0 and get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
@@ -158,7 +263,7 @@ func take_damage(amount: float, push: Vector2) -> void:
 	var actual_damage: float = minf(health, amount)
 	health -= amount
 	damaged.emit(global_position, actual_damage)
-	knockback = push
+	knockback = push if kind != Kind.BOSS else Vector2.ZERO
 	# Damage interrupts a telegraphed attack.
 	windup = 0.0
 	attack_cooldown = maxf(attack_cooldown, 0.25)
@@ -180,6 +285,20 @@ func _draw() -> void:
 	if health < max_health:
 		draw_rect(Rect2(-19, -38, 38, 4), Color("182329"))
 		draw_rect(Rect2(-19, -38, 38 * maxf(0.0, health / max_health), 4), color)
+	if kind == Kind.BOSS:
+		if boss_state == BossState.CIRCLE_WINDUP:
+			draw_circle(Vector2.ZERO, BOSS_CIRCLE_RADIUS, Color(1.0, 0.2, 0.1, 0.18))
+			draw_arc(Vector2.ZERO, BOSS_CIRCLE_RADIUS, 0.0, TAU, 64, Color("ff654f"), 3.0, true)
+		elif boss_state == BossState.COMBO_WINDUP:
+			var angle := boss_charge_aim.angle()
+			var points := PackedVector2Array([Vector2.ZERO])
+			for i in range(25):
+				points.append(Vector2.from_angle(angle - BOSS_COMBO_HALF_ANGLE + 2.0 * BOSS_COMBO_HALF_ANGLE * i / 24.0) * BOSS_COMBO_RADIUS)
+			draw_colored_polygon(points, Color(1.0, 0.3, 0.1, 0.25))
+			draw_arc(Vector2.ZERO, BOSS_COMBO_RADIUS, angle - BOSS_COMBO_HALF_ANGLE, angle + BOSS_COMBO_HALF_ANGLE, 24, Color("ff654f"), 3.0, true)
+		elif boss_state == BossState.CHARGE_WINDUP:
+			draw_line(Vector2.ZERO, boss_charge_aim * boss_charge_distance, Color(1.0, 0.3, 0.1, 0.28), BOSS_CHARGE_WIDTH * 2.0, true)
+			draw_line(Vector2.ZERO, boss_charge_aim * boss_charge_distance, Color("ffd36b"), 3.0, true)
 	if windup > 0.0:
 		var center: float = attack_direction.angle()
 		draw_arc(Vector2.ZERO, 48.0, center - 1.1, center + 1.1, 18, Color(1.0, 0.38, 0.25, 0.9), 3.0, true)

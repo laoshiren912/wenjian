@@ -12,6 +12,7 @@ const PROFESSIONS: Array[Dictionary] = [
 	{"name": "枪兵", "weapon": 1, "health": 150.0, "speed": 180.0},
 	{"name": "弓箭手", "weapon": 2, "health": 80.0, "speed": 240.0},
 ]
+const MANUAL_NAMES = ["旋风斩", "剑气", "乘势"]
 const XP_BASE: int = 40
 const XP_STEP: int = 10
 const XP_ENEMY: int = 10
@@ -48,6 +49,17 @@ var extra_arrows: int = 0
 var projectile_speed_bonus: float = 0.0
 var equipment_names: Array[String] = []
 var skill_points: int = 0
+var manuals: Array[int] = []
+var manual_cooldowns: Array[float] = [0.0, 0.0]
+var manual_levels: Array[int] = [1, 1]
+const MANUAL_MAX_LEVEL: int = 4
+var momentum_armed: float = 0.0
+var momentum_ready: float = 0.0
+var momentum_bonus: float = 1.7
+var manual_flash: float = 0.0
+var manual_effect: int = -1
+var manual_direction: Vector2 = Vector2.RIGHT
+var manual_origin: Vector2 = Vector2.ZERO
 var damage_reduction: float = 0.0
 var heal_on_kill: float = 0.0
 var stamina_on_kill: float = 0.0
@@ -62,6 +74,7 @@ var _movement_facing: Vector2 = Vector2.DOWN
 var _aim_viewport_position: Vector2 = Vector2.ZERO
 var _has_aim_event: bool = false
 var dead: bool = false
+var gm_invulnerable: bool = false
 var dry_attack_flash: float = 0.0
 var _attack_held: bool = false
 var _attack_pending: bool = false
@@ -102,6 +115,58 @@ func _on_attack_started(index: int, direction: Vector2) -> void:
 		_bow_shot_remaining = bow_shot_move_duration
 	visual.play_attack(index, direction, weapon.swing_duration)
 
+func consume_momentum() -> float:
+	if momentum_ready > 0.0:
+		momentum_ready = 0.0
+		return momentum_bonus
+	return 1.0
+
+func use_manual(slot: int) -> void:
+	if dead or get_tree().paused or profession_index != 0 or slot < 0 or slot >= manuals.size() or manual_cooldowns[slot] > 0.0:
+		return
+	# A skill cancels an unfinished sword action, but never resets its cooldown.
+	weapon.swing_time = 0.0
+	manual_direction = aim_direction
+	manual_origin = global_position
+	manual_effect = manuals[slot]
+	manual_flash = 0.25
+	if not is_rolling():
+		visual.play_attack(0, aim_direction, 0.25)
+	var rank: int = manual_levels[slot]
+	match manuals[slot]:
+		0:
+			manual_cooldowns[slot] = 6.0 - 0.4 * (rank - 1)
+			for enemy in get_tree().get_nodes_in_group("enemies"):
+				if enemy.dead or global_position.distance_to(enemy.global_position) > 120.0:
+					continue
+				var ray := PhysicsRayQueryParameters2D.create(global_position, enemy.global_position, 1)
+				if get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
+					enemy.take_damage((45.0 + 15.0 * (rank - 1)) * damage_multiplier, (enemy.global_position - global_position).normalized() * 155.0)
+		1:
+			manual_cooldowns[slot] = 4.0
+			var shot = SurvivorWeapon.PROJECTILE_SCENE.instantiate()
+			shot.direction = aim_direction
+			shot.damage = (65.0 + 20.0 * (rank - 1)) * damage_multiplier
+			shot.sword_energy = true
+			shot.speed = 500.0
+			shot.max_distance = 340.0
+			get_parent().add_child(shot)
+			shot.global_position = global_position + aim_direction * 23.0
+		2:
+			manual_cooldowns[slot] = 6.0
+			momentum_bonus = 1.7 + 0.25 * (rank - 1)
+			if is_rolling():
+				momentum_ready = 3.0
+			else:
+				momentum_armed = 4.0
+
+func upgrade_manual(slot: int) -> bool:
+	if slot < 0 or slot >= manuals.size() or skill_points <= 0 or manual_levels[slot] >= MANUAL_MAX_LEVEL:
+		return false
+	skill_points -= 1
+	manual_levels[slot] += 1
+	return true
+
 func is_bow_recovering() -> bool:
 	return weapon.selected == 2 and _bow_shot_remaining > 0.0 and not is_rolling()
 
@@ -122,6 +187,9 @@ func try_roll() -> bool:
 	var movement := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	_roll_direction = movement.normalized() if not movement.is_zero_approx() else _movement_facing
 	_roll_remaining = maxf(0.001, roll_duration)
+	if momentum_armed > 0.0:
+		momentum_armed = 0.0
+		momentum_ready = 3.0
 	_roll_cooldown = roll_cooldown
 	_attack_pending = false
 	_click_target = null
@@ -143,6 +211,11 @@ func _physics_process(delta: float) -> void:
 	if dead:
 		return
 	invulnerability = maxf(0.0, invulnerability - delta)
+	for i in range(manual_cooldowns.size()):
+		manual_cooldowns[i] = maxf(0.0, manual_cooldowns[i] - delta)
+	momentum_armed = maxf(0.0, momentum_armed - delta)
+	momentum_ready = maxf(0.0, momentum_ready - delta)
+	manual_flash = maxf(0.0, manual_flash - delta)
 	stamina_delay = maxf(0.0, stamina_delay - delta)
 	dry_attack_flash = maxf(0.0, dry_attack_flash - delta)
 	_target_marker_remaining = maxf(0.0, _target_marker_remaining - delta)
@@ -172,8 +245,9 @@ func _physics_process(delta: float) -> void:
 		if weapon.attack(attack_direction):
 			_target_marker = _click_target if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead else null
 			_target_marker_remaining = 0.65 if is_instance_valid(_target_marker) else 0.0
-	_attack_pending = false
-	_click_target = null
+	if not rolling_this_frame:
+		_attack_pending = false
+		_click_target = null
 	if rolling_this_frame:
 		# Scale the final partial tick so unobstructed rolls cover the configured distance.
 		var step: float = minf(delta, _roll_remaining)
@@ -234,7 +308,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Only presses that survive GUI handling may start a world attack gesture.
 	if event.is_action_pressed("attack"):
 		_attack_held = true
-		_attack_pending = not is_rolling()
+		_attack_pending = not is_rolling() or profession_index == 0
 		_click_target = null
 		if event is InputEventMouseButton:
 			_aim_viewport_position = event.position
@@ -242,6 +316,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _attack_pending and weapon.selected != 0:
 				var point: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
 				_click_target = _target_at_click(point)
+		get_viewport().set_input_as_handled()
+	if event.is_action_pressed("skill_1") and not event.is_echo():
+		use_manual(0)
+		get_viewport().set_input_as_handled()
+	if event.is_action_pressed("skill_2") and not event.is_echo():
+		use_manual(1)
 		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("roll"):
 		_roll_requested = true
@@ -256,7 +336,7 @@ func spend_stamina(amount: float) -> bool:
 	return true
 
 func take_damage(amount: float, direction: Vector2) -> bool:
-	if dead or invulnerability > 0.0:
+	if dead or gm_invulnerable or invulnerability > 0.0:
 		return false
 	var actual_damage: float = minf(health, amount * (1.0 - damage_reduction))
 	health = maxf(0.0, health - actual_damage)
@@ -289,6 +369,20 @@ func gain_experience(amount: int) -> void:
 		level_gained.emit()
 
 func _draw() -> void:
+	if manual_flash > 0.0:
+		var fade := manual_flash / 0.25
+		var origin := to_local(manual_origin)
+		if manual_effect == 0:
+			draw_arc(origin, 120.0, 0.0, TAU, 48, Color(0.55, 1.0, 0.85, fade * 0.5), 2.0, true)
+			for i in range(3):
+				var a := manual_direction.angle() + float(i) * TAU / 3.0 + (1.0 - fade) * PI
+				draw_arc(origin, 95.0 - i * 15.0, a, a + 1.1, 18, Color(0.55, 1.0, 0.85, fade), 7.0 - i * 2.0, true)
+		elif manual_effect == 1:
+			draw_line(origin + manual_direction * 16.0, origin + manual_direction * 65.0, Color(0.65, 0.9, 1.0, fade), 5.0, true)
+		else:
+			draw_line(origin - manual_direction * 20.0, origin + manual_direction * 36.0, Color(1.0, 0.85, 0.35, fade), 5.0, true)
+	if momentum_armed > 0.0 or momentum_ready > 0.0:
+		draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 32, Color("ffd96a") if momentum_ready > 0.0 else Color("96e5cf"), 3.0, true)
 	if is_instance_valid(_target_marker) and not _target_marker.dead and _target_marker_remaining > 0.0:
 		var center: Vector2 = to_local(_target_marker.global_position)
 		var color := Color("f9dd7a")
