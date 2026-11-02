@@ -14,7 +14,7 @@ func _initialize() -> void:
 
 func run() -> void:
 	for profession in range(3):
-		var game = load("res://scenes/main.tscn").instantiate()
+		var game = load("res://scenes/main_v31.tscn").instantiate()
 		root.add_child(game)
 		await process_frame
 		game.select_profession(profession)
@@ -28,8 +28,7 @@ func run() -> void:
 		for floor_index in range(1, 5):
 			check(game.floor_number == floor_index, "floor number")
 			if floor_index < 4:
-				check(get_nodes_in_group("enemies").size() == [4, 6, 8][floor_index - 1], "initial wave count")
-				game._spawn_rear_wave()
+				check(game.pending_wave.is_empty() and get_nodes_in_group("enemies").size() == [8, 12, 16][floor_index - 1], "all encounter groups stationed")
 			var enemies = get_nodes_in_group("enemies")
 			check(enemies.size() == [8, 12, 16, 1][floor_index - 1], "enemy count")
 			var ranged := 0

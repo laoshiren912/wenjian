@@ -97,6 +97,59 @@ func path_between(start: Vector2, target: Vector2) -> PackedVector2Array:
 		return PackedVector2Array()
 	return grid.get_point_path(from_cell, to_cell)
 
+func encounter_positions(group_count: int, origin: Vector2) -> Array:
+	# Only use reachable cell centres. Relax spacing if a crowded map requires it.
+	var candidates: Array[Vector2i] = floor_cells.duplicate()
+	candidates.shuffle()
+	var reachable: Array[Vector2] = []
+	for cell in candidates:
+		var point := cell_center(cell)
+		if point.distance_to(origin) >= 400.0 and not path_between(origin, point).is_empty():
+			reachable.append(point)
+	var groups: Array = []
+	var used: Array[Vector2] = []
+	for minimum_spacing in [650.0, 450.0, 250.0, 0.0]:
+		for anchor in reachable:
+			if groups.size() >= group_count:
+				break
+			var valid := true
+			for previous in used:
+				if previous.distance_to(anchor) < minimum_spacing or previous.distance_to(anchor) < 50.0:
+					valid = false
+					break
+			if not valid:
+				continue
+			var members: Array[Vector2] = []
+			for point in reachable:
+				if point.distance_to(anchor) <= 155.0 and not used.has(point):
+					members.append(point)
+					if members.size() == 4:
+						break
+			if members.size() == 4:
+				groups.append(members)
+				used.append_array(members)
+		if groups.size() >= group_count:
+			break
+	# Unusually crowded maps still get reachable enemies instead of a stuck wave.
+	if groups.size() < group_count:
+		for cell in candidates:
+			var point := cell_center(cell)
+			if not reachable.has(point) and point.distance_to(origin) > 100.0 and not path_between(origin, point).is_empty():
+				reachable.append(point)
+		while groups.size() < group_count:
+			var fallback: Array[Vector2] = []
+			for point in reachable:
+				if not used.has(point):
+					fallback.append(point)
+					if fallback.size() == 4:
+						break
+			if fallback.size() < 4:
+				push_warning("Not enough reachable cells for every encounter")
+				break
+			groups.append(fallback)
+			used.append_array(fallback)
+	return groups
+
 func random_spawn(away_from: Vector2, minimum_distance: float = 300.0) -> Vector2:
 	for attempt in range(100):
 		var cell: Vector2i = floor_cells[random.randi_range(0, floor_cells.size() - 1)]

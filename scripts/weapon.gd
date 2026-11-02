@@ -28,6 +28,7 @@ var swing_direction: Vector2 = Vector2.RIGHT
 var swing_weapon: int = 0
 var attack_count: int = 0
 var sword_hit_targets: Array[Node2D] = []
+var sword_momentum_multiplier: float = 1.0
 const SWORD_ASSIST_ANGLE: float = 15.0
 
 func _physics_process(delta: float) -> void:
@@ -68,6 +69,7 @@ func attack(direction: Vector2) -> bool:
 	swing_duration = 0.30 / player.attack_speed_multiplier if selected == 0 else minf(0.18, cooldown)
 	swing_time = swing_duration
 	sword_hit_targets.clear()
+	sword_momentum_multiplier = player.consume_momentum() if selected == 0 else 1.0
 	attack_count += 1
 	attack_started.emit(selected, swing_direction)
 	if selected == 0:
@@ -166,7 +168,7 @@ func _sword_sweep(from_progress: float, to_progress: float) -> void:
 		if sword_hit_targets.size() >= 1 + player.extra_targets:
 			break
 		sword_hit_targets.append(enemy)
-		enemy.take_damage(float(DATA[0].damage) * player.damage_multiplier, swing_direction * 155.0)
+		enemy.take_damage(float(DATA[0].damage) * player.damage_multiplier * sword_momentum_multiplier, swing_direction * 155.0)
 
 func display_direction() -> Vector2:
 	if swing_time > 0.0 and swing_weapon == selected:

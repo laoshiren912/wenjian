@@ -6,10 +6,11 @@ const ENEMY_SCENE = preload("res://scenes/enemy.tscn")
 const RUN_DURATION: float = 180.0
 const START_GOLD: int = 300
 const FLOOR_GOLD: int = 250
+@export var v31_classic: bool = false
 const EQUIPMENT: Array[Dictionary] = [
 	{"category": 0, "name": "长锋石", "price": 200, "effect": "伤害倍率 +10 个百分点；攻击距离 +25"},
 	{"category": 0, "name": "猎手护符", "price": 250, "effect": "攻速倍率 +10 个百分点；击杀恢复 5 体力"},
-	{"category": 0, "name": "破阵徽章", "price": 450, "effect": "伤害倍率 +15 个百分点；剑多击中 1 个目标"},
+	{"category": 0, "name": "破阵徽章", "price": 450, "effect": "伤害倍率 +15 个百分点；剑多击中 1 个目标 / 矛距离 +25 / 弓多射 1 支"},
 	{"category": 2, "name": "守护甲", "price": 200, "effect": "生命上限与当前生命 +20；受伤减免 5%"},
 	{"category": 2, "name": "汲生甲", "price": 250, "effect": "生命上限与当前生命 +20；击杀恢复 3 生命"},
 	{"category": 2, "name": "坚壁甲", "price": 450, "effect": "生命上限与当前生命 +35；受伤减免 10%"},
@@ -31,6 +32,8 @@ var gold: int = START_GOLD
 var clear_pending: bool = false
 var purchased: Array[bool] = [false, false, false, false, false, false, false, false, false]
 var shop_category: int = 4
+var manual_claimed_floor: int = 0
+var gm_bonus_granted: bool = false
 var pending_wave: Array[Dictionary] = []
 var wave_delay: float = 0.0
 @onready var world: SurvivorWorld = $World
@@ -42,9 +45,11 @@ func _ready() -> void:
 	world.build()
 	player = PLAYER_SCENE.instantiate()
 	player.position = SurvivorWorld.SPAWN
-	player.collision_mask = 1 | 4
+	if not v31_classic:
+		player.collision_mask = 1 | 4
 	world.actors.add_child(player)
-	player.enable_dual_attack()
+	if not v31_classic:
+		player.enable_dual_attack()
 	player.camera.limit_left = 0
 	player.camera.limit_top = 0
 	player.camera.limit_right = int(SurvivorWorld.SIZE.x)
@@ -68,12 +73,22 @@ func _ready() -> void:
 	hud.shop_category_requested.connect(select_shop_category)
 	hud.shop_continue_requested.connect(open_shop)
 	hud.next_floor_requested.connect(next_floor)
+	hud.manual_requested.connect(claim_manual)
+	hud.manual_upgrade_requested.connect(upgrade_manual)
+	hud.gm_toggle_requested.connect(set_gm_mode)
+	hud.gm_gold_requested.connect(add_gm_gold)
+	hud.gm_kill_requested.connect(gm_kill_floor)
+	hud.gm_floor_requested.connect(gm_select_floor)
 	_spawn_floor()
 	hud.update_game(elapsed, kills, RUN_DURATION)
-	start_run()
+	if v31_classic:
+		hud.show_start()
+		get_tree().paused = true
+	else:
+		start_run()
 
 func _setup_inputs() -> void:
-	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
+	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE, "skill_1": KEY_Q, "skill_2": KEY_E}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action)
@@ -101,9 +116,54 @@ func select_profession(index: int) -> void:
 	selected_profession = index
 	hud.select_profession(index)
 
+func set_gm_mode(enabled: bool) -> void:
+	if state != State.START and state != State.PAUSED:
+		return
+	player.gm_invulnerable = enabled
+	if enabled:
+		player.health = player.max_health
+		if state == State.PAUSED:
+			_grant_gm_bonus()
+	if state == State.PAUSED:
+		hud.show_gm_panel(gold)
+
+func add_gm_gold() -> void:
+	if state == State.PAUSED and player.gm_invulnerable:
+		gold += 1000
+		hud.show_gm_panel(gold)
+
+func gm_kill_floor() -> void:
+	if state != State.PAUSED or not player.gm_invulnerable:
+		return
+	remaining = maxi(0, remaining - pending_wave.size())
+	pending_wave.clear()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not enemy.dead:
+			enemy.take_damage(enemy.health + 1.0, Vector2.ZERO, true)
+	resume_run()
+
+func gm_select_floor(floor: int) -> void:
+	if state != State.PAUSED or not player.gm_invulnerable or floor < 1 or floor > 4:
+		return
+	floor_number = floor
+	world.rebuild_floor(player)
+	_spawn_floor()
+	clear_pending = false
+	resume_run()
+	hud.show_notice("GM 选关 · 第 %d 层" % floor)
+
+func _grant_gm_bonus() -> void:
+	if not gm_bonus_granted:
+		gold += 5000
+		gm_bonus_granted = true
+
 func start_run() -> void:
 	if state != State.START:
 		return
+	if v31_classic and not player.initialize_profession(selected_profession):
+		return
+	if player.gm_invulnerable:
+		_grant_gm_bonus()
 	state = State.PLAYING
 	hud.hide_screen()
 	hud.update_game(elapsed, kills, RUN_DURATION)
@@ -113,7 +173,7 @@ func start_run() -> void:
 func _process(delta: float) -> void:
 	if state == State.PLAYING and not get_tree().paused:
 		elapsed += delta
-		if not pending_wave.is_empty():
+		if not v31_classic and not pending_wave.is_empty():
 			wave_delay -= delta
 			if wave_delay <= 0.0:
 				_spawn_rear_wave()
@@ -166,8 +226,10 @@ func _spawn_enemy(kind: int, location: Vector2, fast: bool = false) -> SurvivorE
 	var enemy: SurvivorEnemy = ENEMY_SCENE.instantiate()
 	enemy.kind = kind
 	enemy.fast_chaser = fast
+	enemy.legacy_ai = v31_classic
 	enemy.dodge_enabled = false
-	enemy.collision_mask = 1 | 2 | 4
+	if not v31_classic and kind != SurvivorEnemy.Kind.BOSS:
+		enemy.collision_mask = 1 | 2 | 4
 	enemy.position = location
 	enemy.world = world
 	# New enemies gain 50% of base HP per elapsed minute; existing HP is never refilled.
@@ -202,25 +264,46 @@ func _on_experience_received(amount: int) -> void:
 	feedback.show_experience(player.global_position, amount)
 
 func _on_level_gained() -> void:
-	hud.show_notice("等级提升 · 获得 1 技能点（技能尚未开放）")
+	hud.show_notice("等级提升 · 获得 1 技能点，可在 Tab 属性页修炼秘籍")
 
 func _spawn_floor() -> void:
 	var count: int = [8, 12, 16, 1][floor_number - 1]
-	var ranged: int = [0, 2, 4, 0][floor_number - 1]
 	pending_wave.clear()
 	remaining = count
-	wave_delay = 12.0
-	for index in range(count):
-		var kind: int = SurvivorEnemy.Kind.BOSS if floor_number == 4 else (SurvivorEnemy.Kind.RANGED if index < ranged else SurvivorEnemy.Kind.HOSTILE)
-		var fast: bool = floor_number < 4 and kind == SurvivorEnemy.Kind.HOSTILE and (index == ranged or index == count - 1)
-		if floor_number < 4 and index >= count / 2:
-			pending_wave.append({"kind": kind, "fast": fast})
-			continue
+	if not v31_classic:
+		var ranged: int = [0, 2, 4, 0][floor_number - 1]
+		wave_delay = 12.0
+		for index in range(count):
+			var kind: int = SurvivorEnemy.Kind.BOSS if floor_number == 4 else (SurvivorEnemy.Kind.RANGED if index < ranged else SurvivorEnemy.Kind.HOSTILE)
+			var fast: bool = floor_number < 4 and kind == SurvivorEnemy.Kind.HOSTILE and (index == ranged or index == count - 1)
+			if floor_number < 4 and index >= count / 2:
+				pending_wave.append({"kind": kind, "fast": fast})
+				continue
+			var point := world.random_spawn(player.global_position)
+			if point == Vector2.ZERO:
+				pending_wave.append({"kind": kind, "fast": fast})
+				continue
+			_spawn_enemy(kind, point, fast)
+		return
+	if floor_number == 4:
 		var point := world.random_spawn(player.global_position)
 		if point == Vector2.ZERO:
-			pending_wave.append({"kind": kind, "fast": fast})
-			continue
-		_spawn_enemy(kind, point, fast)
+			point = world.cell_center(world.floor_cells.back())
+		_spawn_enemy(SurvivorEnemy.Kind.BOSS, point)
+		return
+	var groups := world.encounter_positions(count / 4, player.global_position)
+	if groups.size() * 4 != count:
+		# Never require kills for enemies that could not be placed.
+		remaining = groups.size() * 4
+	for group_id in range(groups.size()):
+		var positions: Array = groups[group_id]
+		for member in range(positions.size()):
+			var ranged := floor_number > 1 and member == 3 and (floor_number == 3 or group_id < 2)
+			var enemy := _spawn_enemy(SurvivorEnemy.Kind.RANGED if ranged else SurvivorEnemy.Kind.HOSTILE, positions[member], not ranged and member == 1)
+			enemy.encounter_id = group_id
+			enemy.home_position = positions[member]
+			enemy.thrust_type = not ranged and member == 1
+			enemy.side_sign = 1.0 if member % 2 == 0 else -1.0
 
 func _spawn_rear_wave() -> void:
 	# Behind means opposite the weapon aim, including while retreating.
@@ -259,7 +342,22 @@ func open_shop() -> void:
 	show_shop()
 
 func show_shop(message: String = "") -> void:
-	hud.show_shop(gold, purchased, shop_category, message)
+	hud.show_shop(gold, purchased, shop_category, message, floor_number <= 2 and manual_claimed_floor != floor_number)
+
+func claim_manual(index: int) -> void:
+	if state != State.SHOP or player.profession_index != 0 or floor_number > 2 or manual_claimed_floor == floor_number:
+		return
+	if index < 0 or index >= player.MANUAL_NAMES.size() or player.manuals.has(index) or player.manuals.size() >= 2:
+		return
+	player.manuals.append(index)
+	manual_claimed_floor = floor_number
+	show_shop("已获得：%s" % player.MANUAL_NAMES[index])
+
+func upgrade_manual(slot: int) -> void:
+	if state != State.PAUSED or not stats_open:
+		return
+	if player.upgrade_manual(slot):
+		hud.show_stats()
 
 func select_shop_category(index: int) -> void:
 	if state != State.SHOP or index < 0 or index > 4:
@@ -343,7 +441,7 @@ func toggle_pause() -> void:
 		state = State.PAUSED
 		stats_open = false
 		get_tree().paused = true
-		hud.show_pause()
+		hud.show_pause(gold)
 
 func resume_run() -> void:
 	if state != State.PAUSED:

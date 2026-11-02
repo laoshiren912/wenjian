@@ -79,7 +79,7 @@ func visuals() -> void:
 func _run() -> void:
 	root.size = Vector2i(1280, 720)
 	root.title = "Roll Mechanic Checks"
-	game = load("res://scenes/main.tscn").instantiate()
+	game = load("res://scenes/main_v31.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
 	await frames()
@@ -275,7 +275,7 @@ func _run() -> void:
 	mouse(true)
 	mouse(false)
 	await frames(40)
-	check(player.weapon.attack_count == 0, "A short attack clicked only during roll is not buffered for later")
+	check(player.weapon.attack_count == 1, "A sword attack clicked during roll starts after the roll")
 	await fresh(2)
 	player = game.player
 	var enemy := target_at(70)
