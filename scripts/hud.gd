@@ -14,6 +14,8 @@ signal manual_requested(index: int)
 signal manual_upgrade_requested(index: int)
 signal gm_toggle_requested(enabled: bool)
 signal gm_gold_requested
+signal gm_kill_requested
+signal gm_floor_requested(floor: int)
 
 var player: SurvivorPlayer
 var root: Control
@@ -319,14 +321,29 @@ func show_shop_prompt(floor_number: int, gold: int) -> void:
 func show_pause(gold: int = -1) -> void:
 	var box := _screen("已暂停", "战斗已暂停。" if gold < 0 else "战斗已暂停 · 金币 %d" % gold)
 	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nQ/E 使用秘籍 · Tab 修炼秘籍 · Esc 继续战斗\n\n红色区域是攻击预警；紫色标记是远程怪。", 18))
-	var gm_button := PrototypeUI.button("GM 锁血：%s（首次开启送 5000 金币）" % ("开" if player.gm_invulnerable else "关"), func(): gm_toggle_requested.emit(not player.gm_invulnerable), 38)
-	box.add_child(gm_button)
-	if player.gm_invulnerable:
-		box.add_child(PrototypeUI.button("GM 增加 1000 金币", func(): gm_gold_requested.emit(), 38))
+	box.add_child(PrototypeUI.button("GM 测试工具", func(): show_gm_panel(gold), 38))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
 	button.grab_focus()
+
+func show_gm_panel(gold: int) -> void:
+	var box := _screen("GM 测试工具", "当前金币 %d · 操作仅影响本局" % gold)
+	box.add_child(PrototypeUI.button("GM 模式：%s（锁血；首次开启送 5000 金币）" % ("开" if player.gm_invulnerable else "关"), func(): gm_toggle_requested.emit(not player.gm_invulnerable), 36))
+	if player.gm_invulnerable:
+		var actions := HBoxContainer.new()
+		box.add_child(actions)
+		for button in [PrototypeUI.button("增加 1000 金币", func(): gm_gold_requested.emit(), 36), PrototypeUI.button("秒杀本层全部敌人", func(): gm_kill_requested.emit(), 36)]:
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			actions.add_child(button)
+		box.add_child(_modal_label("选关重建地图，保留角色、装备和金币；不补发跳过楼层的奖励。", 15))
+		var floors := HBoxContainer.new()
+		box.add_child(floors)
+		for floor in range(1, 5):
+			var floor_button := PrototypeUI.button("第 %d 层%s" % [floor, " Boss" if floor == 4 else ""], func(): gm_floor_requested.emit(floor), 36)
+			floor_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			floors.add_child(floor_button)
+	box.add_child(PrototypeUI.button("返回暂停菜单", func(): show_pause(gold), 36))
 
 func show_stats() -> void:
 	var box := _screen("%s · 角色属性 / Lv.%d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, player.level], "查看期间暂停战斗 · 本局武器固定")

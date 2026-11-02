@@ -28,8 +28,7 @@ func run() -> void:
 		for floor_index in range(1, 5):
 			check(game.floor_number == floor_index, "floor number")
 			if floor_index < 4:
-				check(get_nodes_in_group("enemies").size() == [4, 6, 8][floor_index - 1], "initial wave count")
-				game._spawn_rear_wave()
+				check(game.pending_wave.is_empty() and get_nodes_in_group("enemies").size() == [8, 12, 16][floor_index - 1], "all encounter groups stationed")
 			var enemies = get_nodes_in_group("enemies")
 			check(enemies.size() == [8, 12, 16, 1][floor_index - 1], "enemy count")
 			var ranged := 0

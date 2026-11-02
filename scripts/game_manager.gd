@@ -72,6 +72,8 @@ func _ready() -> void:
 	hud.manual_upgrade_requested.connect(upgrade_manual)
 	hud.gm_toggle_requested.connect(set_gm_mode)
 	hud.gm_gold_requested.connect(add_gm_gold)
+	hud.gm_kill_requested.connect(gm_kill_floor)
+	hud.gm_floor_requested.connect(gm_select_floor)
 	_spawn_floor()
 	hud.update_game(elapsed, kills, RUN_DURATION)
 	hud.show_start()
@@ -110,12 +112,32 @@ func set_gm_mode(enabled: bool) -> void:
 		if state == State.PAUSED:
 			_grant_gm_bonus()
 	if state == State.PAUSED:
-		hud.show_pause(gold)
+		hud.show_gm_panel(gold)
 
 func add_gm_gold() -> void:
 	if state == State.PAUSED and player.gm_invulnerable:
 		gold += 1000
-		hud.show_pause(gold)
+		hud.show_gm_panel(gold)
+
+func gm_kill_floor() -> void:
+	if state != State.PAUSED or not player.gm_invulnerable:
+		return
+	remaining = maxi(0, remaining - pending_wave.size())
+	pending_wave.clear()
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not enemy.dead:
+			enemy.take_damage(enemy.health + 1.0, Vector2.ZERO, true)
+	resume_run()
+
+func gm_select_floor(floor: int) -> void:
+	if state != State.PAUSED or not player.gm_invulnerable or floor < 1 or floor > 4:
+		return
+	floor_number = floor
+	world.rebuild_floor(player)
+	_spawn_floor()
+	clear_pending = false
+	resume_run()
+	hud.show_notice("GM 选关 · 第 %d 层" % floor)
 
 func _grant_gm_bonus() -> void:
 	if not gm_bonus_granted:
@@ -138,10 +160,6 @@ func start_run() -> void:
 func _process(delta: float) -> void:
 	if state == State.PLAYING and not get_tree().paused:
 		elapsed += delta
-		if not pending_wave.is_empty():
-			wave_delay -= delta
-			if wave_delay <= 0.0:
-				_spawn_rear_wave()
 		if remaining == 0 and not clear_pending:
 			clear_pending = true
 			_floor_cleared.call_deferred()
@@ -229,21 +247,27 @@ func _on_level_gained() -> void:
 
 func _spawn_floor() -> void:
 	var count: int = [8, 12, 16, 1][floor_number - 1]
-	var ranged: int = [0, 2, 4, 0][floor_number - 1]
 	pending_wave.clear()
 	remaining = count
-	wave_delay = 12.0
-	for index in range(count):
-		var kind: int = SurvivorEnemy.Kind.BOSS if floor_number == 4 else (SurvivorEnemy.Kind.RANGED if index < ranged else SurvivorEnemy.Kind.HOSTILE)
-		var fast: bool = floor_number < 4 and kind == SurvivorEnemy.Kind.HOSTILE and (index == ranged or index == count - 1)
-		if floor_number < 4 and index >= count / 2:
-			pending_wave.append({"kind": kind, "fast": fast})
-			continue
+	if floor_number == 4:
 		var point := world.random_spawn(player.global_position)
 		if point == Vector2.ZERO:
-			pending_wave.append({"kind": kind, "fast": fast})
-			continue
-		_spawn_enemy(kind, point, fast)
+			point = world.cell_center(world.floor_cells.back())
+		_spawn_enemy(SurvivorEnemy.Kind.BOSS, point)
+		return
+	var groups := world.encounter_positions(count / 4, player.global_position)
+	if groups.size() * 4 != count:
+		# Never require kills for enemies that could not be placed.
+		remaining = groups.size() * 4
+	for group_id in range(groups.size()):
+		var positions: Array = groups[group_id]
+		for member in range(positions.size()):
+			var ranged := floor_number > 1 and member == 3 and (floor_number == 3 or group_id < 2)
+			var enemy := _spawn_enemy(SurvivorEnemy.Kind.RANGED if ranged else SurvivorEnemy.Kind.HOSTILE, positions[member], not ranged and member == 1)
+			enemy.encounter_id = group_id
+			enemy.home_position = positions[member]
+			enemy.thrust_type = not ranged and member == 1
+			enemy.side_sign = 1.0 if member % 2 == 0 else -1.0
 
 func _spawn_rear_wave() -> void:
 	# Behind means opposite the weapon aim, including while retreating.
