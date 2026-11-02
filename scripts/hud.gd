@@ -204,7 +204,7 @@ func update_game(elapsed: float, kills: int, duration: float) -> void:
 	xp_text.text = "Lv.%d   经验 %d / %d   技能点 %d" % [player.level, player.experience, player.next_level_xp, player.skill_points]
 	xp_bar.max_value = player.next_level_xp
 	xp_bar.value = player.experience
-	weapon_text.text = "%s · %s" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, SurvivorWeapon.DATA[player.weapon.selected].name]
+	weapon_text.text = "左键 剑  ·  右键 弓" if player.dual_attack_enabled else "%s · %s" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, SurvivorWeapon.DATA[player.weapon.selected].name]
 	var weapon_data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	weapon_detail.text = "%s · 每目标伤害 %.0f" % [weapon_data.role, float(weapon_data.damage) * player.damage_multiplier]
 	if player.weapon.selected == 2:
@@ -301,17 +301,20 @@ func show_shop_prompt(floor_number: int, gold: int) -> void:
 
 func show_pause() -> void:
 	var box := _screen("已暂停", "战斗已暂停。")
-	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 按住左键攻击 · Space 翻滚\nTab 查看属性 · Esc 继续战斗 · 本局武器固定\n\n红弧与红圈是攻击预警；紫色标记是远程怪。\n升级获得技能点，技能系统尚未开放。", 18))
+	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键刺击 · 右键射箭 · Space 翻滚\nTab 查看属性 · Esc 继续战斗\n\n红弧与红圈是攻击预警；紫色标记是远程怪。\n升级获得技能点，技能系统尚未开放。", 18))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
 	button.grab_focus()
 
 func show_stats() -> void:
-	var box := _screen("%s · 角色属性 / Lv.%d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, player.level], "查看期间暂停战斗 · 本局武器固定")
+	var box := _screen("角色属性 / Lv.%d" % player.level, "查看期间暂停战斗 · 左键剑 / 右键弓")
 	box.add_child(_modal_label("生命 %.0f / %.0f       体力 %.0f / %.0f\n移动速度 %.0f       体力恢复 %.0f / 秒（消耗后延迟 0.42 秒）\n伤害倍率 %.0f%%       攻速倍率 %.0f%%" % [player.health, player.max_health, player.stamina, player.max_stamina, player.speed, player.stamina_regen, player.damage_multiplier * 100, player.attack_speed_multiplier * 100], 18))
 	var data: Dictionary = SurvivorWeapon.DATA[player.weapon.selected]
 	box.add_child(_modal_label("%s（%s）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒 · 体力 %.0f" % [data.name, data.role, float(data.damage) * player.damage_multiplier, data.reach, float(data.cooldown) / player.attack_speed_multiplier, data.stamina], 18, Color("e1cc9c")))
+	if player.dual_attack_enabled:
+		var bow: Dictionary = SurvivorWeapon.DATA[2]
+		box.add_child(_modal_label("弓（远程单体）伤害 %.1f · 距离 %.0f · 间隔 %.2f 秒" % [float(bow.damage) * player.damage_multiplier, float(bow.reach) + player.reach_bonus, float(bow.cooldown) / player.attack_speed_multiplier], 18, Color("e1cc9c")))
 	box.add_child(_modal_label("翻滚：距离 %.0f · 持续 %.2f 秒 · 体力 %.0f · 冷却 %.2f 秒\n翻滚期间不能攻击，无额外无敌帧。" % [player.roll_distance, player.roll_duration, player.roll_stamina_cost, player.roll_cooldown], 18))
 	if player.weapon.selected == 2:
 		box.add_child(_modal_label("射箭后 %.2f 秒，移动速度为 %.0f%%；松开左键也需完成恢复。" % [player.bow_shot_move_duration, player.bow_shot_move_multiplier * 100.0], 16))
@@ -322,7 +325,7 @@ func show_stats() -> void:
 
 func show_result(won: bool, elapsed: float, kills: int) -> void:
 	var box := _screen("通天塔完成" if won else "挑战结束", "击败了塔顶 Boss！" if won else "生命耗尽，再试一次。")
-	box.add_child(_modal_label("本局职业  %s\n抵达第 %d 层 · 金币 %d\n击败敌人  %d · 等级 %d\n累计经验  %d" % [SurvivorPlayer.PROFESSIONS[player.profession_index].name, tower_floor, tower_gold, kills, player.level, player.total_experience], 24))
+	box.add_child(_modal_label("抵达第 %d 层 · 金币 %d\n击败敌人  %d · 等级 %d\n累计经验  %d" % [tower_floor, tower_gold, kills, player.level, player.total_experience], 24))
 	var button := PrototypeUI.button("重新开始  [Enter / R]", func(): restart_requested.emit(), 54)
 	box.add_child(button)
 	button.grab_focus()

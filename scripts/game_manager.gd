@@ -9,7 +9,7 @@ const FLOOR_GOLD: int = 250
 const EQUIPMENT: Array[Dictionary] = [
 	{"category": 0, "name": "长锋石", "price": 200, "effect": "伤害倍率 +10 个百分点；攻击距离 +25"},
 	{"category": 0, "name": "猎手护符", "price": 250, "effect": "攻速倍率 +10 个百分点；击杀恢复 5 体力"},
-	{"category": 0, "name": "破阵徽章", "price": 450, "effect": "伤害倍率 +15 个百分点；剑多击中 1 个目标 / 矛距离 +25 / 弓多射 1 支"},
+	{"category": 0, "name": "破阵徽章", "price": 450, "effect": "伤害倍率 +15 个百分点；剑多击中 1 个目标"},
 	{"category": 2, "name": "守护甲", "price": 200, "effect": "生命上限与当前生命 +20；受伤减免 5%"},
 	{"category": 2, "name": "汲生甲", "price": 250, "effect": "生命上限与当前生命 +20；击杀恢复 3 生命"},
 	{"category": 2, "name": "坚壁甲", "price": 450, "effect": "生命上限与当前生命 +35；受伤减免 10%"},
@@ -42,7 +42,9 @@ func _ready() -> void:
 	world.build()
 	player = PLAYER_SCENE.instantiate()
 	player.position = SurvivorWorld.SPAWN
+	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
+	player.enable_dual_attack()
 	player.camera.limit_left = 0
 	player.camera.limit_top = 0
 	player.camera.limit_right = int(SurvivorWorld.SIZE.x)
@@ -68,8 +70,7 @@ func _ready() -> void:
 	hud.next_floor_requested.connect(next_floor)
 	_spawn_floor()
 	hud.update_game(elapsed, kills, RUN_DURATION)
-	hud.show_start()
-	get_tree().paused = true
+	start_run()
 
 func _setup_inputs() -> void:
 	var keys := {"move_up": KEY_W, "move_down": KEY_S, "move_left": KEY_A, "move_right": KEY_D, "profession_1": KEY_1, "profession_2": KEY_2, "profession_3": KEY_3, "stats": KEY_TAB, "pause": KEY_ESCAPE, "restart": KEY_R, "roll": KEY_SPACE}
@@ -88,6 +89,11 @@ func _setup_inputs() -> void:
 		var mouse := InputEventMouseButton.new()
 		mouse.button_index = MOUSE_BUTTON_LEFT
 		InputMap.action_add_event("attack", mouse)
+	if not InputMap.has_action("ranged_attack"):
+		InputMap.add_action("ranged_attack")
+		var mouse := InputEventMouseButton.new()
+		mouse.button_index = MOUSE_BUTTON_RIGHT
+		InputMap.action_add_event("ranged_attack", mouse)
 
 func select_profession(index: int) -> void:
 	if state != State.START or index < 0 or index >= SurvivorPlayer.PROFESSIONS.size():
@@ -97,8 +103,6 @@ func select_profession(index: int) -> void:
 
 func start_run() -> void:
 	if state != State.START:
-		return
-	if not player.initialize_profession(selected_profession):
 		return
 	state = State.PLAYING
 	hud.hide_screen()
@@ -162,6 +166,8 @@ func _spawn_enemy(kind: int, location: Vector2, fast: bool = false) -> SurvivorE
 	var enemy: SurvivorEnemy = ENEMY_SCENE.instantiate()
 	enemy.kind = kind
 	enemy.fast_chaser = fast
+	enemy.dodge_enabled = false
+	enemy.collision_mask = 1 | 2 | 4
 	enemy.position = location
 	enemy.world = world
 	# New enemies gain 50% of base HP per elapsed minute; existing HP is never refilled.

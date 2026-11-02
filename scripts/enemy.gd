@@ -22,6 +22,13 @@ var knockback: Vector2 = Vector2.ZERO
 var attack_cooldown: float = 0.0
 var windup: float = 0.0
 var attack_direction: Vector2 = Vector2.RIGHT
+var melee_action: String = "idle"
+var melee_timer: float = 0.0
+var melee_duration: float = 0.0
+var melee_released: bool = false
+var dodge_cooldown: float = 0.0
+var dodge_direction: Vector2 = Vector2.ZERO
+var dodge_enabled: bool = true
 var path: PackedVector2Array = PackedVector2Array()
 var path_index: int = 0
 var repath: float = 0.0
@@ -82,6 +89,8 @@ func _physics_process(delta: float) -> void:
 			special_cooldown = 5.0
 	elif kind == Kind.BOSS and special_cooldown <= 0.0 and distance < 160.0:
 		special_windup = 0.9
+	elif kind == Kind.HOSTILE:
+		movement = _update_melee(delta, distance)
 	elif kind == Kind.RANGED and distance < 420.0 and ranged_has_sight:
 		if attack_cooldown <= 0.0:
 			var shot = PROJECTILE_SCENE.instantiate()
@@ -130,9 +139,68 @@ func _physics_process(delta: float) -> void:
 	velocity = movement * speed + knockback + separation.limit_length(45.0)
 	knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
 	move_and_slide()
-	var look: Vector2 = attack_direction if windup > 0.0 else get_real_velocity()
+	var look: Vector2 = attack_direction if windup > 0.0 or melee_action in ["windup", "attack"] else get_real_velocity()
 	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
 	queue_redraw()
+
+func _update_melee(delta: float, distance: float) -> Vector2:
+	var offset: Vector2 = player.global_position - global_position
+	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
+	if melee_action == "dodge":
+		melee_timer -= delta
+		if melee_timer <= 0.0:
+			melee_action = "recovery"
+			melee_timer = 0.25
+		return dodge_direction * 1.8
+	if melee_action == "windup":
+		melee_timer -= delta
+		if melee_timer > melee_duration * 0.58 and offset.length() > 0.1:
+			attack_direction = attack_direction.slerp(offset.normalized(), minf(1.0, delta * 5.5)).normalized()
+		if melee_timer <= 0.0:
+			melee_action = "attack"
+			melee_duration = 0.5 if fast_chaser else 0.6
+			melee_timer = melee_duration
+			melee_released = false
+		return Vector2.ZERO
+	if melee_action == "attack":
+		melee_timer -= delta
+		var progress := 1.0 - melee_timer / melee_duration
+		if not melee_released and progress >= (0.38 if fast_chaser else 0.44):
+			melee_released = true
+			var ray := PhysicsRayQueryParameters2D.create(global_position, player.global_position, 1)
+			if offset.length() < 63.0 and attack_direction.dot(offset.normalized()) >= (0.82 if fast_chaser else 0.65) and get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
+				player.take_damage(damage, offset.normalized())
+		if melee_timer <= 0.0:
+			melee_action = "recovery"
+			melee_timer = 0.85 if fast_chaser else 1.25
+		return attack_direction * (0.65 if fast_chaser else 0.4) if progress > 0.15 and progress < 0.52 else Vector2.ZERO
+	if melee_action == "recovery":
+		melee_timer -= delta
+		if melee_timer <= 0.0:
+			melee_action = "idle"
+		return Vector2.ZERO
+	if dodge_enabled and dodge_cooldown <= 0.0 and distance < 120.0 and player.weapon.swing_time > 0.0:
+		var incoming: Vector2 = player.weapon.swing_direction
+		var toward_enemy := -offset.normalized()
+		if incoming.dot(toward_enemy) > 0.75:
+			dodge_direction = incoming.rotated(PI * 0.5 if get_instance_id() % 2 == 0 else -PI * 0.5)
+			melee_action = "dodge"
+			melee_timer = 0.22
+			dodge_cooldown = 2.5
+			return dodge_direction * 1.8
+	if distance >= 45.0:
+		return _follow_path(player.global_position)
+	var attackers := 0
+	for other in get_tree().get_nodes_in_group("enemies"):
+		if other != self and not other.dead and other.kind == Kind.HOSTILE and other.melee_action in ["windup", "attack"]:
+			attackers += 1
+	if attackers >= 2:
+		return offset.normalized().rotated(PI * 0.5) * 0.4
+	melee_action = "windup"
+	melee_duration = 0.65 if fast_chaser else 0.85
+	melee_timer = melee_duration
+	attack_direction = offset.normalized()
+	return Vector2.ZERO
 
 func _follow_path(target: Vector2) -> Vector2:
 	var ray := PhysicsRayQueryParameters2D.create(global_position, target, 1)
@@ -141,7 +209,7 @@ func _follow_path(target: Vector2) -> Vector2:
 		return (target - global_position).normalized()
 	if path.is_empty() or repath <= 0.0:
 		path = world.path_between(global_position, target)
-		path_index = 0
+		path_index = 1 if path.size() > 1 else 0
 		repath = 0.55
 	while path_index < path.size() and global_position.distance_to(path[path_index]) < 10.0:
 		path_index += 1
@@ -161,6 +229,9 @@ func take_damage(amount: float, push: Vector2) -> void:
 	knockback = push
 	# Damage interrupts a telegraphed attack.
 	windup = 0.0
+	if melee_action == "windup":
+		melee_action = "recovery"
+		melee_timer = 0.25
 	attack_cooldown = maxf(attack_cooldown, 0.25)
 	if health <= 0.0:
 		dead = true
@@ -183,6 +254,17 @@ func _draw() -> void:
 	if windup > 0.0:
 		var center: float = attack_direction.angle()
 		draw_arc(Vector2.ZERO, 48.0, center - 1.1, center + 1.1, 18, Color(1.0, 0.38, 0.25, 0.9), 3.0, true)
+	if kind == Kind.HOSTILE and melee_action in ["windup", "attack"]:
+		var progress := clampf(1.0 - melee_timer / melee_duration, 0.0, 1.0)
+		var angle := attack_direction.angle()
+		if not fast_chaser:
+			angle += lerpf(-0.8, 0.65, progress) if melee_action == "attack" else -0.8
+		var direction := Vector2.from_angle(angle)
+		var length := 32.0 if melee_action == "windup" else (lerpf(30.0, 48.0, sin(progress * PI)) if fast_chaser else 42.0)
+		draw_line(direction * 12.0, direction * length, Color("ffe2a0"), 4.0, true)
+		if melee_action == "windup":
+			var half_angle := acos(0.82 if fast_chaser else 0.65)
+			draw_arc(Vector2.ZERO, 63.0, attack_direction.angle() - half_angle, attack_direction.angle() + half_angle, 24, Color(1.0, 0.38, 0.25, 0.8), 2.0, true)
 	if special_windup > 0.0:
 		draw_circle(Vector2.ZERO, 125.0, Color(1.0, 0.2, 0.1, 0.18))
 		draw_arc(Vector2.ZERO, 125.0, 0.0, TAU, 48, Color("ff654f"), 3.0, true)

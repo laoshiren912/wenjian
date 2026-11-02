@@ -73,6 +73,10 @@ var _roll_remaining: float = 0.0
 var _roll_cooldown: float = 0.0
 var _roll_direction: Vector2 = Vector2.DOWN
 var _bow_shot_remaining: float = 0.0
+var dual_attack_enabled: bool = false
+var ranged_weapon: SurvivorWeapon
+var _ranged_held: bool = false
+var _ranged_pending: bool = false
 @onready var weapon: SurvivorWeapon = $Weapon
 @onready var camera: Camera2D = $Camera2D
 @onready var visual: ActorVisual = $VisualRoot
@@ -80,6 +84,17 @@ var _bow_shot_remaining: float = 0.0
 func _ready() -> void:
 	weapon.attack_started.connect(_on_attack_started)
 	weapon.selection_changed.connect(_on_weapon_selected)
+
+func enable_dual_attack() -> void:
+	if is_instance_valid(ranged_weapon):
+		return
+	dual_attack_enabled = true
+	ranged_weapon = SurvivorWeapon.new()
+	ranged_weapon.name = "RangedWeapon"
+	add_child(ranged_weapon)
+	ranged_weapon.select_weapon(2)
+	ranged_weapon.hide()
+	ranged_weapon.attack_started.connect(_on_attack_started)
 
 func initialize_profession(index: int) -> bool:
 	# The manager calls this once, while the start screen still pauses the world.
@@ -106,7 +121,7 @@ func is_bow_recovering() -> bool:
 	return weapon.selected == 2 and _bow_shot_remaining > 0.0 and not is_rolling()
 
 func movement_multiplier() -> float:
-	return 0.0 if weapon.swing_time > 0.0 else 1.0
+	return 0.0 if weapon.swing_time > 0.0 or (is_instance_valid(ranged_weapon) and ranged_weapon.swing_time > 0.0) else 1.0
 
 func _on_weapon_selected(_index: int) -> void:
 	visual.cancel_attack()
@@ -129,6 +144,9 @@ func try_roll() -> bool:
 	_target_marker_remaining = 0.0
 	# Existing hits/arrows and shared cooldown survive; only the recovery drawing ends.
 	weapon.swing_time = 0.0
+	if is_instance_valid(ranged_weapon):
+		ranged_weapon.swing_time = 0.0
+	_ranged_pending = false
 	_bow_shot_remaining = 0.0
 	weapon.hide()
 	visual.play_roll(_roll_direction, _roll_remaining)
@@ -163,7 +181,7 @@ func _physics_process(delta: float) -> void:
 	var aim: Vector2 = world_aim - global_position
 	if aim.length_squared() > 1.0:
 		aim_direction = aim.normalized()
-	if not rolling_this_frame and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
+	if not rolling_this_frame and (not is_instance_valid(ranged_weapon) or ranged_weapon.swing_time <= 0.0) and (_attack_pending or (_attack_held and Input.is_action_pressed("attack"))):
 		var attack_direction := aim_direction
 		if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead:
 			var target_offset: Vector2 = _click_target.global_position - global_position
@@ -172,6 +190,9 @@ func _physics_process(delta: float) -> void:
 		if weapon.attack(attack_direction):
 			_target_marker = _click_target if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead else null
 			_target_marker_remaining = 0.65 if is_instance_valid(_target_marker) else 0.0
+	if dual_attack_enabled and not rolling_this_frame and weapon.swing_time <= 0.0 and (_ranged_pending or (_ranged_held and Input.is_action_pressed("ranged_attack"))):
+		ranged_weapon.attack(aim_direction)
+	_ranged_pending = false
 	_attack_pending = false
 	_click_target = null
 	if rolling_this_frame:
@@ -190,6 +211,8 @@ func _physics_process(delta: float) -> void:
 	var body_look: Vector2 = visual.facing
 	if weapon.swing_time > 0.0:
 		body_look = weapon.swing_direction
+	elif is_instance_valid(ranged_weapon) and ranged_weapon.swing_time > 0.0:
+		body_look = ranged_weapon.swing_direction
 	elif not movement.is_zero_approx():
 		body_look = movement
 	if rolling_this_frame:
@@ -208,6 +231,8 @@ func _input(event: InputEvent) -> void:
 	# Releases must clear the gesture even when a GUI control consumes them later.
 	if event.is_action_released("attack"):
 		_attack_held = false
+	if dual_attack_enabled and event.is_action_released("ranged_attack"):
+		_ranged_held = false
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
@@ -216,6 +241,8 @@ func _notification(what: int) -> void:
 		_attack_pending = false
 		_click_target = null
 		_roll_requested = false
+		_ranged_held = false
+		_ranged_pending = false
 
 func _target_at_click(world_position: Vector2) -> Node2D:
 	var best: Node2D = null
@@ -232,6 +259,13 @@ func _target_at_click(world_position: Vector2) -> Node2D:
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Only presses that survive GUI handling may start a world attack gesture.
+	if dual_attack_enabled and event.is_action_pressed("ranged_attack"):
+		_ranged_held = true
+		_ranged_pending = not is_rolling()
+		if event is InputEventMouseButton:
+			_aim_viewport_position = event.position
+			_has_aim_event = true
+		get_viewport().set_input_as_handled()
 	if event.is_action_pressed("attack"):
 		_attack_held = true
 		_attack_pending = not is_rolling()
