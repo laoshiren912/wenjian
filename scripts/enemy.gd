@@ -29,6 +29,7 @@ var melee_released: bool = false
 var dodge_cooldown: float = 0.0
 var dodge_direction: Vector2 = Vector2.ZERO
 var dodge_enabled: bool = true
+var emerging: bool = false
 var path: PackedVector2Array = PackedVector2Array()
 var path_index: int = 0
 var repath: float = 0.0
@@ -218,7 +219,7 @@ func _follow_path(target: Vector2) -> Vector2:
 	return Vector2.ZERO
 
 func take_damage(amount: float, push: Vector2) -> void:
-	if dead:
+	if dead or emerging:
 		return
 	aggro = true
 	flash = 0.14
