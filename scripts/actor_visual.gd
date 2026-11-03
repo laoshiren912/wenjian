@@ -13,6 +13,8 @@ var attack_time: float = 0.0
 var attack_duration: float = 0.18
 var attack_weapon: int = 0
 var attack_direction: Vector2 = Vector2.RIGHT
+var combo_stage := -1
+var combo_data: Dictionary = {}
 var dying: bool = false
 var death_age: float = 0.0
 var roll_time: float = 0.0
@@ -35,6 +37,7 @@ func update_pose(actual_motion: Vector2, look: Vector2, color: Color, leg_look: 
 	queue_redraw()
 
 func play_attack(index: int, direction: Vector2, duration: float) -> void:
+	combo_stage = -1
 	attack_weapon = index
 	attack_direction = direction.normalized()
 	attack_duration = maxf(0.001, duration)
@@ -43,7 +46,12 @@ func play_attack(index: int, direction: Vector2, duration: float) -> void:
 
 func cancel_attack() -> void:
 	attack_time = 0.0
+	combo_stage = -1
 	queue_redraw()
+
+func set_combo_pose(stage: int, data: Dictionary) -> void:
+	combo_stage = stage
+	combo_data = data
 
 func play_roll(direction: Vector2, duration: float) -> void:
 	cancel_attack()
@@ -106,6 +114,10 @@ func _draw() -> void:
 	var bob: float = absf(sin(walk_phase)) * 1.5 if moving else 0.0
 	var recoil: float = attack_time / attack_duration if attack_time > 0.0 else 0.0
 	var lean := attack_direction * recoil * (1.5 if attack_weapon == 2 else 2.5)
+	if combo_stage >= 0 and attack_time > 0.0:
+		var progress := 1.0 - recoil
+		lean = attack_direction * sin(progress * PI) * (7.0 if combo_stage == 2 else 3.0)
+		lean += attack_direction.orthogonal() * sin(progress * TAU) * (2.0 if combo_stage == 0 else -2.0)
 	var offset := Vector2(0, -bob) + lean
 	var color: Color = Color.WHITE if hurt_time > 0.0 else tint
 	var outline := Color("203c43")
@@ -128,6 +140,14 @@ func _draw() -> void:
 	var right_hand := Vector2(12, 5 + step * 0.5) + offset
 	if attack_time > 0.0:
 		right_hand = attack_direction * (18.0 + recoil * 5.0) + Vector2(0, 2)
+		if combo_stage >= 0:
+			var progress := clampf(((1.0 - recoil) * (float(combo_data.windup) + float(combo_data.active) + float(combo_data.recovery)) - float(combo_data.windup)) / float(combo_data.active), 0.0, 1.0)
+			var half := deg_to_rad(float(combo_data.angle) * 0.5)
+			var angle := lerpf(-half, half, progress) if combo_stage != 1 else lerpf(half, -half, progress)
+			right_hand = attack_direction.rotated(angle) * 22.0 + Vector2(0, -8.0 if combo_stage == 2 else 2.0)
+			if combo_stage == 2:
+				right_hand = attack_direction * 18.0 + Vector2(0, lerpf(-28.0, 5.0, progress))
+				left_hand = right_hand - attack_direction * 6.0
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))

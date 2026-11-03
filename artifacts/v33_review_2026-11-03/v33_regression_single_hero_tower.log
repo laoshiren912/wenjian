@@ -1,0 +1,20 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: starts directly in battle
+PASS: single player has sword and bow
+PASS: first floor still spawns four plus four
+PASS: enemy matches sample dodge and collision
+PASS: enemy matches sample dodge and collision
+PASS: enemy matches sample dodge and collision
+PASS: enemy matches sample dodge and collision
+PASS: sword attack works
+PASS: bow waits for sword action
+PASS: roll interrupts sword
+PASS: right click fires bow
+PASS: clear opens shop prompt
+PASS: shop opens
+PASS: badge remains sword extra target
+PASS: continue to next floor
+PASS: death screen opens
+PASS: new run enters battle directly
+SINGLE HERO: 17 checks, 0 failures

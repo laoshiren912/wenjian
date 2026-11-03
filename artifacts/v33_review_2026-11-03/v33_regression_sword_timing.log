@@ -1,0 +1,22 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: Whole body faces movement
+PASS: Weapon follows left movement despite mouse aim
+PASS: Weapon follows up movement
+PASS: Weapon retains direction while idle
+PASS: Sword starts
+PASS: Whole body faces attack
+PASS: Weapon faces attack direction
+PASS: Base action 300 ms and interval 800 ms
+PASS: Movement remains locked during sword action
+PASS: No damage during windup
+PASS: Sword hits during sweep
+PASS: Sword hits target only once
+PASS: Movement resumes while attack remains on cooldown
+PASS: Player actually moves before cooldown ends
+PASS: Cannot attack again before cooldown ends
+PASS: Target leaving range avoids hit
+PASS: Roll interrupts attack
+PASS: Interrupted windup causes no damage
+PASS: Attack speed scales action and interval
+SWORD RESULT: 19 checks, 0 failures

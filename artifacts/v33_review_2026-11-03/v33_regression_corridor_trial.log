@@ -1,0 +1,39 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: original corridor remains available
+PASS: six pending, no automatic spawn
+PASS: fixed narrow corridor
+PASS: trigger 1 creates exactly one protected enemy from either side
+PASS: trigger 1 waits for player to leave spawn
+PASS: trigger 1 activates after emergence
+PASS: trigger 1 does not repeat
+PASS: portal remains locked after kill 1
+PASS: trigger 2 creates exactly one protected enemy from either side
+PASS: trigger 2 waits for player to leave spawn
+PASS: trigger 2 activates after emergence
+PASS: trigger 2 does not repeat
+PASS: portal remains locked after kill 2
+PASS: trigger 3 creates exactly one protected enemy from either side
+PASS: trigger 3 waits for player to leave spawn
+PASS: trigger 3 activates after emergence
+PASS: trigger 3 does not repeat
+PASS: portal remains locked after kill 3
+PASS: trigger 4 creates exactly one protected enemy from either side
+PASS: trigger 4 waits for player to leave spawn
+PASS: trigger 4 activates after emergence
+PASS: trigger 4 does not repeat
+PASS: portal remains locked after kill 4
+PASS: trigger 5 creates exactly one protected enemy from either side
+PASS: trigger 5 waits for player to leave spawn
+PASS: trigger 5 activates after emergence
+PASS: trigger 5 does not repeat
+PASS: portal remains locked after kill 5
+PASS: trigger 6 creates exactly one protected enemy from either side
+PASS: trigger 6 waits for player to leave spawn
+PASS: trigger 6 activates after emergence
+PASS: trigger 6 does not repeat
+PASS: two ranged enemies among six
+PASS: last kill opens portal without ending run
+PASS: reaching portal completes trial
+PASS: restart resets room
+CORRIDOR: 36 checks, 0 failures

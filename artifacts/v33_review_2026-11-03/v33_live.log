@@ -1,0 +1,12 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: 60 Hz GUI-dispatched click buffers second stage
+PASS: 60 Hz third stage follows distinct click
+PASS: 60 Hz lunge remains bounded
+PASS: 60 Hz Space buffers only late in recovery
+PASS: 60 Hz full recovery precedes roll
+PASS: no extra sword from released mouse
+PASS: 60 Hz pause stops movement and clears queues
+PASS: restart resets four enemies and combo state
+PASS: V3.3 HUD click never starts combo
+COMBO LIVE: 9 checks, 0 failures; engine frames, not human input

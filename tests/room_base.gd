@@ -78,7 +78,7 @@ func snapshot(name: String) -> void:
 		root.get_texture().get_image().save_png("res://artifacts/runtime/v32_visual/" + name + ".png")
 
 func run() -> void:
-	check(ProjectSettings.get_setting("application/run/main_scene") == "res://scenes/main_v32.tscn", "F5 starts V3.2")
+	check(ResourceLoader.exists("res://scenes/main_v32.tscn"), "V3.2 remains available")
 	for path in ["main_v31", "main", "corridor_trial"]:
 		check(load("res://scenes/" + path + ".tscn") != null, path + " remains loadable")
 	game = load("res://scenes/main_v32.tscn").instantiate()

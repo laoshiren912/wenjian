@@ -1,0 +1,98 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: F5 starts V3.3
+PASS: four enemies appear immediately
+PASS: existing ordinary melee AI without emergence
+PASS: spawn on right away from hero
+PASS: existing ordinary melee AI without emergence
+PASS: spawn on right away from hero
+PASS: existing ordinary melee AI without emergence
+PASS: spawn on right away from hero
+PASS: existing ordinary melee AI without emergence
+PASS: spawn on right away from hero
+PASS: old triggers inactive with no pending spawn
+PASS: walking former triggers never adds enemies
+PASS: combo stage 1
+PASS: stage 0 does no early windup damage
+PASS: stage 0 direction remains locked
+PASS: stage 0 has one timed damage hit
+PASS: stage 0 short lunge distance actual=8.000
+PASS: stage 0 recovery never hits again
+PASS: combo stage 2
+PASS: stage 1 does no early windup damage
+PASS: stage 1 direction remains locked
+PASS: stage 1 has one timed damage hit
+PASS: stage 1 short lunge distance actual=10.000
+PASS: stage 1 recovery never hits again
+PASS: combo stage 3
+PASS: stage 2 does no early windup damage
+PASS: stage 2 direction remains locked
+PASS: stage 2 has one timed damage hit
+PASS: stage 2 short lunge distance actual=12.000
+PASS: stage 2 recovery never hits again
+PASS: third stage returns to first
+PASS: no lunge sliding after completion
+PASS: simultaneous contacts choose nearest, one target maximum
+PASS: same enemy can receive all three stages
+PASS: chain window expiry resets first stage
+PASS: held left mouse never auto repeats
+PASS: expired early click is discarded
+PASS: early Space cannot cancel windup
+PASS: Space cannot cancel active phase
+PASS: last recovery window buffers without cancelling
+PASS: roll wins over buffered sword and reads execution-time direction
+PASS: roll cost preserved, no new invulnerability
+PASS: stamina prevents and discards buffered roll
+PASS: stamina never causes delayed roll
+PASS: cooldown prevents and discards buffered roll
+PASS: cooldown never causes delayed roll
+PASS: bow cannot cancel sword
+PASS: bow can fire after full sword recovery
+PASS: pause/focus notification clears combo buffers
+PASS: pause/focus notification clears combo buffers
+PASS: death cancels action and inputs
+PASS: wall blocks swept blade damage
+PASS: lunge respects wall collision
+PASS: four kills open exit without auto completion
+PASS: portal completes four-monster trial
+PASS: combat_960x540 HUD fits
+PASS: combat_960x540 HUD fits
+PASS: combat_960x540 HUD fits
+PASS: stats_960x540 HUD fits
+PASS: stats_960x540 HUD fits
+PASS: stats_960x540 HUD fits
+PASS: stats_960x540 modal fits
+PASS: pause_960x540 HUD fits
+PASS: pause_960x540 HUD fits
+PASS: pause_960x540 HUD fits
+PASS: pause_960x540 modal fits
+PASS: stage1_960x540 HUD fits
+PASS: stage1_960x540 HUD fits
+PASS: stage1_960x540 HUD fits
+PASS: stage2_960x540 HUD fits
+PASS: stage2_960x540 HUD fits
+PASS: stage2_960x540 HUD fits
+PASS: stage3_960x540 HUD fits
+PASS: stage3_960x540 HUD fits
+PASS: stage3_960x540 HUD fits
+PASS: combat_1280x720 HUD fits
+PASS: combat_1280x720 HUD fits
+PASS: combat_1280x720 HUD fits
+PASS: stats_1280x720 HUD fits
+PASS: stats_1280x720 HUD fits
+PASS: stats_1280x720 HUD fits
+PASS: stats_1280x720 modal fits
+PASS: pause_1280x720 HUD fits
+PASS: pause_1280x720 HUD fits
+PASS: pause_1280x720 HUD fits
+PASS: pause_1280x720 modal fits
+PASS: stage1_1280x720 HUD fits
+PASS: stage1_1280x720 HUD fits
+PASS: stage1_1280x720 HUD fits
+PASS: stage2_1280x720 HUD fits
+PASS: stage2_1280x720 HUD fits
+PASS: stage2_1280x720 HUD fits
+PASS: stage3_1280x720 HUD fits
+PASS: stage3_1280x720 HUD fits
+PASS: stage3_1280x720 HUD fits
+SWORD COMBO: 95 checks, 0 failures; controlled fixtures, not human playtest

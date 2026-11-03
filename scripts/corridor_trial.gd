@@ -23,7 +23,7 @@ func start_room() -> void:
 	total = ENEMY_KINDS.size()
 	remaining = total
 	phase = "combat"
-	player = PLAYER.instantiate()
+	player = _create_player()
 	player.position = world.cell_center(ENTRY_CELL)
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
@@ -36,6 +36,9 @@ func start_room() -> void:
 	_set_restart_visible(false)
 	world.queue_redraw()
 	_update_status()
+
+func _create_player() -> SurvivorPlayer:
+	return PLAYER.instantiate()
 
 func _spawn_at_trigger(index: int) -> void:
 	world.triggered[index] = true
