@@ -12,7 +12,7 @@ func _initialize() -> void:
 	call_deferred("run")
 
 func run() -> void:
-	check(ProjectSettings.get_setting("application/run/main_scene") == "res://scenes/corridor_trial.tscn", "F5 starts corridor")
+	check(ResourceLoader.exists("res://scenes/corridor_trial.tscn"), "original corridor remains available")
 	var room = load("res://scenes/corridor_trial.tscn").instantiate()
 	root.add_child(room)
 	await process_frame

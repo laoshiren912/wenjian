@@ -1,0 +1,165 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+PASS: F5 starts V3.2
+PASS: main_v31 remains loadable
+PASS: main remains loadable
+PASS: corridor_trial remains loadable
+PASS: direct single-hero entry
+PASS: movement collision and six enemies preserved
+PASS: HUD pause consumes click
+PASS: resume consumes click
+PASS: stats consumes click
+PASS: stats button resumes
+PASS: Space rolls after menu clicks instead of activating buttons
+PASS: Tab opens stats
+PASS: Tab closes stats
+PASS: logical Tab works with an OS-injected mismatched scan code
+PASS: Esc returns from synthetic Tab stats
+PASS: held sword still repeats
+PASS: pause clears held sword
+PASS: resume does not repeat old hold
+PASS: right click fires arrow
+PASS: focus-loss handler clears holds (simulated notification)
+PASS: walking over trigger starts warning
+PASS: pause freezes emergence projectile player and feedback
+PASS: pause restart cleans actors projectiles feedback and camera
+PASS: trigger 0 preserves current AI and protection
+PASS: trigger 0 waits for occupied spawn
+PASS: trigger 0 activates
+PASS: trigger 0 exit gating without automatic result
+PASS: trigger 1 preserves current AI and protection
+PASS: trigger 1 waits for occupied spawn
+PASS: trigger 1 activates
+PASS: trigger 1 exit gating without automatic result
+PASS: trigger 2 preserves current AI and protection
+PASS: trigger 2 waits for occupied spawn
+PASS: trigger 2 activates
+PASS: trigger 2 exit gating without automatic result
+PASS: trigger 3 preserves current AI and protection
+PASS: trigger 3 waits for occupied spawn
+PASS: trigger 3 activates
+PASS: trigger 3 exit gating without automatic result
+PASS: trigger 4 preserves current AI and protection
+PASS: trigger 4 waits for occupied spawn
+PASS: trigger 4 activates
+PASS: trigger 4 exit gating without automatic result
+PASS: trigger 5 preserves current AI and protection
+PASS: trigger 5 waits for occupied spawn
+PASS: trigger 5 activates
+PASS: trigger 5 exit gating without automatic result
+PASS: no growth or manuals enabled
+PASS: portal opens completed modal and pauses world
+PASS: Space cannot restart result
+PASS: Enter restarts completed room
+PASS: death pauses and shows result
+PASS: R restarts death
+PASS: combat_960x540 HUD fits viewport
+PASS: combat_960x540 HUD fits viewport
+PASS: combat_960x540 HUD fits viewport
+PASS: combat_960x540 hides 金币
+PASS: combat_960x540 hides 技能点
+PASS: combat_960x540 hides 秘籍
+PASS: combat_960x540 hides GM
+PASS: combat_960x540 hides 选择职业
+PASS: combat_960x540 hides 商店
+PASS: combat_960x540 hides Lv.
+PASS: pause_960x540 HUD fits viewport
+PASS: pause_960x540 HUD fits viewport
+PASS: pause_960x540 HUD fits viewport
+PASS: pause_960x540 modal fits viewport
+PASS: pause_960x540 hides 金币
+PASS: pause_960x540 hides 技能点
+PASS: pause_960x540 hides 秘籍
+PASS: pause_960x540 hides GM
+PASS: pause_960x540 hides 选择职业
+PASS: pause_960x540 hides 商店
+PASS: pause_960x540 hides Lv.
+PASS: stats_960x540 HUD fits viewport
+PASS: stats_960x540 HUD fits viewport
+PASS: stats_960x540 HUD fits viewport
+PASS: stats_960x540 modal fits viewport
+PASS: stats_960x540 hides 金币
+PASS: stats_960x540 hides 技能点
+PASS: stats_960x540 hides 秘籍
+PASS: stats_960x540 hides GM
+PASS: stats_960x540 hides 选择职业
+PASS: stats_960x540 hides 商店
+PASS: stats_960x540 hides Lv.
+PASS: dead_960x540 HUD fits viewport
+PASS: dead_960x540 HUD fits viewport
+PASS: dead_960x540 HUD fits viewport
+PASS: dead_960x540 modal fits viewport
+PASS: dead_960x540 hides 金币
+PASS: dead_960x540 hides 技能点
+PASS: dead_960x540 hides 秘籍
+PASS: dead_960x540 hides GM
+PASS: dead_960x540 hides 选择职业
+PASS: dead_960x540 hides 商店
+PASS: dead_960x540 hides Lv.
+PASS: complete_960x540 HUD fits viewport
+PASS: complete_960x540 HUD fits viewport
+PASS: complete_960x540 HUD fits viewport
+PASS: complete_960x540 modal fits viewport
+PASS: complete_960x540 hides 金币
+PASS: complete_960x540 hides 技能点
+PASS: complete_960x540 hides 秘籍
+PASS: complete_960x540 hides GM
+PASS: complete_960x540 hides 选择职业
+PASS: complete_960x540 hides 商店
+PASS: complete_960x540 hides Lv.
+PASS: combat_1280x720 HUD fits viewport
+PASS: combat_1280x720 HUD fits viewport
+PASS: combat_1280x720 HUD fits viewport
+PASS: combat_1280x720 hides 金币
+PASS: combat_1280x720 hides 技能点
+PASS: combat_1280x720 hides 秘籍
+PASS: combat_1280x720 hides GM
+PASS: combat_1280x720 hides 选择职业
+PASS: combat_1280x720 hides 商店
+PASS: combat_1280x720 hides Lv.
+PASS: pause_1280x720 HUD fits viewport
+PASS: pause_1280x720 HUD fits viewport
+PASS: pause_1280x720 HUD fits viewport
+PASS: pause_1280x720 modal fits viewport
+PASS: pause_1280x720 hides 金币
+PASS: pause_1280x720 hides 技能点
+PASS: pause_1280x720 hides 秘籍
+PASS: pause_1280x720 hides GM
+PASS: pause_1280x720 hides 选择职业
+PASS: pause_1280x720 hides 商店
+PASS: pause_1280x720 hides Lv.
+PASS: stats_1280x720 HUD fits viewport
+PASS: stats_1280x720 HUD fits viewport
+PASS: stats_1280x720 HUD fits viewport
+PASS: stats_1280x720 modal fits viewport
+PASS: stats_1280x720 hides 金币
+PASS: stats_1280x720 hides 技能点
+PASS: stats_1280x720 hides 秘籍
+PASS: stats_1280x720 hides GM
+PASS: stats_1280x720 hides 选择职业
+PASS: stats_1280x720 hides 商店
+PASS: stats_1280x720 hides Lv.
+PASS: dead_1280x720 HUD fits viewport
+PASS: dead_1280x720 HUD fits viewport
+PASS: dead_1280x720 HUD fits viewport
+PASS: dead_1280x720 modal fits viewport
+PASS: dead_1280x720 hides 金币
+PASS: dead_1280x720 hides 技能点
+PASS: dead_1280x720 hides 秘籍
+PASS: dead_1280x720 hides GM
+PASS: dead_1280x720 hides 选择职业
+PASS: dead_1280x720 hides 商店
+PASS: dead_1280x720 hides Lv.
+PASS: complete_1280x720 HUD fits viewport
+PASS: complete_1280x720 HUD fits viewport
+PASS: complete_1280x720 HUD fits viewport
+PASS: complete_1280x720 modal fits viewport
+PASS: complete_1280x720 hides 金币
+PASS: complete_1280x720 hides 技能点
+PASS: complete_1280x720 hides 秘籍
+PASS: complete_1280x720 hides GM
+PASS: complete_1280x720 hides 选择职业
+PASS: complete_1280x720 hides 商店
+PASS: complete_1280x720 hides Lv.
+ROOM BASE: 161 checks, 0 failures; controlled fixtures, not human playtest

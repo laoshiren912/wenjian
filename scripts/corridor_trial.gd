@@ -33,7 +33,7 @@ func start_room() -> void:
 	feedback.camera = $Camera2D
 	player.died.connect(_on_player_died)
 	player.damage_received.connect(func(amount: float): feedback.show_damage(player.global_position, amount, true))
-	restart_button.hide()
+	_set_restart_visible(false)
 	world.queue_redraw()
 	_update_status()
 
@@ -109,7 +109,10 @@ func _physics_process(delta: float) -> void:
 	if world.portal_open and player.global_position.distance_to(world.cell_center(world.PORTAL_CELL)) < 34.0:
 		phase = "cleared"
 		status.text = "已抵达传送点 · 本次测试完成"
-		restart_button.show()
+		_set_restart_visible(true)
+
+func _set_restart_visible(visible: bool) -> void:
+	restart_button.visible = visible
 
 func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	remaining -= 1
