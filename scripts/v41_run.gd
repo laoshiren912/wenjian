@@ -146,7 +146,9 @@ func _spawn_wave() -> void:
 		enemy.home_position = enemy.position
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
 		enemy.killed.connect(_on_enemy_killed)
-		enemy.damaged.connect(func(point: Vector2, amount: float): feedback.show_damage(point, amount, false, enemy.damage_shakes_camera))
+		enemy.damaged.connect(func(point: Vector2, amount: float):
+			feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
+				not enemy.damage_shakes_camera and enemy.last_hit_blocked))
 		world.actors.add_child(enemy)
 		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
 		enemy.max_health = float(stats.health) * CONFIG.ROOM_SCALES[room_index]

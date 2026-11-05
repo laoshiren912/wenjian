@@ -523,6 +523,7 @@ func _follow_path(target: Vector2) -> Vector2:
 	return Vector2.ZERO
 
 var damage_shakes_camera := true
+var last_hit_blocked := false
 
 func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true) -> void:
 	damage_shakes_camera = camera_shake
@@ -533,6 +534,7 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 		can_block = true
 	aggro = true
 	var blocked_hit := not ignore_guard and kind == Kind.HOSTILE and can_block and not push.is_zero_approx() and guard_direction.dot(-push.normalized()) >= 0.5
+	last_hit_blocked = blocked_hit
 	if blocked_hit:
 		amount *= 0.35
 		push *= 0.25

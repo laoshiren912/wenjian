@@ -11,12 +11,17 @@ const EDGE_MARGIN: float = 8.0
 var _experience_popup: Dictionary = {}
 var hud_obstacles: Array[Control] = []
 
-func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true) -> void:
+func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true, blocked: bool = false) -> void:
 	if amount <= 0.0:
 		return
 	var color := Color("ff8585") if is_player else Color("ffe3a0")
-	_popup(point, "-%d" % roundi(amount), color, "player_damage" if is_player else "enemy_damage", amount)
-	bursts.append({"point": point, "age": 0.0, "color": color})
+	if blocked:
+		color = Color("9ee4ff")
+	var caption := "-%d" % roundi(amount)
+	if blocked:
+		caption = "格挡 " + caption
+	_popup(point, caption, color, "player_damage" if is_player else "enemy_damage", amount)
+	bursts.append({"point": point, "age": 0.0, "color": color, "local_impact": not camera_shake})
 	if camera_shake:
 		shake_strength = maxf(shake_strength, 8.0 if is_player else 3.5)
 		shake_time = 0.18
@@ -132,7 +137,10 @@ func _draw() -> void:
 		var progress: float = float(burst.age) / 0.16
 		var color: Color = burst.color
 		color.a = 1.0 - progress
+		var point: Vector2 = to_local(burst.point)
+		if burst.get("local_impact", false):
+			draw_arc(point, lerpf(6.0, 31.0, progress), 0.0, TAU, 24, color, 3.0, true)
+			draw_circle(point, lerpf(10.0, 2.0, progress), Color(color, color.a * 0.7))
 		for ray in range(6):
 			var direction := Vector2.from_angle(TAU * float(ray) / 6.0)
-			var point: Vector2 = to_local(burst.point)
 			draw_line(point + direction * (12.0 + progress * 13.0), point + direction * (21.0 + progress * 18.0), color, 2.5, true)
