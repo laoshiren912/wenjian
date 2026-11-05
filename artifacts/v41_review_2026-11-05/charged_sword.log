@@ -1,0 +1,84 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: press and short hold do not attack
+PASS: short release starts first ordinary stage
+PASS: release buffers ordinary stage 1
+PASS: release buffers ordinary stage 2
+PASS: below hold threshold has no attack
+PASS: threshold starts charge and clears combo
+PASS: half charge after threshold plus 0.30 seconds
+PASS: full charge waits for release and clamps
+PASS: charge permits full-speed movement
+PASS: charge follows mouse aim and raises hands
+PASS: bow blocked during charge
+PASS: release fires one directional charged attack
+PASS: full power and independent timing
+PASS: charged direction remains locked after release
+PASS: release permits 35 percent movement without automatic lunge
+PASS: charged windup cannot roll cancel
+PASS: charged hit phase cannot roll cancel
+PASS: charged recovery permits roll without extra invulnerability
+PASS: charge windup cannot damage
+PASS: sweep damages multiple enemies exactly once each
+PASS: directional sweep excludes rear targets
+PASS: charged range and angle exclude distant and side targets
+PASS: charged hit emits stronger active shake feedback
+PASS: charged attack has no drift and resets chain
+PASS: ordinary combo restarts at stage one
+PASS: half charge deals interpolated 80 damage
+PASS: threshold release deals minimum 65 damage
+PASS: bow cannot cancel charged recovery
+PASS: bow can fire after complete charged recovery
+PASS: ordinary action blocks long-hold timer
+PASS: hold threshold starts only after action ends
+PASS: continued hold can charge after action
+PASS: active bow blocks charge timer
+PASS: charge starts after bow action ends
+PASS: stamina failure preserves charge
+PASS: stamina failed request does not roll later
+PASS: successful roll cancels charge without attack
+PASS: release after charge cancel cannot queue ordinary sword
+PASS: cooldown failure preserves charge
+PASS: cooldown failed request does not roll later
+PASS: successful roll cancels charge without attack
+PASS: release after charge cancel cannot queue ordinary sword
+PASS: pause/focus clears charge and release cannot fire
+PASS: pause/focus clears charge and release cannot fire
+PASS: death clears charge
+PASS: restart clears charge
+PASS: wall blocks charged swept blade
+PASS: charge_half_960 HUD fits
+PASS: charge_half_960 HUD fits
+PASS: charge_half_960 HUD fits
+PASS: charge_full_960 HUD fits
+PASS: charge_full_960 HUD fits
+PASS: charge_full_960 HUD fits
+PASS: charge_swing_960 HUD fits
+PASS: charge_swing_960 HUD fits
+PASS: charge_swing_960 HUD fits
+PASS: charge_stats_960 HUD fits
+PASS: charge_stats_960 HUD fits
+PASS: charge_stats_960 HUD fits
+PASS: charge_stats_960 modal fits
+PASS: charge_pause_960 HUD fits
+PASS: charge_pause_960 HUD fits
+PASS: charge_pause_960 HUD fits
+PASS: charge_pause_960 modal fits
+PASS: charge_half_1280 HUD fits
+PASS: charge_half_1280 HUD fits
+PASS: charge_half_1280 HUD fits
+PASS: charge_full_1280 HUD fits
+PASS: charge_full_1280 HUD fits
+PASS: charge_full_1280 HUD fits
+PASS: charge_swing_1280 HUD fits
+PASS: charge_swing_1280 HUD fits
+PASS: charge_swing_1280 HUD fits
+PASS: charge_stats_1280 HUD fits
+PASS: charge_stats_1280 HUD fits
+PASS: charge_stats_1280 HUD fits
+PASS: charge_stats_1280 modal fits
+PASS: charge_pause_1280 HUD fits
+PASS: charge_pause_1280 HUD fits
+PASS: charge_pause_1280 HUD fits
+PASS: charge_pause_1280 modal fits
+CHARGED SWORD: 81 checks, 0 failures; controlled fixtures, not human playtest

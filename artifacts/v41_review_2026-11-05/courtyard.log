@@ -1,0 +1,67 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: approved art courtyard sample remains available
+PASS: approved painting imported as game asset
+PASS: visual trial reuses existing hero without spawning enemies
+PASS: two depth props and painted floor boundary
+PASS: foreground terrace has textured polygon
+PASS: foreground terrace has textured polygon
+PASS: foreground art separated from backdrop
+PASS: movement works: ["move_up"]
+PASS: boundary blocks escape: ["move_up"]
+PASS: movement works: ["move_down"]
+PASS: boundary blocks escape: ["move_down"]
+PASS: movement works: ["move_left"]
+PASS: boundary blocks escape: ["move_left"]
+PASS: movement works: ["move_right"]
+PASS: boundary blocks escape: ["move_right"]
+PASS: movement works: ["move_up", "move_left"]
+PASS: boundary blocks escape: ["move_up", "move_left"]
+PASS: movement works: ["move_up", "move_right"]
+PASS: boundary blocks escape: ["move_up", "move_right"]
+PASS: movement works: ["move_down", "move_left"]
+PASS: boundary blocks escape: ["move_down", "move_left"]
+PASS: movement works: ["move_down", "move_right"]
+PASS: boundary blocks escape: ["move_down", "move_right"]
+PASS: stone lantern foot collision blocks walking through
+PASS: lantern occludes hero standing behind
+PASS: behind_lantern button fits: 重置位置
+PASS: behind_lantern button fits: 远近切换
+PASS: behind_lantern button fits: 挥剑样板
+PASS: hero draws in front when passing lantern
+PASS: front_lantern button fits: 重置位置
+PASS: front_lantern button fits: 远近切换
+PASS: front_lantern button fits: 挥剑样板
+PASS: short-release sword works in courtyard
+PASS: bow works in courtyard
+PASS: existing roll can start
+PASS: roll moves on floor without adding invulnerability
+PASS: charge works in courtyard
+PASS: pause cancels held charge
+PASS: pause freezes movement
+PASS: courtyard_1280 button fits: 重置位置
+PASS: courtyard_1280 button fits: 远近切换
+PASS: courtyard_1280 button fits: 挥剑样板
+PASS: close_1280 button fits: 重置位置
+PASS: close_1280 button fits: 远近切换
+PASS: close_1280 button fits: 挥剑样板
+PASS: close camera stays within painting
+PASS: pause_1280 button fits: 重置位置
+PASS: pause_1280 button fits: 远近切换
+PASS: pause_1280 button fits: 挥剑样板
+PASS: pause_1280 button fits: 继续  [Esc]
+PASS: pause_1280 button fits: 返回V4.1（新局）
+PASS: courtyard_960 button fits: 重置位置
+PASS: courtyard_960 button fits: 远近切换
+PASS: courtyard_960 button fits: 挥剑样板
+PASS: close_960 button fits: 重置位置
+PASS: close_960 button fits: 远近切换
+PASS: close_960 button fits: 挥剑样板
+PASS: close camera stays within painting
+PASS: pause_960 button fits: 重置位置
+PASS: pause_960 button fits: 远近切换
+PASS: pause_960 button fits: 挥剑样板
+PASS: pause_960 button fits: 继续  [Esc]
+PASS: pause_960 button fits: 返回V4.1（新局）
+PASS: GUI reset never triggers sword
+COURTYARD: 64 checks, 0 failures; controlled input/collision/rendering, not human playtest

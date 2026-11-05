@@ -110,7 +110,7 @@ func assert_fresh(label: String) -> void:
 	check(game.player.combo.stages[0].damage == 32.0 and game.player.roll_cooldown == 0.65, label + " restores combat baselines")
 
 func run() -> void:
-	check(ProjectSettings.get_setting("application/run/main_scene") == "res://scenes/main_v4.tscn", "F5 defaults to V4")
+	check(ResourceLoader.exists("res://scenes/main_v4.tscn"), "V4 remains available via explicit scene")
 	for name in ["main_v33", "main_v32", "main_v31", "main", "corridor_trial", "trigger_room", "combat_room", "combat_sample"]:
 		check(load("res://scenes/" + name + ".tscn") != null, "old entry loadable: " + name)
 	game = load("res://scenes/main_v4.tscn").instantiate()

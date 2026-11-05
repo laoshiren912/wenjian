@@ -37,6 +37,9 @@ var guard_direction: Vector2 = Vector2.RIGHT
 var encounter_id: int = -1
 var home_position: Vector2 = Vector2.ZERO
 var thrust_type: bool = false
+@export_range(1, 10, 1) var max_simultaneous_attackers: int = 2
+var pair_scheduler: RefCounted
+var waiting_radius := 125.0
 enum EncounterState { IDLE, CHASE, SEARCH, RETURN }
 var encounter_state: int = EncounterState.IDLE
 var last_seen: Vector2 = Vector2.ZERO
@@ -166,7 +169,7 @@ func _physics_process(delta: float) -> void:
 		guard_cooldown = 3.5
 	elif aggro:
 		if distance < 45.0:
-			if attack_cooldown <= 0.0 and (kind != Kind.HOSTILE or _nearby_attackers() < 2):
+			if attack_cooldown <= 0.0 and (kind != Kind.HOSTILE or _nearby_attackers() < max_simultaneous_attackers):
 				windup = 0.25
 				attack_direction = (player.global_position - global_position).normalized()
 		else:
@@ -247,7 +250,7 @@ func _update_melee(delta: float, distance: float) -> Vector2:
 	for other in get_tree().get_nodes_in_group("enemies"):
 		if other != self and not other.dead and other.kind == Kind.HOSTILE and other.melee_action in ["windup", "attack"]:
 			attackers += 1
-	if attackers >= 2:
+	if attackers >= max_simultaneous_attackers:
 		return offset.normalized().rotated(PI * 0.5) * 0.4
 	melee_action = "windup"
 	melee_duration = 0.65 if fast_chaser else 0.85
@@ -325,13 +328,18 @@ func _encounter_process(delta: float) -> void:
 		var reach := 400.0 if kind == Kind.RANGED else (75.0 if thrust_type else 60.0)
 		if kind == Kind.RANGED and distance < 180.0:
 			movement = -offset.normalized() * 0.7
+		elif kind == Kind.HOSTILE and is_instance_valid(pair_scheduler) and not pair_scheduler.can_start(self):
+			var waiting_point := player.global_position - offset.normalized() * waiting_radius + offset.normalized().orthogonal() * side_sign * 35.0
+			movement = _follow_path(waiting_point) * 0.65 if distance > waiting_radius + 25.0 else offset.normalized().orthogonal() * side_sign * 0.35
 		elif distance > reach:
 			movement = _follow_path(player.global_position)
 		elif attack_cooldown <= 0.0:
-			if _encounter_attackers() < 2:
+			if _encounter_attackers() < max_simultaneous_attackers:
 				attack_direction = offset.normalized()
 				attack_duration = 0.85 if kind == Kind.RANGED else (0.65 if thrust_type else 0.8)
 				windup = attack_duration
+				if kind == Kind.HOSTILE and is_instance_valid(pair_scheduler):
+					pair_scheduler.attack_started(self)
 			else:
 				movement = offset.normalized().orthogonal() * side_sign * 0.35
 	elif encounter_state == EncounterState.SEARCH:

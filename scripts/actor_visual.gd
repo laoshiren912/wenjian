@@ -15,6 +15,8 @@ var attack_weapon: int = 0
 var attack_direction: Vector2 = Vector2.RIGHT
 var combo_stage := -1
 var combo_data: Dictionary = {}
+var charge_aim := Vector2.ZERO
+var sword_pose: Dictionary = {}
 var dying: bool = false
 var death_age: float = 0.0
 var roll_time: float = 0.0
@@ -46,7 +48,9 @@ func play_attack(index: int, direction: Vector2, duration: float) -> void:
 
 func cancel_attack() -> void:
 	attack_time = 0.0
+	charge_aim = Vector2.ZERO
 	combo_stage = -1
+	sword_pose = {}
 	queue_redraw()
 
 func set_combo_pose(stage: int, data: Dictionary) -> void:
@@ -107,6 +111,9 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if not sword_pose.is_empty() and not dying and roll_time <= 0.0:
+		_draw_sword_actor()
+		return
 	var moving: bool = motion.length_squared() >= 1.0 and not dying and roll_time <= 0.0
 	if roll_time > 0.0:
 		draw_arc(Vector2.ZERO, 24.0, -1.8, 1.8, 24, Color(0.55, 0.92, 0.86, 0.5), 2.0, true)
@@ -148,6 +155,9 @@ func _draw() -> void:
 			if combo_stage == 2:
 				right_hand = attack_direction * 18.0 + Vector2(0, lerpf(-28.0, 5.0, progress))
 				left_hand = right_hand - attack_direction * 6.0
+	if not charge_aim.is_zero_approx():
+		right_hand = charge_aim * 13.0 + Vector2(0, -20)
+		left_hand = right_hand - charge_aim * 6.0
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))
@@ -176,3 +186,48 @@ func _draw() -> void:
 	else:
 		draw_circle(head + Vector2(facing.x * 3, 0), 1.2, outline)
 		draw_line(head + Vector2(facing.x * 4, 2), head + Vector2(facing.x * 7, 2), color.lightened(0.3), 2.0, true)
+
+func _draw_sword_actor() -> void:
+	var body: Vector2 = sword_pose.torso
+	var side := body.orthogonal()
+	var lean: Vector2 = sword_pose.lean
+	var center := lean + Vector2(0, -2)
+	var color := Color.WHITE if hurt_time > 0.0 else tint
+	var dark := Color("203c43")
+	var step := sin(walk_phase) * 4.0 if motion.length_squared() > 1.0 else 0.0
+	draw_set_transform(Vector2(0, 12), 0.0, Vector2(1.0, 0.35))
+	draw_circle(Vector2.ZERO, 18.0, Color(0, 0, 0, 0.3))
+	draw_set_transform(Vector2.ZERO)
+	for foot in [-1.0, 1.0]:
+		var ankle: Vector2 = side * foot * 6.0 + Vector2(0, 14) + leg_facing * step * foot
+		draw_line(center + side * foot * 4.0, ankle, dark, 6.0, true)
+		draw_line(ankle - body * 2.0, ankle + body * 4.0, Color("77958c"), 4.0, true)
+	var grip: Vector2 = sword_pose.grip
+	var rear: bool = grip.y < -3.0
+	if rear:
+		_draw_sword_arms(center, side, grip, color)
+	# Shoulders and lapels turn continuously around the waist with the sword.
+	var robe := PackedVector2Array([center + side * 11.0 + body * 2.0, center + side * 8.0 - body * 9.0, center - side * 8.0 - body * 9.0, center - side * 11.0 + body * 2.0, center - side * 7.0 + body * 10.0, center + side * 7.0 + body * 10.0])
+	draw_colored_polygon(robe, dark)
+	draw_colored_polygon(PackedVector2Array([center + side * 8.0, center + side * 6.0 - body * 7.0, center - side * 6.0 - body * 7.0, center - side * 8.0, center - side * 5.0 + body * 8.0, center + side * 5.0 + body * 8.0]), color)
+	draw_line(center - side * 7.0 + body * 3.0, center + side * 7.0 + body * 3.0, Color("e3c98e"), 3.0, true)
+	draw_line(center - side * 4.0 - body * 5.0, center + body * 3.0, color.lightened(0.4), 1.5, true)
+	var head := lean * 0.5 + Vector2(0, -13)
+	draw_circle(head, 7.5, dark)
+	draw_circle(head, 5.8, Color("e0c7a6") if hurt_time <= 0.0 else Color.WHITE)
+	draw_arc(head, 6.0, PI, TAU, 12, Color("283c42"), 4.5, true)
+	draw_circle(head + Vector2(0, -8), 3.0, Color("233a40"))
+	draw_line(head + Vector2(-3, -8), head + Vector2(4, -8), Color("e0c58c"), 1.5, true)
+	if not rear:
+		_draw_sword_arms(center, side, grip, color)
+
+func _draw_sword_arms(center: Vector2, side: Vector2, grip: Vector2, color: Color) -> void:
+	var blade: Vector2 = (sword_pose.tip - grip).normalized()
+	var left := grip - blade * 7.0 if sword_pose.support else center - side * 14.0 - blade * 4.0
+	for pair in [[center + side * 8.0, grip], [center - side * 8.0, left]]:
+		var shoulder: Vector2 = pair[0]
+		var hand: Vector2 = pair[1]
+		var elbow := shoulder.lerp(hand, 0.5) + (hand - shoulder).orthogonal().normalized() * 4.0
+		draw_polyline(PackedVector2Array([shoulder, elbow, hand]), Color("203c43"), 6.0, true)
+		draw_polyline(PackedVector2Array([shoulder, elbow, hand]), color.darkened(0.1), 3.5, true)
+		draw_circle(hand, 2.7, Color("e0c7a6"))

@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/courtyard_trial.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/courtyard_world.gd" id="2"]
+
+[node name="CourtyardTrial" type="Node2D"]
+process_mode = 3
+script = ExtResource("1")
+
+[node name="World" type="Node2D" parent="."]
+process_mode = 1
+script = ExtResource("2")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(640, 360)
