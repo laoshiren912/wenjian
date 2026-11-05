@@ -116,8 +116,8 @@ func _physics_process(delta: float) -> void:
 
 func _draw() -> void:
 	var drawing_bow := not bow_aim.is_zero_approx() and not dying and roll_time <= 0.0
-	if not drawing_bow and not sword_pose.is_empty() and not dying and roll_time <= 0.0:
-		_draw_sword_actor()
+	if drawing_bow or (not sword_pose.is_empty() and not dying and roll_time <= 0.0):
+		_draw_armed_actor(drawing_bow)
 		return
 	var moving: bool = motion.length_squared() >= 1.0 and not dying and roll_time <= 0.0
 	if roll_time > 0.0:
@@ -144,15 +144,6 @@ func _draw() -> void:
 	if leg_facing.x != 0.0:
 		left_foot = Vector2(-2 + leg_facing.x * step, 15)
 		right_foot = Vector2(2 - leg_facing.x * step, 15)
-	if drawing_bow and (bow_release > 0.0 or bow_step > 0.0):
-		# Plant the rear foot first, then bring the lead foot back under the hips.
-		var back := -bow_aim
-		var side := back.orthogonal() * 5.0
-		var rear_stride := sin(PI * smoothstep(0.0, 0.78, bow_step))
-		var lead_stride := sin(PI * smoothstep(0.32, 1.0, bow_step))
-		left_foot = Vector2(0, 15) + side + back * (3.0 + 14.0 * rear_stride)
-		right_foot = Vector2(0, 15) - side + back * (3.0 - 10.0 * lead_stride)
-		offset += back * (5.0 * sin(PI * bow_step))
 	draw_line(Vector2(-4, 5) + offset, left_foot, boots, 5.0, true)
 	draw_line(Vector2(4, 5) + offset, right_foot, boots, 5.0, true)
 	draw_circle(left_foot, 3.0, boots)
@@ -172,9 +163,6 @@ func _draw() -> void:
 	if not charge_aim.is_zero_approx():
 		right_hand = charge_aim * 13.0 + Vector2(0, -20)
 		left_hand = right_hand - charge_aim * 6.0
-	if drawing_bow:
-		right_hand = offset + Vector2(0, -6) + bow_aim * lerpf(21.0, 27.0, maxf(bow_pull, bow_release))
-		left_hand = right_hand - bow_aim * (lerpf(5.0, 37.0, bow_pull) + 24.0 * bow_release)
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))
@@ -204,22 +192,23 @@ func _draw() -> void:
 		draw_circle(head + Vector2(facing.x * 3, 0), 1.2, outline)
 		draw_line(head + Vector2(facing.x * 4, 2), head + Vector2(facing.x * 7, 2), color.lightened(0.3), 2.0, true)
 
-	if drawing_bow:
-		var side := bow_aim.orthogonal() * 13.0
-		var limb_base := right_hand - bow_aim * lerpf(7.0, 11.0, bow_pull)
-		var upper := limb_base - side
-		var lower := limb_base + side
-		draw_polyline(PackedVector2Array([upper, right_hand - side * 0.55, right_hand,
-			right_hand + side * 0.55, lower]), Color("e3ad62"), 3.0, true)
-		var string_center := left_hand if bow_release <= 0.0 and bow_step <= 0.0 else limb_base
-		draw_polyline(PackedVector2Array([upper, string_center, lower]), Color("fff1cf"), 1.5, true)
-		if bow_pull > 0.0:
-			draw_line(left_hand, right_hand + bow_aim * 9.0, Color("fff1cf"), 2.0, true)
 
-func _draw_sword_actor() -> void:
-	var body: Vector2 = sword_pose.torso
+func _draw_bow(right_hand: Vector2, left_hand: Vector2) -> void:
+	var side := bow_aim.orthogonal() * 13.0
+	var limb_base := right_hand - bow_aim * lerpf(7.0, 11.0, bow_pull)
+	var upper := limb_base - side
+	var lower := limb_base + side
+	draw_polyline(PackedVector2Array([upper, right_hand - side * 0.55, right_hand,
+		right_hand + side * 0.55, lower]), Color("e3ad62"), 3.0, true)
+	var string_center := left_hand if bow_release <= 0.0 and bow_step <= 0.0 else limb_base
+	draw_polyline(PackedVector2Array([upper, string_center, lower]), Color("fff1cf"), 1.5, true)
+	if bow_pull > 0.0:
+		draw_line(left_hand, right_hand + bow_aim * 9.0, Color("fff1cf"), 2.0, true)
+
+func _draw_armed_actor(drawing_bow: bool) -> void:
+	var body: Vector2 = bow_aim if drawing_bow else sword_pose.torso
 	var side := body.orthogonal()
-	var lean: Vector2 = sword_pose.lean
+	var lean: Vector2 = -bow_aim * (5.0 * sin(PI * bow_step)) if drawing_bow else sword_pose.lean
 	var center := lean + Vector2(0, -2)
 	var color := Color.WHITE if hurt_time > 0.0 else tint
 	var dark := Color("203c43")
@@ -229,10 +218,13 @@ func _draw_sword_actor() -> void:
 	draw_set_transform(Vector2.ZERO)
 	for foot in [-1.0, 1.0]:
 		var ankle: Vector2 = side * foot * 6.0 + Vector2(0, 14) + leg_facing * step * foot
+		if drawing_bow and (bow_release > 0.0 or bow_step > 0.0):
+			var stride := 14.0 * sin(PI * smoothstep(0.0, 0.78, bow_step)) if foot > 0.0 else -10.0 * sin(PI * smoothstep(0.32, 1.0, bow_step))
+			ankle = side * foot * 6.0 + Vector2(0, 14) - body * (3.0 + stride)
 		draw_line(center + side * foot * 4.0, ankle, dark, 6.0, true)
 		draw_line(ankle - body * 2.0, ankle + body * 4.0, Color("77958c"), 4.0, true)
-	var grip: Vector2 = sword_pose.grip
-	var rear: bool = sword_pose.get("rear", grip.y < -3.0)
+	var grip: Vector2 = center + bow_aim * lerpf(21.0, 27.0, maxf(bow_pull, bow_release)) if drawing_bow else sword_pose.grip
+	var rear: bool = not drawing_bow and sword_pose.get("rear", grip.y < -3.0)
 	if rear:
 		_draw_sword_arms(center, side, grip, color)
 	# Shoulders and lapels turn continuously around the waist with the sword.
@@ -247,12 +239,19 @@ func _draw_sword_actor() -> void:
 	draw_arc(head, 6.0, PI, TAU, 12, Color("283c42"), 4.5, true)
 	draw_circle(head + Vector2(0, -8), 3.0, Color("233a40"))
 	draw_line(head + Vector2(-3, -8), head + Vector2(4, -8), Color("e0c58c"), 1.5, true)
-	if not rear:
+	if drawing_bow:
+		var string_hand := grip - bow_aim * (lerpf(5.0, 37.0, bow_pull) + 24.0 * bow_release)
+		_draw_armed_hands(center, side, grip, string_hand, color)
+		_draw_bow(grip, string_hand)
+	elif not rear:
 		_draw_sword_arms(center, side, grip, color)
 
 func _draw_sword_arms(center: Vector2, side: Vector2, grip: Vector2, color: Color) -> void:
 	var blade: Vector2 = (sword_pose.tip - grip).normalized()
 	var left := grip - blade * 7.0 if sword_pose.support else center - side * 14.0 - blade * 4.0
+	_draw_armed_hands(center, side, grip, left, color)
+
+func _draw_armed_hands(center: Vector2, side: Vector2, grip: Vector2, left: Vector2, color: Color) -> void:
 	for pair in [[center + side * 8.0, grip], [center - side * 8.0, left]]:
 		var shoulder: Vector2 = pair[0]
 		var hand: Vector2 = pair[1]
