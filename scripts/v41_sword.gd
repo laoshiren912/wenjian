@@ -6,18 +6,47 @@ var heavy_reward := false
 var roll_armed := false
 var swing_bonus := 1.0
 
-func display_pose(pose: Dictionary) -> Dictionary:
-	var lean: Vector2 = pose.lean
-	var grip: Vector2 = pose.grip - lean
-	var blade: Vector2 = pose.tip - pose.grip
-	var direction := blade.normalized()
-	# Depth comes from the wrist's orbit before projecting height onto screen Y.
-	pose.rear = grip.y < -1.0
-	var grip_lift := lerpf(12.0, 4.0, (grip.y / 18.0 + 1.0) * 0.5)
-	var tip_lift := lerpf(25.0, 3.0, (direction.y + 1.0) * 0.5)
-	pose.grip = lean + Vector2(grip.x, grip.y * 0.72 - grip_lift)
-	pose.tip = pose.grip + Vector2(blade.x, blade.y * 0.88 - tip_lift)
-	return pose
+func _held_pose() -> Dictionary:
+	# A relaxed side carry is independent of the cursor.
+	return {"grip": Vector2(15, -3), "tip": Vector2(47, 27),
+		"torso": Vector2.DOWN, "lean": Vector2.ZERO, "support": false}
+
+func _swing_pose(progress: float, aim := Vector2.ZERO) -> Dictionary:
+	if aim.is_zero_approx():
+		aim = swing_direction
+	var turn := -1.0 if stage == 1 else 1.0
+	var angle := lerpf(-1.65, 1.65, progress) * turn
+	var radial := aim.rotated(angle)
+	# The wrist leads the blade. Its offset keeps the sword off the head axis.
+	var wrist := aim.rotated(angle + turn * 0.8) * 19.0
+	var lean := radial * 3.0
+	var grip := Vector2(wrist.x, wrist.y * 0.65 - 8.0) + lean
+	var blade := radial.rotated(-turn * 0.32) * (62.0 if charged_swing else 49.0)
+	var lift := 9.0 + 10.0 * sin(progress * PI)
+	return {"grip": grip, "tip": grip + Vector2(blade.x, blade.y * 0.78 - lift),
+		"torso": aim.rotated(angle * 0.65), "lean": lean,
+		"support": charged_swing or stage == 2, "rear": wrist.y < -1.0}
+
+func motion_pose() -> Dictionary:
+	if charging:
+		var pose := _swing_pose(0.0, get_parent().aim_direction)
+		pose.support = true
+		return pose
+	if swing_time <= 0.0:
+		return _held_pose()
+	var data := current_data()
+	var elapsed: float = (swing_duration - swing_time) * get_parent().attack_speed_multiplier
+	if phase() == "windup":
+		return _blend_pose(start_pose if not start_pose.is_empty() else _held_pose(),
+			_swing_pose(0.0), elapsed / float(data.windup))
+	if phase() == "active":
+		return _swing_pose(active_progress(swing_time))
+	var recovery: float = (elapsed - float(data.windup) - float(data.active)) / float(data.recovery)
+	return _blend_pose(_swing_pose(1.0), _held_pose(), recovery)
+
+func display_segment(progress: float) -> PackedVector2Array:
+	var pose := _swing_pose(progress)
+	return PackedVector2Array([pose.grip, pose.tip])
 
 func attack(direction: Vector2) -> bool:
 	if not super.attack(direction):
