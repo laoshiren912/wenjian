@@ -1,11 +1,11 @@
 extends SurvivorPlayer
 
-const BOW_WINDUP := 0.25
-const BOW_RECOVERY := 0.75
+const BOW_WINDUP := 0.5
+const BOW_RECOVERY := 0.6
 const BOW_DRAW_SPEED := 0.45
 const BOW_RECOVERY_SPEED := 0.55
-const BOW_RECOIL := 180.0
-const BOW_RECOIL_DECELERATION := 950.0
+const BOW_RECOIL := 150.0
+const BOW_RECOIL_DECELERATION := 500.0
 
 var bow_windup_remaining := 0.0
 var bow_recovery_remaining := 0.0
@@ -49,7 +49,7 @@ func movement_multiplier() -> float:
 	if bow_windup_remaining > 0.0:
 		return BOW_DRAW_SPEED
 	if bow_recovery_remaining > 0.0:
-		return BOW_RECOVERY_SPEED
+		return 0.15 if not _bow_recoil_velocity.is_zero_approx() else BOW_RECOVERY_SPEED
 	return super.movement_multiplier()
 
 func _ranged_recoil_velocity() -> Vector2:

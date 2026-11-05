@@ -11,14 +11,15 @@ const EDGE_MARGIN: float = 8.0
 var _experience_popup: Dictionary = {}
 var hud_obstacles: Array[Control] = []
 
-func show_damage(point: Vector2, amount: float, is_player: bool) -> void:
+func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true) -> void:
 	if amount <= 0.0:
 		return
 	var color := Color("ff8585") if is_player else Color("ffe3a0")
 	_popup(point, "-%d" % roundi(amount), color, "player_damage" if is_player else "enemy_damage", amount)
 	bursts.append({"point": point, "age": 0.0, "color": color})
-	shake_strength = maxf(shake_strength, 8.0 if is_player else 3.5)
-	shake_time = 0.18
+	if camera_shake:
+		shake_strength = maxf(shake_strength, 8.0 if is_player else 3.5)
+		shake_time = 0.18
 
 func show_experience(point: Vector2, amount: int) -> int:
 	# Display immediately; age is measured from the FIRST pickup and never restarted.

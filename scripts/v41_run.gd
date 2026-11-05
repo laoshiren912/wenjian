@@ -63,6 +63,7 @@ func _enter_room() -> void:
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
 	player.enable_dual_attack()
+	player.ranged_weapon.projectile_camera_shake = false
 	player.camera.enabled = false
 	world.visitor = player
 	$Camera2D.make_current()
@@ -145,7 +146,7 @@ func _spawn_wave() -> void:
 		enemy.home_position = enemy.position
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
 		enemy.killed.connect(_on_enemy_killed)
-		enemy.damaged.connect(func(point: Vector2, amount: float): feedback.show_damage(point, amount, false))
+		enemy.damaged.connect(func(point: Vector2, amount: float): feedback.show_damage(point, amount, false, enemy.damage_shakes_camera))
 		world.actors.add_child(enemy)
 		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
 		enemy.max_health = float(stats.health) * CONFIG.ROOM_SCALES[room_index]

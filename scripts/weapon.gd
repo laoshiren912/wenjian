@@ -27,6 +27,7 @@ var swing_duration: float = 0.18
 var swing_direction: Vector2 = Vector2.RIGHT
 var swing_weapon: int = 0
 var attack_count: int = 0
+var projectile_camera_shake := true
 var sword_hit_targets: Array[Node2D] = []
 var sword_momentum_multiplier: float = 1.0
 const SWORD_ASSIST_ANGLE: float = 15.0
@@ -80,6 +81,7 @@ func attack(direction: Vector2) -> bool:
 			var projectile = PROJECTILE_SCENE.instantiate()
 			projectile.direction = swing_direction.rotated((float(arrow) - player.extra_arrows * 0.5) * 0.15)
 			projectile.damage = damage
+			projectile.camera_shake = projectile_camera_shake
 			projectile.speed += player.projectile_speed_bonus
 			projectile.max_distance = float(data.reach) + player.reach_bonus
 			player.get_parent().add_child(projectile)

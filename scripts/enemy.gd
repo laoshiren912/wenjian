@@ -522,7 +522,10 @@ func _follow_path(target: Vector2) -> Vector2:
 		return (path[path_index] - global_position).normalized()
 	return Vector2.ZERO
 
-func take_damage(amount: float, push: Vector2, ignore_guard: bool = false) -> void:
+var damage_shakes_camera := true
+
+func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true) -> void:
+	damage_shakes_camera = camera_shake
 	if dead or emerging:
 		return
 	var can_block := guard_time > 0.0

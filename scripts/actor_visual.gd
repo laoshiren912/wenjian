@@ -164,7 +164,7 @@ func _draw() -> void:
 		left_hand = right_hand - charge_aim * 6.0
 	if drawing_bow:
 		right_hand = offset + Vector2(0, -6) + bow_aim * lerpf(21.0, 27.0, maxf(bow_pull, bow_release))
-		left_hand = right_hand - bow_aim * (lerpf(7.0, 29.0, bow_pull) + 24.0 * bow_release)
+		left_hand = right_hand - bow_aim * (lerpf(5.0, 37.0, bow_pull) + 24.0 * bow_release)
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))
