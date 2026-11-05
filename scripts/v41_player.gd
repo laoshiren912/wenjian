@@ -1,8 +1,58 @@
 extends SurvivorPlayer
 
-# Reward hook only: all movement, stamina and roll timing stay in the base player.
+signal bow_fired
+
+const BOW_WINDUP := 0.25
+const BOW_RECOVERY := 0.75
+const BOW_DRAW_SPEED := 0.45
+const BOW_RECOVERY_SPEED := 0.55
+const BOW_RECOIL := 180.0
+const BOW_RECOIL_DECELERATION := 950.0
+
+var bow_windup_remaining := 0.0
+var bow_recovery_remaining := 0.0
+var _bow_recoil_velocity := Vector2.ZERO
+
+func _tick_ranged_attack(delta: float, rolling: bool) -> void:
+	if bow_recovery_remaining > 0.0:
+		_bow_recoil_velocity = _bow_recoil_velocity.move_toward(Vector2.ZERO, BOW_RECOIL_DECELERATION * delta)
+		bow_recovery_remaining = maxf(0.0, bow_recovery_remaining - delta)
+		return
+	if not dual_attack_enabled or rolling or weapon.swing_time > 0.0 or combo.bow_blocked():
+		bow_windup_remaining = 0.0
+		return
+	if bow_windup_remaining > 0.0:
+		bow_windup_remaining = maxf(0.0, bow_windup_remaining - delta)
+		if bow_windup_remaining <= 0.000001:
+			bow_windup_remaining = 0.0
+			if ranged_weapon.attack(aim_direction):
+				bow_recovery_remaining = BOW_RECOVERY
+				_bow_recoil_velocity = -ranged_weapon.swing_direction * BOW_RECOIL
+				bow_fired.emit()
+	elif _ranged_pending:
+		bow_windup_remaining = BOW_WINDUP
+
+func movement_multiplier() -> float:
+	if weapon.swing_time > 0.0 or combo.charging:
+		return super.movement_multiplier()
+	if bow_windup_remaining > 0.0:
+		return BOW_DRAW_SPEED
+	if bow_recovery_remaining > 0.0:
+		return BOW_RECOVERY_SPEED
+	return super.movement_multiplier()
+
+func _ranged_recoil_velocity() -> Vector2:
+	return _bow_recoil_velocity
+
+func _clear_ranged_input() -> void:
+	super._clear_ranged_input()
+	bow_windup_remaining = 0.0
+
 func try_roll() -> bool:
 	var succeeded := super.try_roll()
-	if succeeded and combo.roll_reward:
-		combo.roll_armed = true
+	if succeeded:
+		bow_windup_remaining = 0.0
+		_bow_recoil_velocity = Vector2.ZERO
+		if combo.roll_reward:
+			combo.roll_armed = true
 	return succeeded

@@ -28,6 +28,10 @@ func update_room(remaining: int, total: int, triggered: int) -> void:
 		action = "蓄力 %d%% · Space取消" % roundi(player.combo.charge_fraction() * 100.0)
 	elif player.combo.swing_time > 0.0:
 		action = "蓄力劈砍" if player.combo.charged_swing else "第%d段 %s" % [player.combo.stage + 1, player.combo.current_data().name]
+	elif player.bow_windup_remaining > 0.0:
+		action = "弓 · 拉弦"
+	elif player.bow_recovery_remaining > 0.0:
+		action = "弓 · 收招 %.1f 秒" % player.bow_recovery_remaining
 	weapon_detail.text = action + "\n" + reward_summary()
 
 func show_rewards() -> void:

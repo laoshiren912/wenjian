@@ -248,6 +248,13 @@ func _finish_roll() -> void:
 	weapon.show()
 	visual.stop_roll()
 
+func _tick_ranged_attack(_delta: float, rolling: bool) -> void:
+	if dual_attack_enabled and not rolling and weapon.swing_time <= 0.0 and (not _uses_charge() or not combo.bow_blocked()) and (_ranged_pending or (_ranged_held and Input.is_action_pressed("ranged_attack"))):
+		ranged_weapon.attack(aim_direction)
+
+func _ranged_recoil_velocity() -> Vector2:
+	return Vector2.ZERO
+
 func _physics_process(delta: float) -> void:
 	if dead:
 		return
@@ -292,8 +299,7 @@ func _physics_process(delta: float) -> void:
 		if weapon.attack(attack_direction):
 			_target_marker = _click_target if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead else null
 			_target_marker_remaining = 0.65 if is_instance_valid(_target_marker) else 0.0
-	if dual_attack_enabled and not rolling_this_frame and weapon.swing_time <= 0.0 and (not _uses_charge() or not combo.bow_blocked()) and (_ranged_pending or (_ranged_held and Input.is_action_pressed("ranged_attack"))):
-		ranged_weapon.attack(aim_direction)
+	_tick_ranged_attack(delta, rolling_this_frame)
 	_ranged_pending = false
 	if not rolling_this_frame:
 		_attack_pending = false
@@ -303,7 +309,7 @@ func _physics_process(delta: float) -> void:
 		var step: float = minf(delta, _roll_remaining)
 		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
 	else:
-		velocity = movement * speed * movement_multiplier() + knockback
+		velocity = movement * speed * movement_multiplier() + knockback + _ranged_recoil_velocity()
 		if combo_enabled:
 			velocity += combo.lunge_velocity(delta)
 	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
@@ -362,8 +368,11 @@ func _notification(what: int) -> void:
 		_attack_pending = false
 		_click_target = null
 		_roll_requested = false
-		_ranged_held = false
-		_ranged_pending = false
+		_clear_ranged_input()
+
+func _clear_ranged_input() -> void:
+	_ranged_held = false
+	_ranged_pending = false
 
 func _target_at_click(world_position: Vector2) -> Node2D:
 	var best: Node2D = null

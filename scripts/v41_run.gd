@@ -70,6 +70,9 @@ func _enter_room() -> void:
 	player.died.connect(_on_player_died)
 	player.damage_received.connect(func(amount): feedback.show_damage(player.global_position, amount, true))
 	player.hurt.connect(hud.flash_damage)
+	player.bow_fired.connect(func():
+		feedback.shake_strength = maxf(feedback.shake_strength, 3.5)
+		feedback.shake_time = maxf(feedback.shake_time, 0.18))
 	hud.player = player
 	hud.hurt_flash.color.a = 0.0
 	hud.notice_time = 0.0

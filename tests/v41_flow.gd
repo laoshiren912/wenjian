@@ -101,6 +101,41 @@ func tick_sword(count: int) -> void:
 	for i in range(count):
 		game.player.weapon._physics_process(0.01)
 
+func check_bow_cycle() -> void:
+	reset()
+	var player = game.player
+	var bow = player.ranged_weapon
+	var origin: Vector2 = player.position
+	var target := Vector2(670, 390)
+	click_mouse(true, target, true)
+	await frames(12)
+	check(bow.attack_count == 0 and player.bow_windup_remaining > 0.0 and is_equal_approx(player.movement_multiplier(), 0.45), "bow draws for a quarter second at reduced speed")
+	await frames(6)
+	check(bow.attack_count == 1 and player.bow_recovery_remaining > 0.0, "bow fires once after windup")
+	check((player.position - origin).dot(bow.swing_direction) < -1.0 and game.feedback.shake_time > 0.0, "bow shot moves the body backward and shakes the camera")
+	check(is_equal_approx(player.movement_multiplier(), 0.55), "bow recovery still allows movement")
+	click_mouse(false, target, true)
+	await frames(36)
+	click_mouse(true, target, true)
+	await frames(3)
+	check(bow.attack_count == 1 and player.bow_windup_remaining == 0.0 and player.bow_recovery_remaining > 0.0, "press near end of recovery cannot queue another shot")
+	await frames(75)
+	check(bow.attack_count == 1 and player.bow_recovery_remaining == 0.0, "holding through the end of recovery never repeats")
+	click_mouse(false, target, true)
+	click_mouse(true, target, true)
+	click_mouse(false, target, true)
+	await frames(18)
+	check(bow.attack_count == 2, "fresh tap after recovery fires even after button release")
+	reset()
+	click_mouse(true, target, true)
+	await frames(5)
+	key(KEY_SPACE)
+	await frames(2)
+	check(game.player.is_rolling() and game.player.bow_windup_remaining == 0.0, "successful roll cancels bow windup")
+	click_mouse(false, target, true)
+	await frames(35)
+	check(game.player.ranged_weapon.attack_count == 0, "cancelled bow never fires after roll")
+
 func snapshot(label: String) -> void:
 	await frames(4)
 	var bounds := Rect2(Vector2.ZERO, game.hud.root.size).grow(1)
@@ -265,6 +300,7 @@ func run() -> void:
 				if e.kind == e.Kind.RANGED: ranged_started = true
 		cap_violation = cap_violation or active > CONFIG.ATTACK_LIMIT
 	check(not cap_violation and ranged_started, "real mixed melee/ranged wave respects total configurable cap3")
+	await check_bow_cycle()
 	# Input boundaries use real GUI-dispatched press/release and 60Hz physics.
 	reset()
 	var sword = game.player.combo
