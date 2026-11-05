@@ -203,7 +203,7 @@ func _draw_sword_actor() -> void:
 		draw_line(center + side * foot * 4.0, ankle, dark, 6.0, true)
 		draw_line(ankle - body * 2.0, ankle + body * 4.0, Color("77958c"), 4.0, true)
 	var grip: Vector2 = sword_pose.grip
-	var rear: bool = grip.y < -3.0
+	var rear: bool = sword_pose.get("rear", grip.y < -3.0)
 	if rear:
 		_draw_sword_arms(center, side, grip, color)
 	# Shoulders and lapels turn continuously around the waist with the sword.

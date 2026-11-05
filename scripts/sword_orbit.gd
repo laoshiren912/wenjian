@@ -86,6 +86,13 @@ func motion_pose() -> Dictionary:
 	var rest := _orbit_pose(0.95, float(stages[0].reach) + get_parent().reach_bonus, 0.0, Vector2.ZERO, swing_direction)
 	return _blend_pose(follow, rest, (recovery - 0.3) / 0.7)
 
+func display_pose(pose: Dictionary) -> Dictionary:
+	return pose
+
+func display_segment(progress: float) -> PackedVector2Array:
+	var pose := display_pose(active_pose(progress))
+	return PackedVector2Array([pose.grip, pose.tip])
+
 func sync_motion() -> void:
 	var actor = get_parent()
 	actor.visual.z_index = 1
@@ -93,18 +100,19 @@ func sync_motion() -> void:
 		actor.visual.sword_pose = {}
 		z_index = 0
 		return
-	var pose := motion_pose()
+	var pose := display_pose(motion_pose())
 	actor.visual.sword_pose = pose
 	# Keep both passes above the floor; a negative Z would put the rear sword
 	# beneath the room background instead of just behind the actor.
-	z_index = 0 if (pose.grip as Vector2).y < -3.0 else 2
+	var rear: bool = pose.get("rear", (pose.grip as Vector2).y < -3.0)
+	z_index = 0 if rear else 2
 	queue_redraw()
 
 func _draw() -> void:
 	var actor = get_parent()
 	if actor.is_rolling() or actor.dead or actor.ranged_weapon.swing_time > 0.0:
 		return
-	var pose := motion_pose()
+	var pose := display_pose(motion_pose())
 	var color := Color("aeefff") if charged_swing and swing_time > 0.0 else Color("eceddb")
 	if charging:
 		var aim: Vector2 = get_parent().aim_direction
@@ -119,9 +127,9 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 30.0, -PI / 2.0, -PI / 2.0 + maxf(0.001, charge_fraction() * TAU), 48, color, 3.0, true)
 	if swing_time > 0.0 and phase() == "active":
 		var progress := active_progress(swing_time)
-		var previous := blade_segment(maxf(0.0, progress - 0.4))
+		var previous := display_segment(maxf(0.0, progress - 0.4))
 		for i in range(1, 9):
-			var segment := blade_segment(lerpf(maxf(0.0, progress - 0.4), progress, i / 8.0))
+			var segment := display_segment(lerpf(maxf(0.0, progress - 0.4), progress, i / 8.0))
 			draw_colored_polygon(PackedVector2Array([previous[0], previous[1], segment[1], segment[0]]), Color(color, i / 8.0 * 0.20))
 			previous = segment
 	_draw_blade(pose.grip, pose.tip, color)
