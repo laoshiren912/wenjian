@@ -20,6 +20,7 @@ var sword_pose: Dictionary = {}
 var bow_aim := Vector2.ZERO
 var bow_pull := 0.0
 var bow_release := 0.0
+var bow_step := 0.0
 var dying: bool = false
 var death_age: float = 0.0
 var roll_time: float = 0.0
@@ -143,6 +144,15 @@ func _draw() -> void:
 	if leg_facing.x != 0.0:
 		left_foot = Vector2(-2 + leg_facing.x * step, 15)
 		right_foot = Vector2(2 - leg_facing.x * step, 15)
+	if drawing_bow and (bow_release > 0.0 or bow_step > 0.0):
+		# Plant the rear foot first, then bring the lead foot back under the hips.
+		var back := -bow_aim
+		var side := back.orthogonal() * 5.0
+		var rear_stride := sin(PI * smoothstep(0.0, 0.78, bow_step))
+		var lead_stride := sin(PI * smoothstep(0.32, 1.0, bow_step))
+		left_foot = Vector2(0, 15) + side + back * (3.0 + 14.0 * rear_stride)
+		right_foot = Vector2(0, 15) - side + back * (3.0 - 10.0 * lead_stride)
+		offset += back * (5.0 * sin(PI * bow_step))
 	draw_line(Vector2(-4, 5) + offset, left_foot, boots, 5.0, true)
 	draw_line(Vector2(4, 5) + offset, right_foot, boots, 5.0, true)
 	draw_circle(left_foot, 3.0, boots)
@@ -201,7 +211,7 @@ func _draw() -> void:
 		var lower := limb_base + side
 		draw_polyline(PackedVector2Array([upper, right_hand - side * 0.55, right_hand,
 			right_hand + side * 0.55, lower]), Color("e3ad62"), 3.0, true)
-		var string_center := left_hand if bow_release <= 0.0 else limb_base
+		var string_center := left_hand if bow_release <= 0.0 and bow_step <= 0.0 else limb_base
 		draw_polyline(PackedVector2Array([upper, string_center, lower]), Color("fff1cf"), 1.5, true)
 		if bow_pull > 0.0:
 			draw_line(left_hand, right_hand + bow_aim * 9.0, Color("fff1cf"), 2.0, true)

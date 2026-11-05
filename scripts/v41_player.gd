@@ -34,14 +34,16 @@ func _physics_process(delta: float) -> void:
 	visual.bow_aim = Vector2.ZERO
 	visual.bow_pull = 0.0
 	visual.bow_release = 0.0
-	if dead or is_rolling() or not dual_attack_enabled:
+	visual.bow_step = 0.0
+	if dead or is_rolling() or not dual_attack_enabled or weapon.swing_time > 0.0 or combo.charging:
 		return
 	if bow_windup_remaining > 0.0:
 		visual.bow_aim = aim_direction
 		visual.bow_pull = 1.0 - bow_windup_remaining / BOW_WINDUP
-	elif ranged_weapon.swing_time > 0.0:
+	elif not _bow_recoil_velocity.is_zero_approx():
 		visual.bow_aim = ranged_weapon.swing_direction
 		visual.bow_release = ranged_weapon.swing_time / ranged_weapon.swing_duration
+		visual.bow_step = 1.0 - _bow_recoil_velocity.length() / BOW_RECOIL
 
 func movement_multiplier() -> float:
 	if weapon.swing_time > 0.0 or combo.charging:
