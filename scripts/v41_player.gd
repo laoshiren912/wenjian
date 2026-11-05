@@ -1,7 +1,5 @@
 extends SurvivorPlayer
 
-signal bow_fired
-
 const BOW_WINDUP := 0.25
 const BOW_RECOVERY := 0.75
 const BOW_DRAW_SPEED := 0.45
@@ -28,9 +26,22 @@ func _tick_ranged_attack(delta: float, rolling: bool) -> void:
 			if ranged_weapon.attack(aim_direction):
 				bow_recovery_remaining = BOW_RECOVERY
 				_bow_recoil_velocity = -ranged_weapon.swing_direction * BOW_RECOIL
-				bow_fired.emit()
 	elif _ranged_pending:
 		bow_windup_remaining = BOW_WINDUP
+
+func _physics_process(delta: float) -> void:
+	super._physics_process(delta)
+	visual.bow_aim = Vector2.ZERO
+	visual.bow_pull = 0.0
+	visual.bow_release = 0.0
+	if dead or is_rolling() or not dual_attack_enabled:
+		return
+	if bow_windup_remaining > 0.0:
+		visual.bow_aim = aim_direction
+		visual.bow_pull = 1.0 - bow_windup_remaining / BOW_WINDUP
+	elif ranged_weapon.swing_time > 0.0:
+		visual.bow_aim = ranged_weapon.swing_direction
+		visual.bow_release = ranged_weapon.swing_time / ranged_weapon.swing_duration
 
 func movement_multiplier() -> float:
 	if weapon.swing_time > 0.0 or combo.charging:

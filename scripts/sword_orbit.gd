@@ -110,7 +110,7 @@ func sync_motion() -> void:
 
 func _draw() -> void:
 	var actor = get_parent()
-	if actor.is_rolling() or actor.dead or actor.ranged_weapon.swing_time > 0.0:
+	if actor.is_rolling() or actor.dead or actor.ranged_weapon.swing_time > 0.0 or not actor.visual.bow_aim.is_zero_approx():
 		return
 	var pose := display_pose(motion_pose())
 	var color := Color("aeefff") if charged_swing and swing_time > 0.0 else Color("eceddb")

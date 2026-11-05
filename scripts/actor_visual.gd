@@ -17,6 +17,9 @@ var combo_stage := -1
 var combo_data: Dictionary = {}
 var charge_aim := Vector2.ZERO
 var sword_pose: Dictionary = {}
+var bow_aim := Vector2.ZERO
+var bow_pull := 0.0
+var bow_release := 0.0
 var dying: bool = false
 var death_age: float = 0.0
 var roll_time: float = 0.0
@@ -111,7 +114,8 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	if not sword_pose.is_empty() and not dying and roll_time <= 0.0:
+	var drawing_bow := not bow_aim.is_zero_approx() and not dying and roll_time <= 0.0
+	if not drawing_bow and not sword_pose.is_empty() and not dying and roll_time <= 0.0:
 		_draw_sword_actor()
 		return
 	var moving: bool = motion.length_squared() >= 1.0 and not dying and roll_time <= 0.0
@@ -158,6 +162,9 @@ func _draw() -> void:
 	if not charge_aim.is_zero_approx():
 		right_hand = charge_aim * 13.0 + Vector2(0, -20)
 		left_hand = right_hand - charge_aim * 6.0
+	if drawing_bow:
+		right_hand = offset + Vector2(0, -6) + bow_aim * lerpf(21.0, 27.0, maxf(bow_pull, bow_release))
+		left_hand = right_hand - bow_aim * (lerpf(7.0, 29.0, bow_pull) + 24.0 * bow_release)
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))
@@ -186,6 +193,18 @@ func _draw() -> void:
 	else:
 		draw_circle(head + Vector2(facing.x * 3, 0), 1.2, outline)
 		draw_line(head + Vector2(facing.x * 4, 2), head + Vector2(facing.x * 7, 2), color.lightened(0.3), 2.0, true)
+
+	if drawing_bow:
+		var side := bow_aim.orthogonal() * 13.0
+		var limb_base := right_hand - bow_aim * lerpf(7.0, 11.0, bow_pull)
+		var upper := limb_base - side
+		var lower := limb_base + side
+		draw_polyline(PackedVector2Array([upper, right_hand - side * 0.55, right_hand,
+			right_hand + side * 0.55, lower]), Color("e3ad62"), 3.0, true)
+		var string_center := left_hand if bow_release <= 0.0 else limb_base
+		draw_polyline(PackedVector2Array([upper, string_center, lower]), Color("fff1cf"), 1.5, true)
+		if bow_pull > 0.0:
+			draw_line(left_hand, right_hand + bow_aim * 9.0, Color("fff1cf"), 2.0, true)
 
 func _draw_sword_actor() -> void:
 	var body: Vector2 = sword_pose.torso
