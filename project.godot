@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="像素幸存者"
-run/main_scene="res://scenes/main_v33.tscn"
+run/main_scene="res://scenes/main_v4.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 

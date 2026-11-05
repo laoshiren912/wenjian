@@ -80,7 +80,7 @@ func run() -> void:
 	current_scene = game
 	await process_frame
 	bind_player()
-	check(ProjectSettings.get_setting("application/run/main_scene") == "res://scenes/main_v33.tscn", "F5 starts V3.3")
+	check(ResourceLoader.exists("res://scenes/main_v33.tscn"), "V3.3 remains available via explicit scene")
 	check(game.total == 4 and game.remaining == 4 and get_nodes_in_group("enemies").size() == 4, "four enemies appear immediately")
 	for enemy in get_nodes_in_group("enemies"):
 		check(enemy.kind == SurvivorEnemy.Kind.HOSTILE and not enemy.emerging and not enemy.dodge_enabled and enemy.encounter_id == -1, "existing ordinary melee AI without emergence")
