@@ -4,6 +4,9 @@ extends CharacterBody2D
 signal killed(location: Vector2, experience_value: int)
 signal damaged(location: Vector2, amount: float)
 enum Kind { PASSIVE, HOSTILE, RANGED, BOSS }
+const V41 = preload("res://scripts/v41_config.gd")
+const ENCOUNTER_LUNGE_TIME := 0.16
+const MELEE_IMPACT_CUE_TIME := 0.08
 const PROJECTILE_SCENE = preload("res://scenes/projectile.tscn")
 var kind: int = Kind.HOSTILE
 var player: CharacterBody2D
@@ -38,6 +41,8 @@ var encounter_id: int = -1
 var home_position: Vector2 = Vector2.ZERO
 var thrust_type: bool = false
 @export_range(1, 10, 1) var max_simultaneous_attackers: int = 2
+var v41_pressure := false
+var intro_room := false
 var pair_scheduler: RefCounted
 var waiting_radius := 125.0
 enum EncounterState { IDLE, CHASE, SEARCH, RETURN }
@@ -276,7 +281,8 @@ func _encounter_attackers() -> int:
 	var count := 0
 	for other in get_tree().get_nodes_in_group("enemies"):
 		if other != self and not other.dead and other.encounter_id == encounter_id and (other.windup > 0.0 or other.lunge_time > 0.0):
-			count += 1
+			if not v41_pressure or other.kind == kind or intro_room:
+				count += 1
 	return count
 
 func _encounter_process(delta: float) -> void:
@@ -286,8 +292,15 @@ func _encounter_process(delta: float) -> void:
 	guard_time = maxf(0.0, guard_time - delta)
 	repath -= delta
 	var offset: Vector2 = player.global_position - global_position
+	if v41_heavy_stun > 0.0:
+		v41_heavy_stun = maxf(0.0, v41_heavy_stun - delta)
+		velocity = Vector2.ZERO
+		knockback = Vector2.ZERO
+		visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
+		queue_redraw()
+		return
 	var distance := offset.length()
-	var visible := distance < 340.0 and _boss_has_sight(player.global_position)
+	var visible := distance < (V41.SIGHT_RANGE if v41_pressure else 340.0) and _boss_has_sight(player.global_position)
 	if visible:
 		alert_encounter(player.global_position)
 	elif encounter_state == EncounterState.CHASE:
@@ -304,39 +317,50 @@ func _encounter_process(delta: float) -> void:
 			path.clear()
 	if windup > 0.0:
 		windup -= delta
-		if windup > attack_duration * 0.5 and visible and distance > 0.01:
+		if not _uses_melee_telegraph() and windup > attack_duration * 0.5 and visible and distance > 0.01:
 			attack_direction = attack_direction.lerp(offset.normalized(), minf(1.0, delta * 5.0)).normalized()
 		if windup <= 0.0:
 			if kind == Kind.RANGED:
 				_fire_encounter_shot()
-				attack_cooldown = 1.7
+				attack_cooldown = V41.RANGED_RECOVERY if v41_pressure else 1.7
 			else:
-				lunge_time = 0.16
+				lunge_time = ENCOUNTER_LUNGE_TIME
 	elif lunge_time > 0.0:
 		lunge_time = maxf(0.0, lunge_time - delta)
-		movement = attack_direction * (1.35 if thrust_type else 0.7)
+		movement = attack_direction * _encounter_lunge_speed_factor()
 		if lunge_time <= 0.0:
-			var half_angle := 0.5 if thrust_type else 1.15
-			if distance < (80.0 if thrust_type else 72.0) and absf(attack_direction.angle_to(offset)) < half_angle and _boss_has_sight(player.global_position):
+			if distance < _encounter_melee_hit_reach() and absf(attack_direction.angle_to(offset)) < _encounter_melee_half_angle() and _boss_has_sight(player.global_position):
 				player.take_damage(damage, offset.normalized())
-			attack_cooldown = 1.0 if thrust_type else 1.2
+			attack_cooldown = V41.MELEE_RECOVERY if v41_pressure else (1.0 if thrust_type else 1.2)
 	elif guard_time > 0.0:
 		pass
 	elif encounter_state == EncounterState.CHASE and visible:
-		if distance > 0.01:
+		if distance > 0.01 and not _holding_encounter_melee_facing():
 			guard_direction = offset.normalized()
 		var reach := 400.0 if kind == Kind.RANGED else (75.0 if thrust_type else 60.0)
-		if kind == Kind.RANGED and distance < 180.0:
+		if kind == Kind.RANGED and v41_pressure:
+			reach = V41.RANGED_REACH
+		var retreat := distance < V41.RANGED_RETREAT and attack_cooldown > 0.0 if v41_pressure else distance < 180.0
+		if kind == Kind.RANGED and retreat:
 			movement = -offset.normalized() * 0.7
 		elif kind == Kind.HOSTILE and is_instance_valid(pair_scheduler) and not pair_scheduler.can_start(self):
 			var waiting_point := player.global_position - offset.normalized() * waiting_radius + offset.normalized().orthogonal() * side_sign * 35.0
-			movement = _follow_path(waiting_point) * 0.65 if distance > waiting_radius + 25.0 else offset.normalized().orthogonal() * side_sign * 0.35
+			if v41_pressure and distance < waiting_radius - 18.0 and distance > 0.01:
+				movement = -offset.normalized() * (0.95 if intro_room else 0.68) + offset.normalized().orthogonal() * side_sign * 0.35
+			else:
+				movement = _follow_path(waiting_point) * 0.65 if distance > waiting_radius + 25.0 else offset.normalized().orthogonal() * side_sign * 0.35
 		elif distance > reach:
 			movement = _follow_path(player.global_position)
 		elif attack_cooldown <= 0.0:
-			if _encounter_attackers() < max_simultaneous_attackers:
+			var attack_limit := max_simultaneous_attackers
+			if v41_pressure:
+				# Reserve both melee turns even with two ranged enemies alive.
+				attack_limit = 1 if kind == Kind.RANGED else V41.PAIR_SIZE
+			if _encounter_attackers() < attack_limit:
 				attack_direction = offset.normalized()
 				attack_duration = 0.85 if kind == Kind.RANGED else (0.65 if thrust_type else 0.8)
+				if v41_pressure:
+					attack_duration -= 0.14
 				windup = attack_duration
 				if kind == Kind.HOSTILE and is_instance_valid(pair_scheduler):
 					pair_scheduler.attack_started(self)
@@ -364,9 +388,24 @@ func _encounter_process(delta: float) -> void:
 	velocity = movement * speed + knockback + separation.limit_length(45.0)
 	knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
 	move_and_slide()
-	var look: Vector2 = attack_direction if windup > 0.0 or lunge_time > 0.0 else (guard_direction if guard_time > 0.0 or encounter_state == EncounterState.CHASE else get_real_velocity())
+	var look: Vector2 = attack_direction if windup > 0.0 or lunge_time > 0.0 or _holding_encounter_melee_facing() else (guard_direction if guard_time > 0.0 or encounter_state == EncounterState.CHASE else get_real_velocity())
 	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
 	queue_redraw()
+
+func _uses_melee_telegraph() -> bool:
+	return v41_pressure and kind == Kind.HOSTILE
+
+func _holding_encounter_melee_facing() -> bool:
+	return _uses_melee_telegraph() and attack_cooldown > V41.MELEE_RECOVERY - V41.MELEE_FACING_RECOVERY
+
+func _encounter_melee_hit_reach() -> float:
+	return 80.0 if thrust_type else 72.0
+
+func _encounter_melee_half_angle() -> float:
+	return 0.5 if thrust_type else 1.15
+
+func _encounter_lunge_speed_factor() -> float:
+	return 1.35 if thrust_type else 0.7
 
 func _fire_encounter_shot() -> void:
 	var shot = PROJECTILE_SCENE.instantiate()
@@ -492,14 +531,14 @@ func _boss_search() -> Vector2:
 		boss_searching = false
 	return direction
 
-func _boss_open_charge_distance() -> float:
+func _boss_open_charge_distance(max_distance: float = BOSS_CHARGE_DISTANCE) -> float:
 	var query := PhysicsShapeQueryParameters2D.new()
 	query.shape = $CollisionShape2D.shape
 	query.transform = global_transform
-	query.motion = boss_charge_aim * BOSS_CHARGE_DISTANCE
+	query.motion = boss_charge_aim * max_distance
 	query.collision_mask = 1
 	var result := get_world_2d().direct_space_state.cast_motion(query)
-	return BOSS_CHARGE_DISTANCE * result[0]
+	return max_distance * result[0]
 
 func _boss_recover(next_attack: int) -> void:
 	boss_next_attack = next_attack
@@ -524,8 +563,18 @@ func _follow_path(target: Vector2) -> Vector2:
 
 var damage_shakes_camera := true
 var last_hit_blocked := false
+var v41_heavy_stun := 0.0
 
-func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true) -> void:
+func suppress_by_third_hit() -> void:
+	if not v41_pressure or kind != Kind.HOSTILE or thrust_type:
+		return
+	v41_heavy_stun = 0.65
+	windup = 0.0
+	lunge_time = 0.0
+	knockback = Vector2.ZERO
+	velocity = Vector2.ZERO
+
+func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true, v41_player_arrow: bool = false) -> void:
 	damage_shakes_camera = camera_shake
 	if dead or emerging:
 		return
@@ -533,21 +582,23 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 	if encounter_id >= 0 and kind == Kind.HOSTILE and not thrust_type and encounter_state == EncounterState.CHASE and windup <= 0.0 and lunge_time <= 0.0 and guard_cooldown <= 0.0:
 		can_block = true
 	aggro = true
-	var blocked_hit := not ignore_guard and kind == Kind.HOSTILE and can_block and not push.is_zero_approx() and guard_direction.dot(-push.normalized()) >= 0.5
+	var guard_arc := V41.GUARD_ARC_DOT if v41_pressure else 0.5
+	var arrow_bypasses := v41_player_arrow and v41_pressure and kind == Kind.HOSTILE and not thrust_type
+	var blocked_hit := not ignore_guard and not arrow_bypasses and kind == Kind.HOSTILE and can_block and not push.is_zero_approx() and guard_direction.dot(-push.normalized()) >= guard_arc
 	last_hit_blocked = blocked_hit
 	if blocked_hit:
-		amount *= 0.35
+		amount *= V41.GUARD_DAMAGE_FACTOR if v41_pressure else 0.35
 		push *= 0.25
-		if encounter_id >= 0:
-			guard_time = 0.2
-			guard_cooldown = 1.5
+		if encounter_id >= 0 and (not v41_pressure or guard_time <= 0.0):
+			guard_time = V41.GUARD_HOLD if v41_pressure else 0.2
+			guard_cooldown = V41.GUARD_COOLDOWN if v41_pressure else 1.5
 	if encounter_id >= 0 and not ignore_guard:
 		alert_encounter(player.global_position)
 	flash = 0.14
 	visual.play_hurt()
 	var actual_damage: float = minf(health, amount)
 	health -= amount
-	if kind == Kind.BOSS and boss_state != BossState.STAGGER and health > 0.0:
+	if kind == Kind.BOSS and not v41_pressure and boss_state != BossState.STAGGER and health > 0.0:
 		boss_pressure += amount
 		boss_pressure_grace = 2.0
 		if boss_pressure >= 260.0:
@@ -572,6 +623,11 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 	queue_redraw()
 
 func _draw() -> void:
+	if intro_room and kind == Kind.HOSTILE and is_instance_valid(pair_scheduler):
+		if pair_scheduler.can_start(self) or windup > 0.0 or lunge_time > 0.0:
+			draw_circle(Vector2(0, 23), 4.0, Color("ffad59"))
+		else:
+			draw_polyline(PackedVector2Array([Vector2(-7, 20), Vector2(0, 27), Vector2(7, 20)]), Color("a6b5bd"), 3.0, true)
 	var color := Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76")
 	if flash > 0.0:
 		color = Color.WHITE
@@ -597,7 +653,10 @@ func _draw() -> void:
 		elif boss_state == BossState.CHARGE_WINDUP:
 			draw_line(Vector2.ZERO, boss_charge_aim * boss_charge_distance, Color(1.0, 0.3, 0.1, 0.28), BOSS_CHARGE_WIDTH * 2.0, true)
 			draw_line(Vector2.ZERO, boss_charge_aim * boss_charge_distance, Color("ffd36b"), 3.0, true)
-	if windup > 0.0:
+	var impact_cue := clampf(1.0 - (V41.MELEE_RECOVERY - attack_cooldown) / MELEE_IMPACT_CUE_TIME, 0.0, 1.0)
+	if _uses_melee_telegraph() and (windup > 0.0 or lunge_time > 0.0 or impact_cue > 0.0):
+		_draw_encounter_melee_cue(impact_cue)
+	elif windup > 0.0:
 		var center: float = attack_direction.angle()
 		if encounter_id >= 0 and kind == Kind.RANGED:
 			draw_line(Vector2.ZERO, attack_direction * 85.0, Color("c09bff"), 3.0, true)
@@ -626,4 +685,29 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 21.0, 0.0, TAU, 24, Color("ffbd55"), 3.0, true)
 	if guard_time > 0.0:
 		var angle := guard_direction.angle()
-		draw_arc(Vector2.ZERO, 25.0, angle - 0.8, angle + 0.8, 20, Color("8fe5ff"), 5.0, true)
+		var half_arc := acos(V41.GUARD_ARC_DOT) if v41_pressure else 0.8
+		draw_arc(Vector2.ZERO, 25.0, angle - half_arc, angle + half_arc, 20, Color("8fe5ff"), 5.0, true)
+
+func _draw_encounter_melee_cue(impact_cue: float) -> void:
+	var aiming := windup > 0.0
+	var half_angle := _encounter_melee_half_angle()
+	var angle := attack_direction.angle()
+	if aiming:
+		var progress := clampf(1.0 - windup / attack_duration, 0.0, 1.0)
+		var reach := _encounter_melee_hit_reach() + speed * _encounter_lunge_speed_factor() * ENCOUNTER_LUNGE_TIME
+		_draw_attack_fan(angle, half_angle, reach, progress)
+		var hand := attack_direction * 10.0 + Vector2(0, -12)
+		draw_line(hand, hand - Vector2(attack_direction.x * 11.0, 22), Color("412420"), 7.0, true)
+		draw_line(hand, hand - Vector2(attack_direction.x * 11.0, 22), Color("ffe2a0"), 3.0, true)
+	else:
+		var progress := 1.0 - lunge_time / ENCOUNTER_LUNGE_TIME
+		var blade_angle := angle + lerpf(-half_angle, half_angle, progress)
+		draw_arc(Vector2.ZERO, _encounter_melee_hit_reach() * 0.8,
+			maxf(angle - half_angle, blade_angle - 0.55), blade_angle + 0.001, 12, Color(1.0, 0.89, 0.63, 1.0 if lunge_time > 0.0 else impact_cue), 5.0, true)
+
+func _draw_attack_fan(angle: float, half_angle: float, reach: float, progress: float) -> void:
+	var points := PackedVector2Array([Vector2.ZERO])
+	for i in range(17):
+		points.append(Vector2.from_angle(angle + lerpf(-half_angle, half_angle, i / 16.0)) * reach)
+	draw_colored_polygon(points, Color(1.0, 0.31, 0.12, lerpf(0.24, 0.49, progress)))
+	draw_polyline(points + PackedVector2Array([Vector2.ZERO]), Color("ffad59"), 2.5, true)

@@ -1,0 +1,25 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+TRACE f=2 enemy=0 state=windup hp=100.0 pos=(675.0, 400.0) group=0
+TRACE f=2 enemy=1 state=windup hp=100.0 pos=(675.0, 440.0) group=0
+TRACE f=2 enemy=2 state=idle hp=100.0 pos=(838.5253, 351.8998) group=0
+TRACE f=2 enemy=3 state=idle hp=100.0 pos=(838.5253, 488.1002) group=0
+TRACE dodge f=2
+TRACE roll end f=23 pos=(620.0, 270.0001)
+TRACE f=42 enemy=0 state=lunge hp=100.0 pos=(675.0, 400.0) group=0
+TRACE f=42 enemy=1 state=lunge hp=100.0 pos=(675.0, 440.0) group=0
+TRACE f=52 enemy=0 state=recovery hp=100.0 pos=(651.1594, 405.3441) group=0
+TRACE f=52 enemy=1 state=recovery hp=100.0 pos=(651.3932, 435.0695) group=0
+TRACE both missed f=52
+TRACE f=90 enemy=0 state=idle hp=100.0 pos=(611.0132, 528.8959) group=0
+TRACE f=90 enemy=1 state=idle hp=100.0 pos=(745.94, 526.0922) group=0
+TRACE f=118 enemy=2 state=windup hp=100.0 pos=(684.3111, 471.6141) group=1
+TRACE f=158 enemy=2 state=lunge hp=100.0 pos=(686.3499, 472.8003) group=1
+TRACE f=159 enemy=3 state=windup hp=100.0 pos=(646.7497, 489.3785) group=1
+TRACE f=168 enemy=2 state=recovery hp=100.0 pos=(672.7252, 480.018) group=1
+TRACE f=199 enemy=3 state=lunge hp=100.0 pos=(644.1243, 490.3516) group=1
+TRACE f=206 enemy=2 state=idle hp=100.0 pos=(762.3315, 447.5228) group=1
+TRACE f=209 enemy=3 state=recovery hp=88.0 pos=(637.3745, 515.3564) group=1
+TRACE player hit f=209 health=88.0 phase=2
+OBSERVATION counter=false first=-1 third=-1 elapsed=0.0 hits=[] rolled=false hp=88.0
+RESULT standing_risk=true hp=88.0

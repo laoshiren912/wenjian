@@ -27,6 +27,7 @@ func _tick_ranged_attack(delta: float, rolling: bool) -> void:
 				bow_recovery_remaining = BOW_RECOVERY
 				_bow_recoil_velocity = -ranged_weapon.swing_direction * BOW_RECOIL
 	elif _ranged_pending:
+		combo.clear_chain_memory()
 		bow_windup_remaining = BOW_WINDUP
 
 func _physics_process(delta: float) -> void:

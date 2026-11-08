@@ -9,6 +9,7 @@ var spent: bool = false
 var hostile: bool = false
 var camera_shake := true
 var sword_energy: bool = false
+var v41_player_arrow: bool = false
 
 func _physics_process(delta: float) -> void:
 	if spent:
@@ -20,7 +21,7 @@ func _physics_process(delta: float) -> void:
 		var body = collision.get_collider()
 		if is_instance_valid(body) and body.has_method("take_damage"):
 			if not hostile and body is SurvivorEnemy:
-				body.take_damage(damage, direction * 95.0, false, camera_shake)
+				body.take_damage(damage, direction * 95.0, false, camera_shake, v41_player_arrow)
 			else:
 				body.take_damage(damage, direction if hostile else direction * 95.0)
 		spent = true

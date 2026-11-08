@@ -1,0 +1,287 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: F5 uses integrated V4.1
+PASS: room1: four spawned melee, two real pairs
+PASS: approved courtyard texture and two collidable lanterns
+PASS: F5 uses orbit sword with rewards
+PASS: seeded draws vary and can offer all four rewards
+PASS: configured point reachable: (535.0, 365.0)
+PASS: configured point reachable: (540.0, 485.0)
+PASS: configured point reachable: (690.0, 345.0)
+PASS: configured point reachable: (680.0, 490.0)
+PASS: configured point reachable: (780.0, 365.0)
+PASS: configured point reachable: (905.0, 375.0)
+PASS: configured point reachable: (340.0, 370.0)
+PASS: configured point reachable: (640.0, 420.0)
+PASS: configured point reachable: (960.0, 370.0)
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: REAL F5 defender: front 25 percent and active blue-arc state
+PASS: REAL F5 defender: back full damage
+PASS: guard HUD fits
+PASS: guard HUD fits
+PASS: guard HUD fits
+PASS: real physics: only selected pair attacks, multiple attack rounds occur
+PASS: real physics: pair 0 -> pair 1 -> pair 0, not a mere cap
+PASS: live pair starts promptly and hands off after ordinary recovery without added waiting
+PASS: real physics: non-active pair moves aside
+PASS: configurable pair size changes permission, not just number cap
+PASS: unreachable/unstarted turn times out instead of stalling queue
+PASS: finished recovery hands off immediately without artificial delay
+PASS: dead active member immediately releases turn
+PASS: full room clear required before reward
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: room2 starts only wave1 of six total
+PASS: vitals preserved; only normal stamina regeneration after entry
+PASS: room2 scales both health and damage
+PASS: room2 scales both health and damage
+PASS: room2 scales both health and damage
+PASS: REAL F5 spawned ranger physically retreats at close range
+PASS: ranged_retreat HUD fits
+PASS: ranged_retreat HUD fits
+PASS: ranged_retreat HUD fits
+PASS: retreating ranger can fire while player stays close
+PASS: second wave only after first clear, no early reward
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: room3 starts first four of nine
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: third room second wave includes one fast thrust and two full pairs
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: enters ordinary room 4 in sequence
+PASS: room 4 clears before offering a reward
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: room 4 reward opens exit
+PASS: enters ordinary room 5 in sequence
+PASS: room 5 clears before offering a reward
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: room 5 reward opens exit
+PASS: enters ordinary room 6 in sequence
+PASS: room 6 clears before offering a reward
+PASS: reward cannot be opened outside the central radius
+PASS: approaching reward waits for E
+PASS: E at real reward point opens selection
+PASS: three random options are distinct
+PASS: room 6 reward opens exit
+PASS: six rooms lead to one live boss with no adds
+PASS: six rewards carry into a closed boss arena
+PASS: boss approaches and starts the orange sweep warning
+PASS: boss sweep windup deals no damage
+PASS: remaining in the sweep takes real damage after the warning
+PASS: boss alternates to its short charge warning
+PASS: charge warning is harmless and stays locked after a sidestep
+PASS: charge begins after its warning
+PASS: sidestep avoids the real locked charge
+PASS: real sword finishes boss and opens existing victory result
+PASS: Enter after boss win restarts a fresh run
+PASS: boss starts its attack on a fresh entry
+PASS: lethal boss attack opens death result
+PASS: R after boss death clears rewards and returns to room one
+PASS: real mixed melee/ranged wave respects two melee slots and one ranged slot
+PASS: real input reaches recovery stage 0
+PASS: recovery roll cancels and physically moves at stage 0
+PASS: tap during roll starts next sword within two frames
+PASS: roll cooldown has ended with the roll
+PASS: real input reaches recovery stage 1
+PASS: recovery roll cancels and physically moves at stage 1
+PASS: tap during roll starts next sword within two frames
+PASS: roll cooldown has ended with the roll
+PASS: real input reaches recovery stage 2
+PASS: recovery roll cancels and physically moves at stage 2
+PASS: tap during roll starts next sword within two frames
+PASS: roll cooldown has ended with the roll
+PASS: room two keeps a real melee pair and at most two simultaneous threats
+PASS: real click starts stage for held-charge link
+PASS: held input enters fresh charge after stage 0
+PASS: same held gesture releases charged sword
+PASS: real click starts stage for held-charge link
+PASS: held input enters fresh charge after stage 1
+PASS: same held gesture releases charged sword
+PASS: real click starts stage for held-charge link
+PASS: held input enters fresh charge after stage 2
+PASS: same held gesture releases charged sword
+PASS: live melee raises warning before dealing damage
+PASS: warning completes before melee contact begins
+PASS: melee keeps its original facing through warning and swing
+PASS: live swing misses the rear and hits the front for 12
+PASS: live melee raises warning before dealing damage
+PASS: warning completes before melee contact begins
+PASS: rear sword is still winding up when enemy starts its swing
+PASS: real sword from behind the swing deals full 32 damage
+PASS: melee keeps its original facing through warning and swing
+PASS: live swing misses the rear and hits the front for 12
+PASS: short recovery keeps the original guard and body facing
+PASS: enemy turns again after the recovery facing window
+PASS: real entry and spawn points bring two melee into overlapping windups
+PASS: repeated bow from entry takes real damage, retreating: false
+PASS: retreating bow fixture moves the player away from the real entry
+PASS: repeated bow from entry takes real damage, retreating: true
+PASS: bow draws for a half second at reduced speed
+PASS: bow windup draws the string toward the body
+PASS: bow fires once after windup
+PASS: bow shot moves the body backward without shaking the camera
+PASS: bow string snaps forward while release pose is visible
+PASS: bow recovery still allows movement
+PASS: press near end of recovery cannot queue another shot
+PASS: holding through the end of recovery never repeats
+PASS: stationary bow recoil travels about half a body over time
+PASS: F5 arrows disable impact camera shake
+PASS: arrow damage feedback keeps the camera steady
+PASS: fresh tap after recovery fires even after button release
+PASS: successful roll cancels bow windup
+PASS: cancelled bow never fires after roll
+PASS: short hold does not attack on press
+PASS: short release attacks first stage
+PASS: short release buffers second stage
+PASS: short release buffers third stage
+PASS: 0.22 threshold starts charge without extra ordinary hit
+PASS: 0.60 more seconds reaches full charge without auto release
+PASS: release starts exactly one charged attack
+PASS: real Space cancels charging only on successful roll
+PASS: release after cancelled charge never produces delayed attack
+PASS: successful roll arms reward while rolling does not consume it
+PASS: ordinary short-release attack consumes roll reward even on miss
+PASS: roll multiplier is not reused for second ordinary attack
+PASS: focus loss clears hold and release cannot attack
+PASS: +30 percent applies to ordinary and charged base, without shared bow multiplier
+PASS: roll arms one empowered sword
+PASS: charge release consumes roll bonus once
+PASS: actual charged orbit hit combines 95 x 1.3 x 2
+PASS: third-stage reward never boosts charged knockback
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: guard interaction on front contact: base
+PASS: guard window: base
+PASS: guard interaction on front contact: reward
+PASS: guard window: reward
+PASS: correct charged vs rewarded third knockback
+PASS: guard interaction on front contact: charge
+PASS: guard window: charge
+PASS: correct charged vs rewarded third knockback
+PASS: stacked kill heal capped at max health
+PASS: real damage enters death result
+PASS: death R resets run and rewards
+PASS: already unlocked unique reward is visibly disabled
+PASS: disabled unique reward cannot be selected through code
+PASS: real reward button applies once without ordinary or charged attack
+PASS: room transition preserves unlock but clears armed multiplier and held charge
+PASS: imported sample runs: courtyard_trial
+PASS: imported sample runs: sword_motion_trial
+PASS: imported sample runs: sword_motion_combat
+PASS: 960_courtyard HUD fits
+PASS: 960_courtyard HUD fits
+PASS: 960_courtyard HUD fits
+PASS: 960_close HUD fits
+PASS: 960_close HUD fits
+PASS: 960_close HUD fits
+PASS: 960_charge HUD fits
+PASS: 960_charge HUD fits
+PASS: 960_charge HUD fits
+PASS: 960_pause HUD fits
+PASS: 960_pause HUD fits
+PASS: 960_pause HUD fits
+PASS: 960_pause modal fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: pause clears charge gesture
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats modal fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_rewards HUD fits
+PASS: 960_rewards HUD fits
+PASS: 960_rewards HUD fits
+PASS: 960_rewards modal fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 1280_courtyard HUD fits
+PASS: 1280_courtyard HUD fits
+PASS: 1280_courtyard HUD fits
+PASS: 1280_close HUD fits
+PASS: 1280_close HUD fits
+PASS: 1280_close HUD fits
+PASS: 1280_charge HUD fits
+PASS: 1280_charge HUD fits
+PASS: 1280_charge HUD fits
+PASS: 1280_pause HUD fits
+PASS: 1280_pause HUD fits
+PASS: 1280_pause HUD fits
+PASS: 1280_pause modal fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: pause clears charge gesture
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats modal fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards modal fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+V41 FLOW: 284 checks, 0 failures; real-scene controlled tests, not human play

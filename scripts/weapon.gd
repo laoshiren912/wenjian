@@ -81,6 +81,7 @@ func attack(direction: Vector2) -> bool:
 			var projectile = PROJECTILE_SCENE.instantiate()
 			projectile.direction = swing_direction.rotated((float(arrow) - player.extra_arrows * 0.5) * 0.15)
 			projectile.damage = damage
+			projectile.v41_player_arrow = player.get_script().resource_path == "res://scripts/v41_player.gd"
 			projectile.camera_shake = projectile_camera_shake
 			projectile.speed += player.projectile_speed_bonus
 			projectile.max_distance = float(data.reach) + player.reach_bonus

@@ -1,6 +1,7 @@
 extends "res://scripts/room_game.gd"
 
 const CONFIG = preload("res://scripts/v41_config.gd")
+const MINI_BOSS = preload("res://scripts/v41_boss.gd")
 const COMBO_PLAYER = preload("res://scenes/player_v41.tscn")
 var room_index := 0
 var reward_counts: Array[int] = [0, 0, 0, 0]
@@ -8,6 +9,7 @@ var run_kills := 0
 var base_stages: Array[Dictionary] = []
 var close_view := false
 var scheduler: RefCounted
+var boss: SurvivorEnemy
 var wave_index := 0
 var wave_remaining := 0
 var reward_options: Array[int] = []
@@ -47,6 +49,7 @@ func _enter_room() -> void:
 	menu_open = false
 	stats_open = false
 	scheduler = null
+	boss = null
 	for child in world.actors.get_children():
 		child.free()
 	for child in feedback.get_children():
@@ -63,6 +66,8 @@ func _enter_room() -> void:
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
 	player.enable_dual_attack()
+	player.roll_cooldown = player.roll_duration
+	player.roll_stamina_cost = 15.0
 	player.ranged_weapon.projectile_camera_shake = false
 	player.camera.enabled = false
 	world.visitor = player
@@ -91,22 +96,16 @@ func _enter_room() -> void:
 	player.weapon.heavy_hit.connect(func():
 		feedback.shake_strength = maxf(feedback.shake_strength, 9.0 if player.combo.charged_swing else 6.0)
 		feedback.shake_time = maxf(feedback.shake_time, 0.18))
-	if room_index == CONFIG.WAVES.size():
-		total = 0
-		remaining = 0
-		triggered_count = 0
-		phase = "cleared"
-		world.room_cleared = true
-		_update_status()
-		_show_result(true)
+	wave_index = 0
+	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
+	remaining = total
+	triggered_count = 0
+	reward_options.clear()
+	if room_index == CONFIG.BOSS_ROOM:
+		_spawn_boss()
 	else:
-		wave_index = 0
-		total = CONFIG.room_total(room_index)
-		remaining = total
-		triggered_count = 0
-		reward_options.clear()
 		_spawn_wave()
-		_update_status()
+	_update_status()
 	hud.update_room(remaining, total, triggered_count)
 	world.queue_redraw()
 	_update_camera()
@@ -128,7 +127,7 @@ func _spawn_wave() -> void:
 	wave_remaining = kinds.size()
 	var points: Array[Vector2] = CONFIG.SPAWN_POINTS.duplicate()
 	var melee: Array = []
-	# Six spaced courtyard points for at most four enemies; avoid the player.
+	# Six spaced courtyard points for at most five enemies; avoid the player.
 	points = points.filter(func(point): return point.distance_to(player.position) >= CONFIG.SPAWN_CLEARANCE)
 	for i in range(kinds.size()):
 		var type: int = kinds[i]
@@ -139,18 +138,20 @@ func _spawn_wave() -> void:
 		enemy.fast_chaser = type == CONFIG.THRUST
 		enemy.thrust_type = type == CONFIG.THRUST
 		enemy.encounter_id = 0
+		enemy.v41_pressure = true
+		enemy.intro_room = room_index < 2
 		enemy.max_simultaneous_attackers = CONFIG.ATTACK_LIMIT
 		enemy.collision_mask = 1 | 2 | 4
 		enemy.position = points[i]
-		enemy.waiting_radius = CONFIG.WAITING_RADIUS
+		enemy.waiting_radius = 180.0 if room_index < 2 else CONFIG.WAITING_RADIUS
 		enemy.home_position = enemy.position
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
-		enemy.killed.connect(_on_enemy_killed)
-		enemy.damaged.connect(func(point: Vector2, amount: float):
-			feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
-				not enemy.damage_shakes_camera and enemy.last_hit_blocked))
+		_connect_enemy(enemy)
 		world.actors.add_child(enemy)
 		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
+		enemy.speed = float(stats.speed)
+		enemy.guard_cooldown = 0.0
+		enemy.attack_cooldown = 0.25 if type == CONFIG.RANGED else 0.0
 		enemy.max_health = float(stats.health) * CONFIG.ROOM_SCALES[room_index]
 		enemy.health = enemy.max_health
 		enemy.damage = float(stats.damage) * CONFIG.ROOM_SCALES[room_index]
@@ -159,7 +160,25 @@ func _spawn_wave() -> void:
 			melee.append(enemy)
 	scheduler = preload("res://scripts/pair_scheduler.gd").new()
 	scheduler.configure(melee, CONFIG.PAIR_SIZE, CONFIG.PAIR_APPROACH_TIMEOUT)
+	melee[0].alert_encounter(player.global_position)
 	_update_status()
+
+func _spawn_boss() -> void:
+	boss = ENEMY.instantiate()
+	boss.set_script(MINI_BOSS)
+	boss.world = world
+	boss.position = CONFIG.REWARD_POINT
+	boss.collision_mask = 1 | 2
+	_connect_enemy(boss)
+	world.actors.add_child(boss)
+	wave_remaining = 1
+	triggered_count = 1
+
+func _connect_enemy(enemy: SurvivorEnemy) -> void:
+	enemy.killed.connect(_on_enemy_killed)
+	enemy.damaged.connect(func(point: Vector2, amount: float):
+		feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
+			not enemy.damage_shakes_camera and enemy.last_hit_blocked))
 
 func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	if phase != "combat":
@@ -169,6 +188,12 @@ func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	run_kills += 1
 	if not player.dead:
 		player.health = minf(player.max_health, player.health + CONFIG.KILL_HEAL * reward_counts[2])
+	if room_index == CONFIG.BOSS_ROOM:
+		phase = "cleared"
+		world.room_cleared = true
+		_update_status()
+		_show_result(true)
+		return
 	if wave_remaining == 0 and remaining > 0:
 		phase = "wave_transition"
 		wave_index += 1
@@ -186,15 +211,21 @@ func _physics_process(delta: float) -> void:
 	if phase == "combat" and is_instance_valid(scheduler):
 		scheduler.tick(delta)
 	_update_camera()
-	if phase == "reward_wait" and player.global_position.distance_to(CONFIG.REWARD_POINT) <= CONFIG.REWARD_RADIUS:
-		phase = "reward_select"
-		get_tree().paused = true
-		_draw_rewards()
-		hud.show_rewards()
-	elif phase == "exit_ready" and player.global_position.distance_to(CONFIG.EXIT_POINT) < 34.0:
+	if phase == "exit_ready" and player.global_position.distance_to(CONFIG.EXIT_POINT) < 34.0:
 		room_index += 1
 		phase = "transition"
 		_enter_room.call_deferred()
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_E or event.physical_keycode == KEY_E):
+		if phase == "reward_wait" and not get_tree().paused and player.global_position.distance_to(CONFIG.REWARD_POINT) <= CONFIG.REWARD_RADIUS:
+			phase = "reward_select"
+			get_tree().paused = true
+			_draw_rewards()
+			hud.show_rewards()
+			get_viewport().set_input_as_handled()
+		return
+	super._input(event)
 
 func _draw_rewards() -> void:
 	reward_options.assign([0, 1, 2, 3])
@@ -223,10 +254,11 @@ func select_reward(index: int) -> void:
 
 func _update_status() -> void:
 	match phase:
-		"combat": status.text = "第 %d / 3 间 · 第 %d / %d 波" % [room_index + 1, wave_index + 1, CONFIG.WAVES[room_index].size()]
-		"reward_wait", "reward_select": status.text = "已清场 · 靠近中央金色奖励，选择后开放出口"
+		"combat":
+			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
+		"reward_wait", "reward_select": status.text = "已清场 · 靠近中央金色奖励按 E，选择后开放出口"
 		"exit_ready": status.text = "已领奖 · 前往右侧出口"
-		"cleared": status.text = "终点房间 · 本局通关"
+		"cleared": status.text = "守庭者已击败 · 本局通关"
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
 
 func toggle_pause() -> void:

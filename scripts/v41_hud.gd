@@ -21,7 +21,12 @@ func update_room(remaining: int, total: int, triggered: int) -> void:
 	super.update_room(remaining, total, triggered)
 	if run == null:
 		return
-	timer_text.text = "终点 · 通关" if run.room_index == 3 else "房间 %d / 3 · 剩余 %d / %d" % [run.room_index + 1, remaining, total]
+	if run.phase == "cleared":
+		timer_text.text = "守庭者已击败 · 通关"
+	elif is_instance_valid(run.boss):
+		timer_text.text = "第 %d / %d 间 · 守庭者 %.0f / %.0f" % [run.room_index + 1, CONFIG.RUN_ROOMS, run.boss.health, run.boss.max_health]
+	else:
+		timer_text.text = "房间 %d / %d · 剩余 %d / %d" % [run.room_index + 1, CONFIG.RUN_ROOMS, remaining, total]
 	weapon_text.text = "左键 剑击 / 蓄力 · 右键 弓"
 	var action := "短按松手连击 · 长按松手重击"
 	if player.combo.charging:
@@ -46,8 +51,8 @@ func show_rewards() -> void:
 	box.add_child(_modal_label("翻滚翻倍作用下一次普通剑击或蓄力释放，挥空也消耗。\n第三段破防只作用普通第三段，不作用蓄力。", 16))
 
 func show_pause(_gold: int = -1) -> void:
-	var box := _screen("已暂停", "V4.1 · 三房战斗与两波接战")
-	box.add_child(_modal_label("第1间4近战；第2间6怪；第3间8怪，后两间各两波。\n近战配对轮换，当前一组出手，其余侧移等待。\n左键短按松手连击，长按蓄力松手释放；右键弓。\n清完全部波次，靠近金色奖励领奖，再走右侧出口。\n进入独立样板会结束本局，返回时重新开始。", 17))
+	var box := _screen("已暂停", "V4.1 · 六间战斗房与守庭者")
+	box.add_child(_modal_label("前六间清场领奖，第七间挑战守庭者。\n近战配对轮换，当前一组出手，其余侧移等待。\n左键短按松手连击，长按蓄力松手释放；右键弓。\n清完全部波次，靠近金色奖励按 E 领奖，再走右侧出口。\n进入独立样板会结束本局，返回时重新开始。", 17))
 	_add_button(box, "继续  [Esc]", func(): resume_requested.emit())
 	_add_button(box, "重新开始", func(): restart_requested.emit())
 	_add_button(box, "庭院 / 镜头独立样板（结束本局）", func(): _open_sample("courtyard_trial"))
@@ -68,7 +73,7 @@ func show_stats() -> void:
 	_add_button(box, "返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 
 func show_run_result(won: bool) -> void:
-	var box := _screen("本局通关" if won else "角色倒下", "已抵达终点房间" if won else "倒在第 %d / 3 间" % (run.room_index + 1))
+	var box := _screen("本局通关" if won else "角色倒下", "已击败守庭者" if won else "倒在第 %d / %d 间" % [run.room_index + 1, CONFIG.RUN_ROOMS])
 	box.add_child(_modal_label("本局击败 %d / %d\n%s" % [run.run_kills, CONFIG.run_total(), reward_summary()], 19))
 	box.add_child(_modal_label("重新开始：第1间、满生命与体力、清空奖励。", 17))
 	_add_button(box, "重新开始  [Enter / R]", func(): restart_requested.emit())
