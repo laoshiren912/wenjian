@@ -3,8 +3,9 @@ extends "res://scripts/room_game.gd"
 const CONFIG = preload("res://scripts/v41_config.gd")
 const MINI_BOSS = preload("res://scripts/v41_boss.gd")
 const COMBO_PLAYER = preload("res://scenes/player_v41.tscn")
+const CARD_POOL = preload("res://scripts/v41_card_pool.gd")
 var room_index := 0
-var reward_counts: Array[int] = [0, 0, 0, 0]
+var reward_counts: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var run_kills := 0
 var base_stages: Array[Dictionary] = []
 var close_view := false
@@ -14,6 +15,7 @@ var wave_index := 0
 var wave_remaining := 0
 var reward_options: Array[int] = []
 var reward_rng := RandomNumberGenerator.new()
+var opening_choice := false
 
 func _ready() -> void:
 	_setup_inputs()
@@ -34,7 +36,7 @@ func _build_ui() -> void:
 # All existing restart signals reset the run; room transitions use _enter_room.
 func start_room() -> void:
 	room_index = 0
-	reward_counts.assign([0, 0, 0, 0])
+	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
 	reward_options.clear()
 	_enter_room()
@@ -67,7 +69,10 @@ func _enter_room() -> void:
 	world.actors.add_child(player)
 	player.enable_dual_attack()
 	player.roll_cooldown = player.roll_duration
-	player.roll_stamina_cost = 15.0
+	player.max_stamina = CONFIG.STAMINA_MAX
+	player.stamina = CONFIG.STAMINA_MAX
+	player.stamina_regen = CONFIG.STAMINA_REGEN
+	player.roll_stamina_cost = CONFIG.ROLL_STAMINA_COST
 	player.ranged_weapon.projectile_camera_shake = false
 	player.camera.enabled = false
 	world.visitor = player
@@ -101,7 +106,13 @@ func _enter_room() -> void:
 	remaining = total
 	triggered_count = 0
 	reward_options.clear()
-	if room_index == CONFIG.BOSS_ROOM:
+	if room_index == 0:
+		opening_choice = true
+		phase = "reward_select"
+		reward_options.assign([4, 5, 6])
+		get_tree().paused = true
+		hud.show_rewards()
+	elif room_index == CONFIG.BOSS_ROOM:
 		_spawn_boss()
 	else:
 		_spawn_wave()
@@ -118,6 +129,12 @@ func _apply_rewards() -> void:
 	player.combo.charge_damage_max = CONFIG.CHARGE_MAX * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
 	player.combo.roll_reward = reward_counts[1] > 0
 	player.combo.heavy_reward = reward_counts[3] > 0
+	player.move_energy = reward_counts[4] > 0
+	player.move_echo = reward_counts[5] > 0
+	player.move_return = reward_counts[6] > 0
+	player.upgrade_energy = reward_counts[7] > 0
+	player.upgrade_echo = reward_counts[8] > 0
+	player.upgrade_return = reward_counts[9] > 0
 
 func _spawn_wave() -> void:
 	if phase == "dead":
@@ -217,6 +234,10 @@ func _physics_process(delta: float) -> void:
 		_enter_room.call_deferred()
 
 func _input(event: InputEvent) -> void:
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+		_debug_menu()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_E or event.physical_keycode == KEY_E):
 		if phase == "reward_wait" and not get_tree().paused and player.global_position.distance_to(CONFIG.REWARD_POINT) <= CONFIG.REWARD_RADIUS:
 			phase = "reward_select"
@@ -228,29 +249,68 @@ func _input(event: InputEvent) -> void:
 	super._input(event)
 
 func _draw_rewards() -> void:
-	reward_options.assign([0, 1, 2, 3])
-	for i in range(reward_options.size() - 1, 0, -1):
-		var j := reward_rng.randi_range(0, i)
-		var previous := reward_options[i]
-		reward_options[i] = reward_options[j]
-		reward_options[j] = previous
-	reward_options.resize(3)
+	reward_options = CARD_POOL.draw(reward_counts, reward_rng, CONFIG.FORCE_NEW_CARD)
 
 func can_select_reward(index: int) -> bool:
-	return index in reward_options and not (index in [1, 3] and reward_counts[index] > 0)
+	return index in reward_options and CARD_POOL.eligible(index, reward_counts)
 
 func select_reward(index: int) -> void:
 	if phase != "reward_select" or not can_select_reward(index):
 		return
-	phase = "exit_ready"
 	reward_counts[index] += 1
 	_apply_rewards()
+	if opening_choice:
+		opening_choice = false
+		hud.hide_screen()
+		get_tree().paused = false
+		_spawn_wave()
+		_update_status()
+		return
+	phase = "exit_ready"
 	world.reward_visible = false
 	world.portal_open = true
 	world.queue_redraw()
 	hud.hide_screen()
 	get_tree().paused = false
 	_update_status()
+
+func _debug_menu() -> void:
+	if not OS.is_debug_build():
+		return
+	get_tree().paused = true
+	hud.show_card_debug()
+
+func debug_grant(index: int) -> void:
+	if not OS.is_debug_build() or not CARD_POOL.eligible(index, reward_counts):
+		return
+	reward_counts[index] += 1
+	_apply_rewards()
+	hud.show_card_debug()
+
+func debug_opening(skip: bool) -> void:
+	if not OS.is_debug_build() or room_index != 0 or triggered_count != 0:
+		return
+	if skip:
+		opening_choice = false
+		hud.hide_screen()
+		get_tree().paused = false
+		_spawn_wave()
+	else:
+		opening_choice = true
+		phase = "reward_select"
+		reward_options.assign([4, 5, 6])
+		hud.show_rewards()
+
+func debug_close() -> void:
+	if not OS.is_debug_build():
+		return
+	if opening_choice:
+		hud.show_rewards()
+	elif phase == "reward_select":
+		hud.show_rewards()
+	else:
+		hud.hide_screen()
+		get_tree().paused = false
 
 func _update_status() -> void:
 	match phase:

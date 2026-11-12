@@ -15,7 +15,7 @@ func _ready() -> void:
 func reward_summary() -> String:
 	if run == null:
 		return ""
-	return "剑伤 +%.0f%% · 击杀回血 %.0f\n翻滚翻倍 %s · 重劈破防 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("已就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁"]
+	return "剑伤 +%.0f%% · 击杀回血 %.0f · 翻滚翻倍 %s · 重劈 %s\n蓄力槽 %s · 翻滚槽 %s · 弓槽 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁", "剑气斩+" if run.reward_counts[7] else ("剑气斩" if run.reward_counts[4] else "空"), "残影步+" if run.reward_counts[8] else ("残影步" if run.reward_counts[5] else "空"), "回身箭+" if run.reward_counts[9] else ("回身箭" if run.reward_counts[6] else "空")]
 
 func update_room(remaining: int, total: int, triggered: int) -> void:
 	super.update_room(remaining, total, triggered)
@@ -40,7 +40,7 @@ func update_room(remaining: int, total: int, triggered: int) -> void:
 	weapon_detail.text = action + "\n" + reward_summary()
 
 func show_rewards() -> void:
-	var box := _screen("清房奖励 · 随机三选一", "已解锁项禁用；剑伤、击杀回血可重复叠加")
+	var box := _screen("开战前选择招式 · 三选一" if run.opening_choice else "清房奖励 · 三选一", "选择一张卡；招式装入对应槽位，强化需要先获得招式")
 	box.add_child(_modal_label(reward_summary(), 17))
 	var names: Array[String] = CONFIG.reward_names()
 	for index in run.reward_options:
@@ -48,7 +48,27 @@ func show_rewards() -> void:
 		var enabled: bool = run.can_select_reward(index)
 		_add_button(box, label if enabled else label + "（已解锁）", func(): reward_selected.emit(index))
 		(box.get_child(box.get_child_count() - 1) as Button).disabled = not enabled
-	box.add_child(_modal_label("翻滚翻倍作用下一次普通剑击或蓄力释放，挥空也消耗。\n第三段破防只作用普通第三段，不作用蓄力。", 16))
+	box.add_child(_modal_label("剑气斩：满蓄释放远程穿透剑气。残影步：翻滚起点延时范围爆炸。\n回身箭：每次翻滚最多一箭；滚中按下也会缓存。", 16))
+
+func show_card_debug() -> void:
+	var box := _screen("调试得卡 · F8", "仅调试运行有效；强化须先获得对应招式")
+	var grid := GridContainer.new()
+	grid.columns = 2
+	box.add_child(grid)
+	var names := CONFIG.reward_names()
+	for index in range(names.size()):
+		var button := PrototypeUI.button(names[index], func(): run.debug_grant(index), 38)
+		button.disabled = not run.CARD_POOL.eligible(index, run.reward_counts)
+		grid.add_child(button)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	var skip := PrototypeUI.button("跳过开局选卡", func(): run.debug_opening(true), 38)
+	var redo := PrototypeUI.button("重做开局选卡", func(): run.debug_opening(false), 38)
+	skip.disabled = run.room_index != 0 or run.triggered_count != 0
+	redo.disabled = skip.disabled
+	row.add_child(skip)
+	row.add_child(redo)
+	box.add_child(PrototypeUI.button("返回", func(): run.debug_close(), 38))
 
 func show_pause(_gold: int = -1) -> void:
 	var box := _screen("已暂停", "V4.1 · 六间战斗房与守庭者")

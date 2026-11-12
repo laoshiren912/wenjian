@@ -67,9 +67,17 @@ func attack(direction: Vector2) -> bool:
 	return true
 
 func _release_charge(direction: Vector2) -> void:
+	var full := charge_fraction() >= 1.0
 	swing_bonus = CONFIG.ROLL_SWORD_FACTOR if roll_reward and roll_armed else 1.0
 	roll_armed = false
 	super._release_charge(direction)
+	if full and get_parent().move_energy:
+		var effect = preload("res://scripts/v41_move_effect.gd").new()
+		effect.direction = direction.normalized()
+		effect.damage = charge_damage_max * get_parent().damage_multiplier * swing_bonus * CONFIG.ENERGY_DAMAGE_FACTOR
+		effect.distance = CONFIG.ENERGY_DISTANCE + (CONFIG.ENERGY_EXTRA_DISTANCE if get_parent().upgrade_energy else 0.0)
+		get_parent().get_parent().add_child(effect)
+		effect.global_position = get_parent().global_position
 
 func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	var heavy_hit := stage == 2 and not charged_swing

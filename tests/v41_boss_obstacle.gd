@@ -14,6 +14,7 @@ func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
+	game.debug_opening(true)
 	await tick()
 	for pillar in game.world.lanterns:
 		for setup in [[Vector2.RIGHT, 0.0], [Vector2.LEFT, 0.0], [Vector2.UP, 0.0], [Vector2.DOWN, 0.0], [Vector2.RIGHT, 18.0], [Vector2.LEFT, 18.0], [Vector2.UP, 18.0], [Vector2.DOWN, 18.0]]:

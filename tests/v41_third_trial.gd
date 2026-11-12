@@ -34,6 +34,7 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
+	game.debug_opening(true)
 	await tick()
 	for count in [1, 2]:
 		for reward in [false, true]:
@@ -43,6 +44,7 @@ func run():
 func trial(count: int, reward: bool, tactic: int):
 	release_move()
 	game.start_room()
+	game.debug_opening(true)
 	await tick()
 	var p = game.player
 	var es = get_nodes_in_group("enemies")

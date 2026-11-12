@@ -77,6 +77,8 @@ func attack(direction: Vector2) -> bool:
 		return true
 	var damage: float = float(data.damage) * player.damage_multiplier
 	if selected == 2:
+		if player.has_method("v41_arrow_factor"):
+			damage *= player.v41_arrow_factor()
 		for arrow in range(1 + player.extra_arrows):
 			var projectile = PROJECTILE_SCENE.instantiate()
 			projectile.direction = swing_direction.rotated((float(arrow) - player.extra_arrows * 0.5) * 0.15)

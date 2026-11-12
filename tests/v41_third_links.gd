@@ -12,6 +12,7 @@ func tap():
 	await tick()
 func fresh():
 	game.start_room()
+	game.debug_opening(true)
 	for e in get_nodes_in_group("enemies"): e.free()
 	game.player.position = Vector2(620,420)
 	await tick()
@@ -21,6 +22,7 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
+	game.debug_opening(true)
 	await tick()
 	for pause in [16,20]:
 		await fresh()

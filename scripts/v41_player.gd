@@ -1,5 +1,6 @@
 extends SurvivorPlayer
 
+const V41_CONFIG = preload("res://scripts/v41_config.gd")
 const BOW_WINDUP := 0.5
 const BOW_RECOVERY := 0.6
 const BOW_DRAW_SPEED := 0.45
@@ -10,8 +11,58 @@ const BOW_RECOIL_DECELERATION := 500.0
 var bow_windup_remaining := 0.0
 var bow_recovery_remaining := 0.0
 var _bow_recoil_velocity := Vector2.ZERO
+var move_energy := false
+var move_echo := false
+var move_return := false
+var upgrade_energy := false
+var upgrade_echo := false
+var upgrade_return := false
+var return_window := 0.0
+var return_buffered := false
+
+func v41_arrow_factor() -> float:
+	if combo.roll_reward and combo.roll_armed:
+		combo.roll_armed = false
+		return V41_CONFIG.ROLL_SWORD_FACTOR
+	return 1.0
+
+func _unhandled_input(event: InputEvent) -> void:
+	if move_return and event.is_action_pressed("ranged_attack") and is_rolling():
+		return_buffered = true
+	super._unhandled_input(event)
+
+func _finish_roll() -> void:
+	super._finish_roll()
+	if move_return:
+		return_window = V41_CONFIG.RETURN_UPGRADED_WINDOW if upgrade_return else V41_CONFIG.RETURN_WINDOW
+		if return_buffered:
+			_fire_return_arrow()
+	return_buffered = false
+
+func _fire_return_arrow() -> void:
+	if dead or not dual_attack_enabled or not move_return or return_window <= 0.0:
+		return
+	return_window = 0.0
+	bow_windup_remaining = 0.0
+	combo.clear_chain_memory()
+	var arrow = preload("res://scenes/projectile.tscn").instantiate()
+	arrow.direction = aim_direction.normalized()
+	arrow.damage = float(ranged_weapon.DATA[2].damage) * damage_multiplier * V41_CONFIG.RETURN_DAMAGE_FACTOR * v41_arrow_factor()
+	arrow.v41_player_arrow = true
+	arrow.camera_shake = false
+	arrow.speed += projectile_speed_bonus
+	arrow.max_distance = float(ranged_weapon.DATA[2].reach) + reach_bonus
+	get_parent().add_child(arrow)
+	arrow.global_position = global_position + arrow.direction * 23.0
+	ranged_weapon.swing_direction = arrow.direction
+	ranged_weapon.attack_count += 1
+	bow_recovery_remaining = BOW_RECOVERY
+	_bow_recoil_velocity = -arrow.direction * BOW_RECOIL
 
 func _tick_ranged_attack(delta: float, rolling: bool) -> void:
+	if not rolling and move_return and return_window > 0.0 and _ranged_pending:
+		_fire_return_arrow()
+		return
 	if bow_recovery_remaining > 0.0:
 		_bow_recoil_velocity = _bow_recoil_velocity.move_toward(Vector2.ZERO, BOW_RECOIL_DECELERATION * delta)
 		bow_recovery_remaining = maxf(0.0, bow_recovery_remaining - delta)
@@ -31,6 +82,8 @@ func _tick_ranged_attack(delta: float, rolling: bool) -> void:
 		bow_windup_remaining = BOW_WINDUP
 
 func _physics_process(delta: float) -> void:
+	if not is_rolling():
+		return_window = maxf(0.0, return_window - delta)
 	super._physics_process(delta)
 	visual.bow_aim = Vector2.ZERO
 	visual.bow_pull = 0.0
@@ -62,9 +115,25 @@ func _clear_ranged_input() -> void:
 	super._clear_ranged_input()
 	bow_windup_remaining = 0.0
 
+func spend_stamina(amount: float) -> bool:
+	if not super.spend_stamina(amount):
+		return false
+	stamina_delay = V41_CONFIG.STAMINA_REGEN_DELAY
+	return true
+
 func try_roll() -> bool:
+	var origin := global_position
 	var succeeded := super.try_roll()
 	if succeeded:
+		return_window = 0.0
+		return_buffered = false
+		if move_echo:
+			var echo = preload("res://scripts/v41_move_effect.gd").new()
+			echo.kind = "echo"
+			echo.damage = V41_CONFIG.ECHO_DAMAGE
+			echo.radius = V41_CONFIG.ECHO_UPGRADED_RADIUS if upgrade_echo else V41_CONFIG.ECHO_RADIUS
+			get_parent().add_child(echo)
+			echo.global_position = origin
 		bow_windup_remaining = 0.0
 		_bow_recoil_velocity = Vector2.ZERO
 		if combo.roll_reward:

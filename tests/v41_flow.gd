@@ -29,6 +29,7 @@ func reset() -> void:
 	Input.action_release("attack")
 	Input.action_release("ranged_attack")
 	game.start_room()
+	game.debug_opening(true)
 	game.player.gm_invulnerable = true
 
 func click_mouse(down: bool, point := Vector2(670, 390), right := false) -> void:
@@ -223,7 +224,7 @@ func wait_boss_state(enemy: SurvivorEnemy, state: int, limit: int = 180) -> bool
 func check_final_boss() -> void:
 	var boss: SurvivorEnemy = game.boss
 	check(CONFIG.WAVES.size() == 6 and game.room_index == 6 and enemies() == [boss] and game.remaining == 1 and game.run_kills == 42, "six rooms lead to one live boss with no adds")
-	check(not game.world.portal_open and not game.world.reward_visible and game.reward_counts == [4, 1, 1, 0], "six rewards carry into a closed boss arena")
+	check(not game.world.portal_open and not game.world.reward_visible and game.reward_counts == [4, 1, 1, 0, 0, 0, 0, 0, 0, 0], "six rewards carry into a closed boss arena")
 	if not is_instance_valid(boss):
 		return
 	var player: SurvivorPlayer = game.player
@@ -249,7 +250,8 @@ func check_final_boss() -> void:
 	await frames(22)
 	check(game.phase == "cleared" and paused and game.hud.overlay.visible and game.run_kills == CONFIG.run_total() and not game.world.reward_visible, "real sword finishes boss and opens existing victory result")
 	key(KEY_ENTER)
-	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0] and game.player.health == 100.0 and not paused, "Enter after boss win restarts a fresh run")
+	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "Enter after boss win restarts a fresh run")
+	game.debug_opening(true)
 	game.room_index = CONFIG.BOSS_ROOM
 	game.reward_counts[0] = 2
 	game._enter_room()
@@ -261,7 +263,8 @@ func check_final_boss() -> void:
 	await frames(58)
 	check(game.phase == "dead" and paused and game.hud.overlay.visible, "lethal boss attack opens death result")
 	key(KEY_R)
-	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0] and game.player.health == 100.0 and not paused, "R after boss death clears rewards and returns to room one")
+	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "R after boss death clears rewards and returns to room one")
+	game.debug_opening(true)
 
 func check_roll_links() -> void:
 	for target_stage in range(3):
@@ -367,7 +370,7 @@ func run() -> void:
 		game._draw_rewards()
 		draws[str(game.reward_options)] = true
 		for index in game.reward_options: offered[index] = true
-	check(draws.size() > 1 and offered.size() == 4, "seeded draws vary and can offer all four rewards")
+	check(draws.size() > 1 and offered.size() == 3 and offered.has(4) and offered.has(5) and offered.has(6), "empty slots have priority")
 	for point in CONFIG.SPAWN_POINTS + [CONFIG.ENTRY_POINT, CONFIG.REWARD_POINT, CONFIG.EXIT_POINT]:
 		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "configured point reachable: " + str(point))
 	for e in enemies():
@@ -595,7 +598,7 @@ func run() -> void:
 	game.player.set_physics_process(false)
 	game.player.combo.set_physics_process(false)
 	game.player.position = Vector2(580, 420)
-	game.reward_counts.assign([1, 1, 0, 1])
+	game.reward_counts.assign([1, 1, 0, 1, 0, 0, 0, 0, 0, 0])
 	game._apply_rewards()
 	sword = game.player.combo
 	var target := target_at(game.player.position + Vector2(65, 0))
@@ -667,7 +670,8 @@ func run() -> void:
 	game.player.take_damage(10000.0, Vector2.ZERO)
 	check(game.phase == "dead" and paused, "real damage enters death result")
 	key(KEY_R)
-	check(game.reward_counts == [0, 0, 0, 0] and game.player.health == 100.0 and not paused, "death R resets run and rewards")
+	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "death R resets run and rewards")
+	game.debug_opening(true)
 	await clear_room()
 	game.player.position = CONFIG.REWARD_POINT
 	await frames()

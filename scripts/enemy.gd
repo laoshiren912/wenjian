@@ -547,6 +547,8 @@ func _boss_recover(next_attack: int) -> void:
 	velocity = Vector2.ZERO
 
 func _follow_path(target: Vector2) -> Vector2:
+	if v41_pressure:
+		return _v41_follow_path(target)
 	var ray := PhysicsRayQueryParameters2D.create(global_position, target, 1)
 	if global_position.distance_to(target) < 130.0 and get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 		# Short final approach; obstacle avoidance still uses physical collision.
@@ -554,6 +556,28 @@ func _follow_path(target: Vector2) -> Vector2:
 	if path.is_empty() or repath <= 0.0:
 		path = world.path_between(global_position, target)
 		path_index = 1 if path.size() > 1 else 0
+		repath = 0.55
+	while path_index < path.size() and global_position.distance_to(path[path_index]) < 10.0:
+		path_index += 1
+	if path_index < path.size():
+		return (path[path_index] - global_position).normalized()
+	return Vector2.ZERO
+
+func _v41_path_clear(target: Vector2) -> bool:
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = $CollisionShape2D.shape
+	query.transform = global_transform
+	query.motion = target - global_position
+	query.collision_mask = 1
+	return get_world_2d().direct_space_state.cast_motion(query)[0] >= 1.0
+
+func _v41_follow_path(target: Vector2) -> Vector2:
+	# A centre ray can miss a pillar that clips the enemy's collision circle.
+	if global_position.distance_to(target) < 130.0 and _v41_path_clear(target):
+		return (target - global_position).normalized()
+	if path.is_empty() or repath <= 0.0:
+		path = world.path_between(global_position, target)
+		path_index = 1 if path.size() > 1 and _v41_path_clear(path[1]) else 0
 		repath = 0.55
 	while path_index < path.size() and global_position.distance_to(path[path_index]) < 10.0:
 		path_index += 1

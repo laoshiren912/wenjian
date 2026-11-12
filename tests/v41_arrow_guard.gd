@@ -9,9 +9,11 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
+	game.debug_opening(true)
 	await tick()
 	for mode in ["front21", "front30", "rear", "obstacle", "scaled", "thrust", "ranged", "boss"]:
 		game.start_room()
+		game.debug_opening(true)
 		await tick()
 		var p = game.player
 		var enemies = get_nodes_in_group("enemies")

@@ -52,9 +52,27 @@ const ROLL_SWORD_FACTOR := 2.0
 const KILL_HEAL := 5.0
 const HEAVY_PUSH := 420.0
 const GUARD_BREAK_TIME := 1.5
+const FORCE_NEW_CARD := true
+const STAMINA_MAX := 100.0
+const ROLL_STAMINA_COST := 15.0
+const STAMINA_REGEN := 16.0
+const STAMINA_REGEN_DELAY := 0.9
+const BODY_WIDTH := 30.0
+const ENERGY_DISTANCE := BODY_WIDTH * 8.0
+const ENERGY_EXTRA_DISTANCE := BODY_WIDTH
+const ENERGY_SPEED := 700.0
+const ENERGY_HALF_WIDTH := 22.0
+const ENERGY_DAMAGE_FACTOR := 0.85
+const ECHO_DELAY := 0.35
+const ECHO_DAMAGE := 55.0
+const ECHO_RADIUS := 100.0
+const ECHO_UPGRADED_RADIUS := 135.0
+const RETURN_WINDOW := 0.8
+const RETURN_UPGRADED_WINDOW := 1.2
+const RETURN_DAMAGE_FACTOR := 2.0
 
 static func reward_names() -> Array[String]:
-	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "翻滚后下一剑伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒（普通近战不击退，压制0.65秒）"]
+	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "翻滚后下一击（剑或弓）伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒", "剑气斩 · 满蓄释放穿透剑气", "残影步 · 翻滚起点延时爆炸", "回身箭 · 翻滚后短时间瞬发双倍箭", "剑气斩强化 · 射程增加一个身位", "残影步强化 · 爆炸半径扩大", "回身箭强化 · 瞬发窗口延长"]
 
 static func room_total(index: int) -> int:
 	var count := 0
