@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/v41_run.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/v41_world.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/combat_feedback.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/v41_feedback.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/v41_hud.gd" id="4"]
 
 [node name="RoomGame" type="Node2D"]

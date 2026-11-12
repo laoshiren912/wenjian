@@ -15,7 +15,7 @@ func _ready() -> void:
 func reward_summary() -> String:
 	if run == null:
 		return ""
-	return "剑伤 +%.0f%% · 击杀回血 %.0f\n翻滚翻倍 %s · 重劈破防 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("已就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁"]
+	return "剑伤 +%.0f%% · 击杀回血 %.0f\n翻滚翻倍 %s · 第三段破防延长 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("已就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁"]
 
 func update_room(remaining: int, total: int, triggered: int) -> void:
 	super.update_room(remaining, total, triggered)
@@ -48,7 +48,7 @@ func show_rewards() -> void:
 		var enabled: bool = run.can_select_reward(index)
 		_add_button(box, label if enabled else label + "（已解锁）", func(): reward_selected.emit(index))
 		(box.get_child(box.get_child_count() - 1) as Button).disabled = not enabled
-	box.add_child(_modal_label("翻滚翻倍作用下一次普通剑击或蓄力释放，挥空也消耗。\n第三段破防只作用普通第三段，不作用蓄力。", 16))
+	box.add_child(_modal_label("翻滚翻倍作用下一次普通剑击或蓄力释放，挥空也消耗。\n第三段与蓄力自带破防；此奖励只延长第三段破防。", 16))
 
 func show_pause(_gold: int = -1) -> void:
 	var box := _screen("已暂停", "V4.1 · 六间战斗房与守庭者")
@@ -69,7 +69,7 @@ func show_stats() -> void:
 	for i in range(player.combo.stages.size()):
 		var data: Dictionary = player.combo.stages[i]
 		box.add_child(_modal_label("%d %s：伤害 %.1f · 距离 %.0f · 前移 %.0f" % [i + 1, data.name, float(data.damage) * player.damage_multiplier, data.reach, data.lunge], 17, Color("e1cc9c")))
-	box.add_child(_modal_label("蓄力 %.2f+%.2f秒 · 伤害 %.1f～%.1f · 范围 %.0f/%.0f°\n弓伤害 %.1f · 翻滚冷却 %.3f秒\n翻滚后普通剑/蓄力×%.0f；第三段破防不影响蓄力。" % [CONFIG.HOLD_THRESHOLD, CONFIG.CHARGE_DURATION, player.combo.charge_damage_min, player.combo.charge_damage_max, CONFIG.CHARGE_REACH, CONFIG.CHARGE_ANGLE, 21.0 * player.damage_multiplier, player.roll_cooldown, CONFIG.ROLL_SWORD_FACTOR], 16))
+	box.add_child(_modal_label("蓄力 %.2f+%.2f秒 · 伤害 %.1f～%.1f · 范围 %.0f/%.0f°\n弓伤害 %.1f · 翻滚冷却 %.3f秒\n翻滚后普通剑/蓄力×%.0f；破防延长奖励只作用第三段。" % [CONFIG.HOLD_THRESHOLD, CONFIG.CHARGE_DURATION, player.combo.charge_damage_min, player.combo.charge_damage_max, CONFIG.CHARGE_REACH, CONFIG.CHARGE_ANGLE, 21.0 * player.damage_multiplier, player.roll_cooldown, CONFIG.ROLL_SWORD_FACTOR], 16))
 	_add_button(box, "返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 
 func show_run_result(won: bool) -> void:

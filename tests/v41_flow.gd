@@ -651,11 +651,13 @@ func run() -> void:
 			sword.chain_time = 0.2
 			sword.attack(Vector2.RIGHT)
 		tick_sword(40)
-		check(is_equal_approx(1000.0 - target.health, 23.75 if charged else 60.0), "guard interaction on front contact: " + mode)
-		var guard_window := CONFIG.GUARD_COOLDOWN if charged else (CONFIG.HEAVY_BASE_BREAK if mode == "base" else CONFIG.GUARD_BREAK_TIME)
+		check(is_equal_approx(1000.0 - target.health, 95.0 if charged else 60.0), "guard interaction on front contact: " + mode)
+		var guard_window := CONFIG.HEAVY_BASE_BREAK if charged or mode == "base" else CONFIG.GUARD_BREAK_TIME
 		check(is_equal_approx(target.guard_cooldown, guard_window), "guard window: " + mode)
+		check(is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "third and charge same break stun: " + mode)
+		check(target.guard_time == 0.0 and target.guard_visual_time == 0.0, "break clears guard and blue arc: " + mode)
 		if mode != "base":
-			check(is_equal_approx(target.knockback.length(), 65.0 if charged else 0.0), "correct charged vs suppressed third knockback")
+			check(is_equal_approx(target.knockback.length(), 260.0 if charged else CONFIG.THIRD_MOB_PUSH), "correct charged vs small third knockback")
 	reset()
 	game.reward_counts[2] = 2
 	game.player.health = 91.0

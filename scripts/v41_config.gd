@@ -35,6 +35,19 @@ const GUARD_ARC_DOT := 0.34
 const GUARD_HOLD := 0.16
 const GUARD_COOLDOWN := 0.72
 const HEAVY_BASE_BREAK := 0.85
+const SWORD_TIMINGS := [Vector3(0.08, 0.10, 0.14), Vector3(0.10, 0.12, 0.16), Vector3(0.12, 0.14, 0.20)]
+const BREAK_STUN := 0.65
+const THIRD_MOB_PUSH := 90.0
+const THIRD_GRIP_LIFT := 20.0
+const THIRD_TIP_LIFT := 52.0
+const THIRD_HITSTOP := 0.06
+const THIRD_HITSTOP_SCALE := 0.01
+const THIRD_SHAKE := 5.0
+const THIRD_SHAKE_TIME := 0.18
+const GUARD_DISPLAY := 0.42 # Display only; GUARD_HOLD still controls AI.
+const GUARD_SPARK_TIME := 0.24
+const BREAK_SPARK_TIME := 0.36
+const GUARD_SOUND_DB := -16.0
 const ENTRY_POINT := Vector2(340, 370)
 const EXIT_POINT := Vector2(960, 370)
 const REWARD_POINT := Vector2(640, 420)
@@ -54,7 +67,7 @@ const HEAVY_PUSH := 420.0
 const GUARD_BREAK_TIME := 1.5
 
 static func reward_names() -> Array[String]:
-	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "翻滚后下一剑伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒（普通近战不击退，压制0.65秒）"]
+	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "翻滚后下一剑伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒（小怪小幅击退，普通近战硬直0.65秒）"]
 
 static func room_total(index: int) -> int:
 	var count := 0

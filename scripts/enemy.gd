@@ -290,12 +290,14 @@ func _encounter_process(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	guard_cooldown = maxf(0.0, guard_cooldown - delta)
 	guard_time = maxf(0.0, guard_time - delta)
+	guard_visual_time = maxf(0.0, guard_visual_time - delta)
 	repath -= delta
 	var offset: Vector2 = player.global_position - global_position
 	if v41_heavy_stun > 0.0:
 		v41_heavy_stun = maxf(0.0, v41_heavy_stun - delta)
-		velocity = Vector2.ZERO
-		knockback = Vector2.ZERO
+		velocity = knockback
+		knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
+		move_and_slide()
 		visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
 		queue_redraw()
 		return
@@ -564,14 +566,14 @@ func _follow_path(target: Vector2) -> Vector2:
 var damage_shakes_camera := true
 var last_hit_blocked := false
 var v41_heavy_stun := 0.0
+var guard_visual_time := 0.0
 
 func suppress_by_third_hit() -> void:
 	if not v41_pressure or kind != Kind.HOSTILE or thrust_type:
 		return
-	v41_heavy_stun = 0.65
+	v41_heavy_stun = V41.BREAK_STUN
 	windup = 0.0
 	lunge_time = 0.0
-	knockback = Vector2.ZERO
 	velocity = Vector2.ZERO
 
 func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true, v41_player_arrow: bool = false) -> void:
@@ -587,6 +589,8 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 	var blocked_hit := not ignore_guard and not arrow_bypasses and kind == Kind.HOSTILE and can_block and not push.is_zero_approx() and guard_direction.dot(-push.normalized()) >= guard_arc
 	last_hit_blocked = blocked_hit
 	if blocked_hit:
+		if v41_pressure:
+			guard_visual_time = V41.GUARD_DISPLAY
 		amount *= V41.GUARD_DAMAGE_FACTOR if v41_pressure else 0.35
 		push *= 0.25
 		if encounter_id >= 0 and (not v41_pressure or guard_time <= 0.0):
@@ -683,7 +687,7 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 24.0, 0.0, TAU, 32, Color("ffcc57"), 4.0, true)
 	if fast_chaser:
 		draw_arc(Vector2.ZERO, 21.0, 0.0, TAU, 24, Color("ffbd55"), 3.0, true)
-	if guard_time > 0.0:
+	if guard_time > 0.0 or v41_pressure and guard_visual_time > 0.0:
 		var angle := guard_direction.angle()
 		var half_arc := acos(V41.GUARD_ARC_DOT) if v41_pressure else 0.8
 		draw_arc(Vector2.ZERO, 25.0, angle - half_arc, angle + half_arc, 20, Color("8fe5ff"), 5.0, true)

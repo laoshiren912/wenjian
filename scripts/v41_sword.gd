@@ -1,6 +1,8 @@
 extends "res://scripts/sword_orbit.gd"
 
 const CONFIG = preload("res://scripts/v41_config.gd")
+signal finisher_contact(point: Vector2)
+signal guard_broken(point: Vector2)
 var roll_reward := false
 var heavy_reward := false
 var roll_armed := false
@@ -8,6 +10,21 @@ var swing_bonus := 1.0
 
 func _ready() -> void:
 	chain_window = 0.30
+	stages = stages.duplicate(true)
+	for i in range(stages.size()):
+		stages[i].windup = CONFIG.SWORD_TIMINGS[i].x
+		stages[i].active = CONFIG.SWORD_TIMINGS[i].y
+		stages[i].recovery = CONFIG.SWORD_TIMINGS[i].z
+
+func blade_segment(progress: float) -> PackedVector2Array:
+	if charged_swing or stage != 2:
+		return super.blade_segment(progress)
+	# Same projected overhead-to-ground blade for rendering and swept collision.
+	var reach: float = float(current_data().reach) + get_parent().reach_bonus
+	var drop := smoothstep(0.0, 1.0, progress)
+	return PackedVector2Array([
+		swing_direction * 13.0 + Vector2.UP * CONFIG.THIRD_GRIP_LIFT * (1.0 - drop),
+		swing_direction * reach + Vector2.UP * CONFIG.THIRD_TIP_LIFT * (1.0 - drop)])
 
 func clear_chain_memory() -> void:
 	next_stage = 0
@@ -73,19 +90,27 @@ func _release_charge(direction: Vector2) -> void:
 
 func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	var heavy_hit := stage == 2 and not charged_swing
-	var suppress: bool = heavy_hit and target is SurvivorEnemy and target.v41_pressure and target.kind == SurvivorEnemy.Kind.HOSTILE and not target.thrust_type
-	var break_guard: bool = heavy_hit and (heavy_reward or target is SurvivorEnemy and target.v41_pressure)
+	if target.dead or target.emerging:
+		return
+	var ordinary: bool = target is SurvivorEnemy and target.v41_pressure and target.kind == SurvivorEnemy.Kind.HOSTILE and not target.thrust_type
+	var suppress: bool = (heavy_hit or charged_swing) and ordinary
+	var break_guard: bool = heavy_hit and (heavy_reward or target is SurvivorEnemy and target.v41_pressure) or charged_swing and ordinary
 	if break_guard:
 		target.guard_time = 0.0
-		var opening := CONFIG.GUARD_BREAK_TIME if heavy_reward else CONFIG.HEAVY_BASE_BREAK
+		target.guard_visual_time = 0.0
+		var opening := CONFIG.GUARD_BREAK_TIME if heavy_hit and heavy_reward else CONFIG.HEAVY_BASE_BREAK
 		target.guard_cooldown = maxf(target.guard_cooldown, opening)
-		if heavy_reward:
+		if heavy_hit and heavy_reward:
 			push = swing_direction * CONFIG.HEAVY_PUSH
-	if suppress:
-		push = Vector2.ZERO
+	if heavy_hit and target is SurvivorEnemy and target.v41_pressure and target.kind != SurvivorEnemy.Kind.BOSS:
+		push = swing_direction * CONFIG.THIRD_MOB_PUSH
 	target.take_damage(damage * swing_bonus, push)
 	if suppress and not target.dead:
 		target.suppress_by_third_hit()
+	if break_guard and ordinary:
+		guard_broken.emit(target.global_position)
+	if heavy_hit:
+		finisher_contact.emit(target.global_position)
 
 func can_roll() -> bool:
 	return swing_time <= 0.0 or phase() == "recovery" or (not charged_swing and phase() == "windup")
