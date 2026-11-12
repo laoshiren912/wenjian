@@ -658,7 +658,7 @@ func run() -> void:
 		var guard_window := CONFIG.GUARD_COOLDOWN if charged else (CONFIG.HEAVY_BASE_BREAK if mode == "base" else CONFIG.GUARD_BREAK_TIME)
 		check(is_equal_approx(target.guard_cooldown, guard_window), "guard window: " + mode)
 		if mode != "base":
-			check(is_equal_approx(target.knockback.length(), 65.0 if charged else 0.0), "correct charged vs suppressed third knockback")
+			check(is_equal_approx(target.knockback.length(), 65.0 if charged else CONFIG.THIRD_MELEE_PUSH), "correct charged vs suppressed third knockback")
 	reset()
 	game.reward_counts[2] = 2
 	game.player.health = 91.0

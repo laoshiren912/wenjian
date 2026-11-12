@@ -294,8 +294,9 @@ func _encounter_process(delta: float) -> void:
 	var offset: Vector2 = player.global_position - global_position
 	if v41_heavy_stun > 0.0:
 		v41_heavy_stun = maxf(0.0, v41_heavy_stun - delta)
-		velocity = Vector2.ZERO
-		knockback = Vector2.ZERO
+		velocity = knockback
+		knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
+		move_and_slide()
 		visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
 		queue_redraw()
 		return
@@ -589,14 +590,14 @@ var damage_shakes_camera := true
 var last_hit_blocked := false
 var v41_heavy_stun := 0.0
 
-func suppress_by_third_hit() -> void:
+func suppress_by_third_hit(push := Vector2.ZERO) -> void:
 	if not v41_pressure or kind != Kind.HOSTILE or thrust_type:
 		return
 	v41_heavy_stun = 0.65
 	windup = 0.0
 	lunge_time = 0.0
-	knockback = Vector2.ZERO
-	velocity = Vector2.ZERO
+	knockback = push
+	velocity = push
 
 func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true, v41_player_arrow: bool = false) -> void:
 	damage_shakes_camera = camera_shake

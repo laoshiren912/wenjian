@@ -13,6 +13,12 @@ func clear_chain_memory() -> void:
 	next_stage = 0
 	chain_time = 0.0
 
+func blade_segment(progress: float) -> PackedVector2Array:
+	if stage == 2 and not charged_swing:
+		var reach: float = float(current_data().reach) + get_parent().reach_bonus
+		return PackedVector2Array([swing_direction * 13.0 + Vector2(0, -CONFIG.THIRD_BLADE_GRIP_LIFT * (1.0 - progress)), swing_direction * reach + Vector2(0, -CONFIG.THIRD_BLADE_TIP_LIFT * (1.0 - progress))])
+	return super.blade_segment(progress)
+
 func _held_pose() -> Dictionary:
 	# A relaxed side carry is independent of the cursor.
 	return {"grip": Vector2(15, -3), "tip": Vector2(47, 27),
@@ -90,10 +96,10 @@ func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 		if heavy_reward:
 			push = swing_direction * CONFIG.HEAVY_PUSH
 	if suppress:
-		push = Vector2.ZERO
+		push = swing_direction * CONFIG.THIRD_MELEE_PUSH
 	target.take_damage(damage * swing_bonus, push)
 	if suppress and not target.dead:
-		target.suppress_by_third_hit()
+		target.suppress_by_third_hit(push)
 
 func can_roll() -> bool:
 	return swing_time <= 0.0 or phase() == "recovery" or (not charged_swing and phase() == "windup")

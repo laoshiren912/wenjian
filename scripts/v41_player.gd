@@ -100,6 +100,8 @@ func _physics_process(delta: float) -> void:
 		visual.bow_step = 1.0 - _bow_recoil_velocity.length() / BOW_RECOIL
 
 func movement_multiplier() -> float:
+	if weapon.swing_time > 0.0 and not combo.charged_swing and combo.stage in [0, 1]:
+		return V41_CONFIG.COMBO_FIRST_TWO_MOVE_FACTOR
 	if weapon.swing_time > 0.0 or combo.charging:
 		return super.movement_multiplier()
 	if bow_windup_remaining > 0.0:

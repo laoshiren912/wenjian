@@ -16,6 +16,9 @@ var wave_remaining := 0
 var reward_options: Array[int] = []
 var reward_rng := RandomNumberGenerator.new()
 var opening_choice := false
+var hitstop_generation := 0
+var hitstop_previous_scale := 1.0
+var hitstop_active := false
 
 func _ready() -> void:
 	_setup_inputs()
@@ -35,6 +38,7 @@ func _build_ui() -> void:
 
 # All existing restart signals reset the run; room transitions use _enter_room.
 func start_room() -> void:
+	_clear_hitstop()
 	room_index = 0
 	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
@@ -99,8 +103,13 @@ func _enter_room() -> void:
 		player.health = carried_health
 		player.stamina = carried_stamina
 	player.weapon.heavy_hit.connect(func():
-		feedback.shake_strength = maxf(feedback.shake_strength, 9.0 if player.combo.charged_swing else 6.0)
-		feedback.shake_time = maxf(feedback.shake_time, 0.18))
+		if player.combo.charged_swing:
+			feedback.shake_strength = maxf(feedback.shake_strength, 9.0)
+			feedback.shake_time = maxf(feedback.shake_time, 0.18)
+		else:
+			feedback.shake_strength = maxf(feedback.shake_strength, CONFIG.THIRD_SHAKE_STRENGTH)
+			feedback.shake_time = maxf(feedback.shake_time, CONFIG.THIRD_SHAKE_SECONDS)
+			_start_hitstop())
 	wave_index = 0
 	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
 	remaining = total
@@ -121,8 +130,32 @@ func _enter_room() -> void:
 	world.queue_redraw()
 	_update_camera()
 
+func _start_hitstop() -> void:
+	if not hitstop_active:
+		hitstop_previous_scale = Engine.time_scale
+	hitstop_active = true
+	hitstop_generation += 1
+	var generation := hitstop_generation
+	Engine.time_scale = CONFIG.THIRD_HITSTOP_SCALE
+	get_tree().create_timer(CONFIG.THIRD_HITSTOP_SECONDS, true, false, true).timeout.connect(func():
+		if hitstop_active and generation == hitstop_generation:
+			_clear_hitstop())
+
+func _clear_hitstop() -> void:
+	if hitstop_active:
+		Engine.time_scale = hitstop_previous_scale
+		hitstop_active = false
+	hitstop_generation += 1
+
+func _exit_tree() -> void:
+	_clear_hitstop()
+
 func _apply_rewards() -> void:
 	player.combo.stages = base_stages.duplicate(true)
+	player.combo.stages[0].recovery = CONFIG.COMBO_FIRST_RECOVERY
+	player.combo.stages[1].recovery = CONFIG.COMBO_SECOND_RECOVERY
+	player.combo.stages[2].windup = CONFIG.COMBO_THIRD_WINDUP
+	player.combo.stages[2].recovery = CONFIG.COMBO_THIRD_RECOVERY
 	for data in player.combo.stages:
 		data.damage = float(data.damage) * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
 	player.combo.charge_damage_min = CONFIG.CHARGE_MIN * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
