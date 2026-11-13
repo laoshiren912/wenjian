@@ -8,15 +8,19 @@ const B_IDLE = preload("res://assets/characters/Bandit/Bandit_Idle_Sheet_780x131
 const B_WALK = preload("res://assets/characters/Bandit/Bandit_Walk_Sheet_1404x1312.png")
 const B_ATTACK = preload("res://assets/characters/Bandit/Bandit_Attack_Sheet_1404x656.png")
 const B_DEATH = preload("res://assets/characters/Bandit/Bandit_Death_Sheet_1404x328.png")
+const H_WALK = preload("res://assets/characters/Herbalist/Herbalist_Walk_Sheet_972x928.png")
+const H_DEATH = preload("res://assets/characters/Herbalist/Herbalist_Death_Sheet_972x348.png")
 const ART_SCALE := 0.55
 
 var look_direction := Vector2.DOWN
 var animation_clock := 0.0
 var player_death := false
 var player_death_age := 0.0
+var herbalist_visual := false
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	herbalist_visual = get_parent() is SurvivorEnemy and get_parent().kind == SurvivorEnemy.Kind.RANGED
 	if get_parent() is SurvivorPlayer:
 		process_mode = Node.PROCESS_MODE_ALWAYS
 		get_parent().died.connect(_player_died)
@@ -45,6 +49,9 @@ func _direction_index(direction: Vector2) -> int:
 	return posmod(roundi((direction.angle() + PI / 2.0) / (PI / 4.0)), 8)
 
 func _draw() -> void:
+	if herbalist_visual:
+		_draw_herbalist()
+		return
 	var is_player := get_parent() is SurvivorPlayer or player_death
 	var direction := attack_direction if attack_time > 0.0 and attack_weapon == 0 else look_direction
 	var index := _direction_index(direction)
@@ -80,6 +87,28 @@ func _draw() -> void:
 		row = index
 	var destination := Rect2(-pivot * ART_SCALE + Vector2(0, 15), size * ART_SCALE)
 	var source := Rect2(Vector2(frame * size.x, row * size.y), size)
+	var color := Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE
+	if flip:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
+	draw_texture_rect_region(sheet, destination, source, color)
+	if flip:
+		draw_set_transform(Vector2.ZERO)
+
+func _draw_herbalist() -> void:
+	var index := _direction_index(look_direction)
+	var sheet: Texture2D = H_WALK
+	var row := index
+	var frame := int(animation_clock * 8.0) % 9 if motion.length_squared() >= 1.0 else 0
+	var flip := false
+	if dying:
+		sheet = H_DEATH
+		frame = mini(8, int(death_age / DEATH_DURATION * 9.0))
+		row = 0 if index in [0, 1, 7] else (1 if index == 4 else 2)
+		flip = index in [2, 3]
+	elif get_parent() is SurvivorEnemy and get_parent().windup > 0.0:
+		frame = 0
+	var destination := Rect2(-Vector2(54, 103) * ART_SCALE + Vector2(0, 15), Vector2(108, 116) * ART_SCALE)
+	var source := Rect2(Vector2(frame * 108, row * 116), Vector2(108, 116))
 	var color := Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE
 	if flip:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
