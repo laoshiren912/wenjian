@@ -6,7 +6,7 @@ const UPGRADE_FIRST := 7
 const SLOT_COUNT := 3
 
 static func eligible(card: int, counts: Array[int]) -> bool:
-	if card < 0 or card >= 10 or counts.size() < 10:
+	if card < 0 or card >= 10 or card in [6, 9] or counts.size() < 10:
 		return false
 	if card in [0, 2]:
 		return true
@@ -20,7 +20,7 @@ static func draw(counts: Array[int], rng: RandomNumberGenerator, force_new: bool
 	var result: Array[int] = []
 	var upgrades: Array[int] = []
 	var old: Array[int] = []
-	for slot in range(SLOT_COUNT):
+	for slot in range(2):
 		var move := MOVE_FIRST + slot
 		var upgrade := UPGRADE_FIRST + slot
 		if eligible(move, counts):

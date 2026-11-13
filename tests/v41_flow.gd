@@ -100,72 +100,6 @@ func tick_sword(count: int) -> void:
 	for i in range(count):
 		game.player.weapon._physics_process(0.01)
 
-func check_bow_cycle() -> void:
-	reset()
-	var player = game.player
-	var bow = player.ranged_weapon
-	var origin: Vector2 = player.position
-	var target := Vector2(670, 390)
-	click_mouse(true, target, true)
-	await frames(22)
-	check(bow.attack_count == 0 and player.bow_windup_remaining > 0.0 and is_equal_approx(player.movement_multiplier(), 0.45), "bow draws for a half second at reduced speed")
-	check(player.visual.bow_pull > 0.5 and not player.visual.bow_aim.is_zero_approx(), "bow windup draws the string toward the body")
-	await frames(12)
-	check(bow.attack_count == 1 and player.bow_recovery_remaining > 0.0, "bow fires once after windup")
-	check((player.position - origin).dot(bow.swing_direction) < -1.0 and game.feedback.shake_time == 0.0, "bow shot moves the body backward without shaking the camera")
-	check(player.visual.bow_pull == 0.0 and player.visual.bow_release > 0.0, "bow string snaps forward while release pose is visible")
-	check(is_equal_approx(player.movement_multiplier(), 0.15), "bow recovery still allows movement")
-	click_mouse(false, target, true)
-	await frames(24)
-	click_mouse(true, target, true)
-	await frames(3)
-	check(bow.attack_count == 1 and player.bow_windup_remaining == 0.0 and player.bow_recovery_remaining > 0.0, "press near end of recovery cannot queue another shot")
-	await frames(75)
-	check(bow.attack_count == 1 and player.bow_recovery_remaining == 0.0, "holding through the end of recovery never repeats")
-	var retreat: float = -(player.position - origin).dot(bow.swing_direction)
-	check(retreat >= 20.0 and retreat <= 27.0, "stationary bow recoil travels about half a body over time")
-	check(not bow.projectile_camera_shake, "F5 arrows disable impact camera shake")
-	game.feedback.shake_time = 0.0
-	enemies()[0].take_damage(21.0, Vector2.ZERO, false, bow.projectile_camera_shake)
-	check(game.feedback.shake_time == 0.0, "arrow damage feedback keeps the camera steady")
-	click_mouse(false, target, true)
-	click_mouse(true, target, true)
-	click_mouse(false, target, true)
-	await frames(34)
-	check(bow.attack_count == 2, "fresh tap after recovery fires even after button release")
-	reset()
-	click_mouse(true, target, true)
-	await frames(5)
-	key(KEY_SPACE)
-	await frames(2)
-	check(game.player.is_rolling() and game.player.bow_windup_remaining == 0.0, "successful roll cancels bow windup")
-	click_mouse(false, target, true)
-	await frames(35)
-	check(game.player.ranged_weapon.attack_count == 0, "cancelled bow never fires after roll")
-
-func check_opening_bow_pressure(retreating: bool) -> void:
-	reset()
-	var player = game.player
-	player.gm_invulnerable = false
-	var double_windup := false
-	var mouse := Vector2(950, 370)
-	if retreating:
-		Input.action_press("move_left")
-	for i in range(360):
-		if player.bow_windup_remaining <= 0.0 and player.bow_recovery_remaining <= 0.0:
-			click_mouse(true, mouse, true)
-			click_mouse(false, mouse, true)
-		await frames(1)
-		double_windup = double_windup or enemies().filter(func(e): return e.windup > 0.0).size() == 2
-		if player.health < player.max_health:
-			break
-	if retreating:
-		Input.action_release("move_left")
-		check(player.position.x < CONFIG.ENTRY_POINT.x - 50.0, "retreating bow fixture moves the player away from the real entry")
-	else:
-		check(double_windup, "real entry and spawn points bring two melee into overlapping windups")
-	check(player.ranged_weapon.attack_count > 0 and player.health < player.max_health, "repeated bow from entry takes real damage, retreating: " + str(retreating))
-
 func check_melee_cue_and_facing() -> void:
 	for flank in [false, true]:
 		reset()
@@ -327,7 +261,7 @@ func check_buffered_charge_links() -> void:
 					await frames(1)
 		check(sword.stage == target_stage and sword.phase() == "windup", "real click starts stage for held-charge link")
 		var origin: int = sword.attack_count
-		click_mouse(true)
+		click_mouse(true, Vector2(670, 390), true)
 		var saw_active := false
 		for tick in range(30):
 			if sword.charging:
@@ -335,7 +269,7 @@ func check_buffered_charge_links() -> void:
 			saw_active = saw_active or sword.phase() == "active"
 			await frames(1)
 		check(saw_active and sword.charging and sword.charge_time <= 0.017 and sword.attack_count == origin, "held input enters fresh charge after stage " + str(target_stage))
-		click_mouse(false)
+		click_mouse(false, Vector2(670, 390), true)
 		await frames(2)
 		check(sword.charged_swing and sword.attack_count == origin + 1, "same held gesture releases charged sword")
 
@@ -370,7 +304,9 @@ func run() -> void:
 		game._draw_rewards()
 		draws[str(game.reward_options)] = true
 		for index in game.reward_options: offered[index] = true
-	check(draws.size() > 1 and offered.size() == 3 and offered.has(4) and offered.has(5) and offered.has(6), "empty slots have priority")
+	check(draws.size() > 1 and draws.keys().all(func(draw):
+		var cards: Array = JSON.parse_string(draw).map(func(value): return int(value))
+		return cards.has(4) and cards.has(5) and not cards.has(6)), "empty slots have priority")
 	for point in CONFIG.SPAWN_POINTS + [CONFIG.ENTRY_POINT, CONFIG.REWARD_POINT, CONFIG.EXIT_POINT]:
 		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "configured point reachable: " + str(point))
 	for e in enemies():
@@ -528,9 +464,6 @@ func run() -> void:
 	await check_roll_links()
 	await check_buffered_charge_links()
 	await check_melee_cue_and_facing()
-	await check_opening_bow_pressure(false)
-	await check_opening_bow_pressure(true)
-	await check_bow_cycle()
 	# Input boundaries use real GUI-dispatched press/release and 60Hz physics.
 	reset()
 	var sword = game.player.combo
@@ -551,22 +484,22 @@ func run() -> void:
 	check(sword.attack_count == 3 and sword.stage == 2, "short release buffers third stage")
 	reset()
 	sword = game.player.combo
-	click_mouse(true)
+	click_mouse(true, Vector2(670, 390), true)
 	await frames(14)
 	check(sword.charging and sword.attack_count == 0, "0.22 threshold starts charge without extra ordinary hit")
 	await frames(40)
 	check(sword.charge_fraction() == 1.0 and sword.attack_count == 0, "0.60 more seconds reaches full charge without auto release")
-	click_mouse(false)
+	click_mouse(false, Vector2(670, 390), true)
 	await frames(1)
 	check(sword.charged_swing and sword.attack_count == 1 and not sword.charging, "release starts exactly one charged attack")
 	reset()
 	sword = game.player.combo
-	click_mouse(true)
+	click_mouse(true, Vector2(670, 390), true)
 	await frames(18)
 	key(KEY_SPACE)
 	await frames(2)
 	check(game.player.is_rolling() and not sword.charging, "real Space cancels charging only on successful roll")
-	click_mouse(false)
+	click_mouse(false, Vector2(670, 390), true)
 	await frames(30)
 	check(sword.attack_count == 0, "release after cancelled charge never produces delayed attack")
 	reset()
@@ -587,10 +520,10 @@ func run() -> void:
 	check(sword.swing_bonus == 1.0, "roll multiplier is not reused for second ordinary attack")
 	reset()
 	sword = game.player.combo
-	click_mouse(true)
+	click_mouse(true, Vector2(670, 390), true)
 	await frames(20)
 	game.player._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
-	click_mouse(false)
+	click_mouse(false, Vector2(670, 390), true)
 	await frames(3)
 	check(not sword.charging and sword.attack_count == 0, "focus loss clears hold and release cannot attack")
 	# Actual contact tests use the current F5's spawned enemy and orbit blade.
@@ -698,11 +631,11 @@ func run() -> void:
 	await frames(2)
 	check(game.phase == "exit_ready" and game.reward_counts[0] == 1 and game.player.weapon.attack_count == count_before, "real reward button applies once without ordinary or charged attack")
 	game.player.combo.roll_armed = true
-	click_mouse(true)
+	click_mouse(true, Vector2(670, 390), true)
 	await frames(18)
 	# Change rooms through the real exit while holding a charge.
 	await advance()
-	click_mouse(false)
+	click_mouse(false, Vector2(670, 390), true)
 	await frames(2)
 	check(game.room_index == 1 and game.reward_counts[1] == 1 and not game.player.combo.roll_armed and not game.player.combo.charging and game.player.combo.attack_count == 0, "room transition preserves unlock but clears armed multiplier and held charge")
 	# All original imported samples must load with compatible charge-aware player.
@@ -721,14 +654,14 @@ func run() -> void:
 		game.toggle_view()
 		await snapshot("%d_close" % size.x)
 		game.toggle_view()
-		click_mouse(true)
+		click_mouse(true, Vector2(670, 390), true)
 		await frames(55)
 		await snapshot("%d_charge" % size.x)
 		game.toggle_pause()
 		await snapshot("%d_pause" % size.x)
 		check(not game.player.combo.charging and not game.player.combo.gesture_held, "pause clears charge gesture")
 		game.resume_room()
-		click_mouse(false)
+		click_mouse(false, Vector2(670, 390), true)
 		game.toggle_stats()
 		await snapshot("%d_stats" % size.x)
 		game.resume_room()

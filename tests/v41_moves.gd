@@ -39,7 +39,7 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	check(game.phase == "reward_select" and paused and game.triggered_count == 0, "opening choice before spawn")
-	check(game.reward_options == [4, 5, 6], "opening offers three moves")
+	check(game.reward_options == [4, 5], "opening offers two moves")
 	var opening_button: Button
 	for button in game.hud.modal_panel.find_children("*", "Button", true, false):
 		if button.text.begins_with("剑气斩"):
@@ -52,15 +52,11 @@ func run() -> void:
 	for e in get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
 	var sword = p.combo
-	check(not p.move_echo and not p.move_return, "unselected slots inactive")
+	check(not p.move_echo, "unselected slots inactive")
 	p._roll_cooldown = 0.0
 	p.try_roll()
 	check(effects("echo").is_empty(), "roll without echo makes no explosion")
-	action("ranged_attack", true)
-	action("ranged_attack", false)
-	check(not p.return_buffered, "roll without return does not buffer")
 	p._finish_roll()
-	check(p.return_window == 0.0, "roll without return opens no window")
 	p.stamina = p.max_stamina
 	p._roll_cooldown = 0.0
 	sword.charge_time = CONFIG.CHARGE_DURATION * 0.5
@@ -100,7 +96,6 @@ func run() -> void:
 	sword._release_charge(Vector2.RIGHT)
 	check(is_equal_approx(effects("energy").back().distance, CONFIG.ENERGY_DISTANCE + CONFIG.ENERGY_EXTRA_DISTANCE), "energy upgrade")
 	game.debug_grant(5)
-	game.debug_grant(6)
 	game.debug_grant(1)
 	sword.swing_time = 0.0
 	p._roll_cooldown = 0.0
@@ -115,73 +110,17 @@ func run() -> void:
 	echo._physics_process(CONFIG.ECHO_DELAY + 0.01)
 	check(is_equal_approx(hp1 - first.health, CONFIG.ECHO_DAMAGE), "echo damages nearby target")
 	check(p.combo.roll_armed, "echo does not consume roll multiplier")
-	p.bow_recovery_remaining = 0.6
-	p.weapon.swing_time = 0.25
-	action("ranged_attack", true)
-	action("ranged_attack", false)
-	check(p.return_buffered, "press during roll buffered")
-	var before: int = p.ranged_weapon.attack_count
 	p._finish_roll()
-	check(p.ranged_weapon.attack_count == before + 1, "buffered arrow bypasses sword and bow recovery")
-	check(not arrows().is_empty() and is_equal_approx(arrows().back().damage, 84.0), "return arrow and roll multiplier stack")
-	check(not p.combo.roll_armed, "arrow consumes multiplier")
-	p._ranged_pending = true
-	p._tick_ranged_attack(0.016, false)
-	p._tick_ranged_attack(0.016, false)
-	check(p.ranged_weapon.attack_count == before + 1, "one roll cannot fire multiple return arrows")
-	p._roll_cooldown = 0.0
-	p.weapon.swing_time = 0.0
-	p.stamina = p.max_stamina
-	p.try_roll()
-	before = p.ranged_weapon.attack_count
-	action("ranged_attack", true)
-	action("ranged_attack", false)
-	await frames(24)
-	check(not p.is_rolling() and p.ranged_weapon.attack_count == before + 1, "buffered press fires on real roll completion")
-	p._roll_cooldown = 0.0
-	p.weapon.swing_time = 0.0
-	p.stamina = p.max_stamina
-	action("ranged_attack", true)
-	p.try_roll()
-	before = p.ranged_weapon.attack_count
-	await frames(24)
-	check(not p.is_rolling() and p.ranged_weapon.attack_count == before, "held across real roll without press does not fire")
-	action("ranged_attack", false)
-	p._roll_cooldown = 0.0
-	p.weapon.swing_time = 0.0
-	check(p.try_roll(), "second roll")
-	p._ranged_held = true
-	before = p.ranged_weapon.attack_count
-	p._finish_roll()
-	check(p.ranged_weapon.attack_count == before, "held without new press does not fire")
-	p._ranged_pending = true
-	p.weapon.swing_time = 0.2
-	p.bow_recovery_remaining = 0.6
-	p._tick_ranged_attack(0.016, false)
-	check(p.ranged_weapon.attack_count == before + 1, "press in window bypasses recovery")
-	p.return_window = 0.0
-	p.bow_recovery_remaining = 0.0
-	p.weapon.swing_time = 0.0
-	p._ranged_pending = true
-	before = p.ranged_weapon.attack_count
-	p._tick_ranged_attack(0.016, false)
-	check(p.ranged_weapon.attack_count == before and is_equal_approx(p.bow_windup_remaining, 0.5), "outside window normal draw")
-	p.combo.roll_armed = true
-	p.ranged_weapon.cooldown = 0.0
-	p.ranged_weapon.attack(Vector2.RIGHT)
-	check(is_equal_approx(arrows().back().damage, 42.0) and not p.combo.roll_armed, "normal arrow consumes roll bonus")
 	game.debug_grant(8)
-	game.debug_grant(9)
-	check(p.upgrade_echo and p.upgrade_return, "debug grants upgrades")
+	check(p.upgrade_echo, "debug grants echo upgrade")
 	p._roll_cooldown = 0.0
 	p.weapon.swing_time = 0.0
 	p.try_roll()
 	check(is_equal_approx(effects("echo").back().radius, CONFIG.ECHO_UPGRADED_RADIUS), "upgraded echo radius")
 	p._finish_roll()
-	check(is_equal_approx(p.return_window, 1.2), "upgraded arrow window")
 	game._draw_rewards()
-	check(game.reward_options.size() == 3 and 4 not in game.reward_options and 5 not in game.reward_options and 6 not in game.reward_options, "clear rewards exclude equipped cards")
-	for slot in range(3):
+	check(game.reward_options.size() == 3 and 4 not in game.reward_options and 5 not in game.reward_options, "clear rewards exclude equipped cards")
+	for slot in range(2):
 		var empty: Array[int] = [0,0,0,0,0,0,0,0,0,0]
 		check(not POOL.eligible(7 + slot, empty), "upgrade requires move")
 	game.start_room()
@@ -268,7 +207,11 @@ func run() -> void:
 		key.keycode = KEY_E
 		key.pressed = true
 		root.push_input(key)
-		check(game.phase == "reward_select" and paused and game.reward_options.size() == 3, "room reward menu %d" % room)
+		var eligible_count := 0
+		for card in range(CONFIG.reward_names().size()):
+			if POOL.eligible(card, game.reward_counts): eligible_count += 1
+		var expected_count := mini(3, eligible_count) if room >= 4 else 3
+		check(game.phase == "reward_select" and paused and game.reward_options.size() == expected_count and expected_count >= 1, "room reward menu %d" % room)
 		var choice: int = game.reward_options[0]
 		check(game.can_select_reward(choice), "selectable room reward %d" % room)
 		game.select_reward(choice)

@@ -110,7 +110,6 @@ func _enter_room() -> void:
 	player.stamina = CONFIG.STAMINA_MAX
 	player.stamina_regen = CONFIG.STAMINA_REGEN
 	player.roll_stamina_cost = CONFIG.ROLL_STAMINA_COST
-	player.ranged_weapon.projectile_camera_shake = false
 	player.camera.enabled = false
 	world.visitor = player
 	$Camera2D.make_current()
@@ -149,7 +148,7 @@ func _enter_room() -> void:
 	if room_index == 0:
 		opening_choice = true
 		phase = "reward_select"
-		reward_options.assign([4, 5, 6])
+		reward_options.assign([4, 5])
 		get_tree().paused = true
 		hud.show_rewards()
 	elif room_index == CONFIG.BOSS_ROOM:
@@ -175,10 +174,8 @@ func _apply_rewards() -> void:
 	player.combo.heavy_reward = reward_counts[3] > 0
 	player.move_energy = reward_counts[4] > 0
 	player.move_echo = reward_counts[5] > 0
-	player.move_return = reward_counts[6] > 0
 	player.upgrade_energy = reward_counts[7] > 0
 	player.upgrade_echo = reward_counts[8] > 0
-	player.upgrade_return = reward_counts[9] > 0
 
 func _spawn_wave() -> void:
 	if phase == "dead":
@@ -414,7 +411,7 @@ func debug_opening(skip: bool) -> void:
 	else:
 		opening_choice = true
 		phase = "reward_select"
-		reward_options.assign([4, 5, 6])
+		reward_options.assign([4, 5])
 		hud.show_rewards()
 
 func debug_close() -> void:
