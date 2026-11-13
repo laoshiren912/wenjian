@@ -30,6 +30,18 @@ func v41_arrow_factor() -> float:
 	return 1.0
 
 func _unhandled_input(event: InputEvent) -> void:
+	# A roll request can be queued before the physics frame starts the roll.
+	if not is_rolling() and _roll_requested and _roll_cooldown <= 0.0 and (stamina >= roll_stamina_cost or (OS.is_debug_build() and gm_infinite_stamina)) and event.is_action_pressed("attack"):
+		roll_action = "primary"
+		roll_primary_held = true
+		if event is InputEventMouseButton:
+			_aim_viewport_position = event.position
+			_has_aim_event = true
+		get_viewport().set_input_as_handled()
+		return
+	if not is_rolling() and _roll_requested and (event.is_action_pressed("roll") or event.is_action_pressed("ranged_attack")):
+		roll_action = ""
+		roll_primary_held = false
 	if is_rolling():
 		if event.is_action_pressed("attack"):
 			roll_action = "primary"
@@ -54,7 +66,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _input(event: InputEvent) -> void:
 	super._input(event)
-	if is_rolling() and event.is_action_released("attack"):
+	if (is_rolling() or (_roll_requested and roll_action == "primary")) and event.is_action_released("attack"):
 		roll_primary_held = false
 
 func _execute_roll_action() -> void:
@@ -172,10 +184,12 @@ func spend_stamina(amount: float) -> bool:
 
 func try_roll() -> bool:
 	var origin := global_position
+	var queued_action := roll_action
+	var queued_held := roll_primary_held
 	var succeeded := super.try_roll()
 	if succeeded:
-		roll_action = ""
-		roll_primary_held = false
+		roll_action = queued_action if queued_action == "primary" else ""
+		roll_primary_held = queued_held if roll_action == "primary" else false
 		return_window = 0.0
 		return_buffered = false
 		if move_echo:
