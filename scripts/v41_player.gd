@@ -19,6 +19,8 @@ var upgrade_echo := false
 var upgrade_return := false
 var return_window := 0.0
 var return_buffered := false
+var roll_action := ""
+var roll_primary_held := false
 
 func v41_arrow_factor() -> float:
 	if combo.roll_reward and combo.roll_armed:
@@ -27,9 +29,47 @@ func v41_arrow_factor() -> float:
 	return 1.0
 
 func _unhandled_input(event: InputEvent) -> void:
-	if move_return and event.is_action_pressed("ranged_attack") and is_rolling():
-		return_buffered = true
+	if is_rolling():
+		if event.is_action_pressed("attack"):
+			roll_action = "primary"
+			roll_primary_held = true
+			if event is InputEventMouseButton:
+				_aim_viewport_position = event.position
+				_has_aim_event = true
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("roll"):
+			roll_action = "roll"
+			roll_primary_held = false
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("ranged_attack"):
+			if move_return:
+				return_buffered = true
+			else:
+				roll_action = "bow"
+				roll_primary_held = false
 	super._unhandled_input(event)
+
+func _input(event: InputEvent) -> void:
+	super._input(event)
+	if is_rolling() and event.is_action_released("attack"):
+		roll_primary_held = false
+
+func _execute_roll_action() -> void:
+	var action := roll_action
+	var held := roll_primary_held
+	roll_action = ""
+	roll_primary_held = false
+	if action == "roll":
+		try_roll()
+	elif action == "primary":
+		combo.press_primary()
+		if not held:
+			combo.release_primary()
+		combo.tick_inputs(0.0)
+	elif action == "bow":
+		_ranged_pending = true
 
 func _finish_roll() -> void:
 	super._finish_roll()
@@ -38,6 +78,7 @@ func _finish_roll() -> void:
 		if return_buffered:
 			_fire_return_arrow()
 	return_buffered = false
+	_execute_roll_action()
 
 func _fire_return_arrow() -> void:
 	if dead or not dual_attack_enabled or not move_return or return_window <= 0.0:
@@ -82,6 +123,9 @@ func _tick_ranged_attack(delta: float, rolling: bool) -> void:
 		bow_windup_remaining = BOW_WINDUP
 
 func _physics_process(delta: float) -> void:
+	if is_rolling() and _roll_remaining <= roll_duration * 0.5 and roll_action in ["primary", "roll"] and not return_buffered:
+		if roll_action != "roll" or stamina >= roll_stamina_cost:
+			_finish_roll()
 	if not is_rolling():
 		return_window = maxf(0.0, return_window - delta)
 	super._physics_process(delta)
@@ -127,6 +171,8 @@ func try_roll() -> bool:
 	var origin := global_position
 	var succeeded := super.try_roll()
 	if succeeded:
+		roll_action = ""
+		roll_primary_held = false
 		return_window = 0.0
 		return_buffered = false
 		if move_echo:

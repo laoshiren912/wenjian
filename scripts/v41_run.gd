@@ -97,7 +97,7 @@ func _enter_room() -> void:
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
 	player.enable_dual_attack()
-	player.roll_cooldown = player.roll_duration
+	player.roll_cooldown = 0.0
 	player.max_stamina = CONFIG.STAMINA_MAX
 	player.stamina = CONFIG.STAMINA_MAX
 	player.stamina_regen = CONFIG.STAMINA_REGEN

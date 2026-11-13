@@ -1086,3 +1086,9 @@
 - 原生窗口 `--script tests/v41_finisher.gd -- --capture`；检查 artifacts/v41_finisher_guard.png、v41_finisher_third_break.png、v41_finisher_charge_break.png，确认字幕/蓝弧/碎片可见。捕获的HUD剩余4是受控移除其他样本未当清怪，不是正常清房画面。
 - 新受控日志保存 artifacts/v41_finisher_2026-11-12.log。解析无错误；快速退出偶发2～4个音频资源释放警告，verbose定位AudioStreamWAV/AudioStreamPlaybackWAV；已在音效节点退出停止/清流，但尚未彻底排除退出警告。真人试听、长时间音频/暂停重开检查待验。
 - 未做正常六房整局/真人手感/网页版验收。Boss绕柱、普通箭跳过普通近战格挡、玩家取消与长按缓冲保留；没有改敌人预警、出手/配对节奏或卡牌抽取规则。
+
+
+## 2026-11-13 V4.1 翻滚衔接
+- 原翻滚0.34秒、冷却从起滚算0.34秒，无结束后独立锁定和额外无敌帧；本轮仅V4.1取消硬冷却并加入半程动作缓冲，体力/动作数值不变。
+- 前半段禁止取消；普攻、蓄力手势与再次翻滚可在半程后衔接。翻滚中右键保持至完整结束，有回身箭时先发箭再执行其他缓冲动作；普通弓在结束后按原拉弓时序启动。
+- Godot 4.7.2、60Hz无窗口受控测试：v41_roll_links 14/14、v41_flow 290/290、v41_moves 80/80、v41_combo_opening 4/4、v41_third_links 11/11。未做真人手感或平衡验收。
