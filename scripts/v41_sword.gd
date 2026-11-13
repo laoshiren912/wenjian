@@ -76,6 +76,10 @@ func display_segment(progress: float) -> PackedVector2Array:
 	var pose := _swing_pose(progress)
 	return PackedVector2Array([pose.grip, pose.tip])
 
+func _draw_blade(_grip: Vector2, _tip: Vector2, _color: Color) -> void:
+	# V4.1's character sprite already contains the weapon.
+	pass
+
 func attack(direction: Vector2) -> bool:
 	if not super.attack(direction):
 		return false
