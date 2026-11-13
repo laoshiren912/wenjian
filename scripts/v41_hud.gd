@@ -15,7 +15,7 @@ func _ready() -> void:
 func reward_summary() -> String:
 	if run == null:
 		return ""
-	return "剑伤 +%.0f%% · 击杀回血 %.0f · 翻滚翻倍 %s · 重劈 %s\n蓄力槽 %s · 翻滚槽 %s · 弓槽 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁", "剑气斩+" if run.reward_counts[7] else ("剑气斩" if run.reward_counts[4] else "空"), "残影步+" if run.reward_counts[8] else ("残影步" if run.reward_counts[5] else "空"), "回身箭+" if run.reward_counts[9] else ("回身箭" if run.reward_counts[6] else "空")]
+	return "剑伤 +%.0f%% · 击杀回血 %.0f · 翻滚翻倍 %s · 第三段破防延长 %s\n蓄力槽 %s · 翻滚槽 %s · 弓槽 %s" % [run.reward_counts[0] * CONFIG.SWORD_BONUS * 100.0, run.reward_counts[2] * CONFIG.KILL_HEAL, ("就绪" if player.combo.roll_armed else "已解锁") if run.reward_counts[1] > 0 else "未解锁", "已解锁" if run.reward_counts[3] > 0 else "未解锁", "剑气斩+" if run.reward_counts[7] else ("剑气斩" if run.reward_counts[4] else "空"), "残影步+" if run.reward_counts[8] else ("残影步" if run.reward_counts[5] else "空"), "回身箭+" if run.reward_counts[9] else ("回身箭" if run.reward_counts[6] else "空")]
 
 func update_room(remaining: int, total: int, triggered: int) -> void:
 	super.update_room(remaining, total, triggered)
@@ -48,7 +48,7 @@ func show_rewards() -> void:
 		var enabled: bool = run.can_select_reward(index)
 		_add_button(box, label if enabled else label + "（已解锁）", func(): reward_selected.emit(index))
 		(box.get_child(box.get_child_count() - 1) as Button).disabled = not enabled
-	box.add_child(_modal_label("剑气斩：满蓄释放远程穿透剑气。残影步：翻滚起点延时范围爆炸。\n回身箭：每次翻滚最多一箭；滚中按下也会缓存。", 16))
+	box.add_child(_modal_label("剑气斩：满蓄释放远程穿透剑气。残影步：翻滚起点延时范围爆炸。\n回身箭：每次翻滚最多一箭；滚中按下也会缓存。\n翻滚翻倍作用下一次剑击、蓄力或箭，挥空消耗；第三段自带破防，蓄力正面会被格挡、不破防。", 16))
 
 func show_card_debug() -> void:
 	var box := _screen("调试得卡 · F8", "仅调试运行有效；强化须先获得对应招式")
@@ -89,7 +89,7 @@ func show_stats() -> void:
 	for i in range(player.combo.stages.size()):
 		var data: Dictionary = player.combo.stages[i]
 		box.add_child(_modal_label("%d %s：伤害 %.1f · 距离 %.0f · 前移 %.0f" % [i + 1, data.name, float(data.damage) * player.damage_multiplier, data.reach, data.lunge], 17, Color("e1cc9c")))
-	box.add_child(_modal_label("蓄力 %.2f+%.2f秒 · 伤害 %.1f～%.1f · 范围 %.0f/%.0f°\n弓伤害 %.1f · 翻滚冷却 %.3f秒\n翻滚后普通剑/蓄力×%.0f；第三段破防不影响蓄力。" % [CONFIG.HOLD_THRESHOLD, CONFIG.CHARGE_DURATION, player.combo.charge_damage_min, player.combo.charge_damage_max, CONFIG.CHARGE_REACH, CONFIG.CHARGE_ANGLE, 21.0 * player.damage_multiplier, player.roll_cooldown, CONFIG.ROLL_SWORD_FACTOR], 16))
+	box.add_child(_modal_label("蓄力 %.2f+%.2f秒 · 伤害 %.1f～%.1f · 范围 %.0f/%.0f°\n弓伤害 %.1f · 翻滚冷却 %.3f秒\n翻滚后普通剑/蓄力或箭×%.0f；破防延长奖励只作用第三段。" % [CONFIG.HOLD_THRESHOLD, CONFIG.CHARGE_DURATION, player.combo.charge_damage_min, player.combo.charge_damage_max, CONFIG.CHARGE_REACH, CONFIG.CHARGE_ANGLE, 21.0 * player.damage_multiplier, player.roll_cooldown, CONFIG.ROLL_SWORD_FACTOR], 16))
 	_add_button(box, "返回战斗  [Tab / Esc]", func(): resume_requested.emit())
 
 func show_run_result(won: bool) -> void:

@@ -55,16 +55,32 @@ func run() -> void:
 	sword.swing_time = 0.0
 	sword.next_stage = 2
 	sword.chain_time = 0.2
+	target.guard_time = CONFIG.GUARD_HOLD
+	target.guard_cooldown = 0.0
+	target.guard_direction = Vector2.LEFT
 	sword.attack(Vector2.RIGHT)
 	for i in range(50): sword._physics_process(0.01)
 	check(game.hitstop_active and is_equal_approx(Engine.time_scale, CONFIG.THIRD_HITSTOP_SCALE), "third hit starts hitstop")
-	check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MELEE_PUSH) and target.v41_heavy_stun > 0.0, "third hit suppresses with configured small push")
-	check(game.feedback.shake_strength >= CONFIG.THIRD_SHAKE_STRENGTH and game.feedback.shake_time > 0.0, "third hit shakes camera")
-	await create_timer(CONFIG.THIRD_HITSTOP_SECONDS + 0.05, true, false, true).timeout
+	check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MOB_PUSH) and target.v41_heavy_stun > 0.0, "third hit suppresses with configured small push")
+	check(not target.last_hit_blocked and is_equal_approx(target.guard_cooldown, CONFIG.HEAVY_BASE_BREAK) and is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "third breaks active guard for base duration and stun")
+	check(not game.feedback.guard_effects.is_empty() and game.feedback.guard_effects.back().broken and game.feedback.break_sound.data.size() > 0, "third emits break shards and sound")
+	var break_caption := false
+	for popup in game.feedback.popups:
+		if popup.label.text == "破防": break_caption = true
+	check(break_caption, "third emits break caption")
+	check(game.feedback.shake_strength >= CONFIG.THIRD_SHAKE and game.feedback.shake_time > 0.0, "third hit shakes camera")
+	await create_timer(CONFIG.THIRD_HITSTOP + 0.05, true, false, true).timeout
 	check(not game.hitstop_active and is_equal_approx(Engine.time_scale, 1.0), "hitstop restores time scale")
 	var before: Vector2 = target.position
 	target._encounter_process(1.0 / 60.0)
 	check(target.position.distance_to(before) > 0.1 and target.v41_heavy_stun > 0.0, "stunned enemy actually moves from the push")
+	sword.heavy_reward = true
+	target.guard_time = CONFIG.GUARD_HOLD
+	target.guard_cooldown = 0.0
+	target.v41_heavy_stun = 0.0
+	sword._deal_hit(target, 60.0, Vector2.RIGHT * CONFIG.THIRD_MOB_PUSH)
+	check(not target.last_hit_blocked and is_equal_approx(target.guard_cooldown, CONFIG.GUARD_BREAK_TIME) and is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "upgraded third breaks active guard for extended duration and stun")
+	game._end_hitstop()
 	target.position = Vector2(1100, 500)
 	sword.swing_time = 0.0
 	sword.next_stage = 2

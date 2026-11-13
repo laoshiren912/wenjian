@@ -17,8 +17,31 @@ var reward_options: Array[int] = []
 var reward_rng := RandomNumberGenerator.new()
 var opening_choice := false
 var hitstop_generation := 0
-var hitstop_previous_scale := 1.0
+var saved_time_scale := 1.0
 var hitstop_active := false
+
+func _end_hitstop() -> void:
+	hitstop_generation += 1
+	if hitstop_active:
+		Engine.time_scale = saved_time_scale
+		hitstop_active = false
+
+func _exit_tree() -> void:
+	_end_hitstop()
+
+func _third_impact(_point: Vector2) -> void:
+	feedback.shake_strength = maxf(feedback.shake_strength, CONFIG.THIRD_SHAKE)
+	feedback.shake_time = maxf(feedback.shake_time, CONFIG.THIRD_SHAKE_TIME)
+	if hitstop_active:
+		return
+	saved_time_scale = Engine.time_scale
+	hitstop_active = true
+	hitstop_generation += 1
+	var generation := hitstop_generation
+	Engine.time_scale = CONFIG.THIRD_HITSTOP_SCALE
+	await get_tree().create_timer(CONFIG.THIRD_HITSTOP, true, false, true).timeout
+	if generation == hitstop_generation:
+		_end_hitstop()
 
 func _ready() -> void:
 	_setup_inputs()
@@ -38,7 +61,7 @@ func _build_ui() -> void:
 
 # All existing restart signals reset the run; room transitions use _enter_room.
 func start_room() -> void:
-	_clear_hitstop()
+	_end_hitstop()
 	room_index = 0
 	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
@@ -46,6 +69,7 @@ func start_room() -> void:
 	_enter_room()
 
 func _enter_room() -> void:
+	_end_hitstop()
 	var carried_health := -1.0
 	var carried_stamina := -1.0
 	if room_index > 0 and is_instance_valid(player):
@@ -62,6 +86,7 @@ func _enter_room() -> void:
 		child.free()
 	feedback.popups.clear()
 	feedback.bursts.clear()
+	feedback.guard_effects.clear()
 	feedback.shake_time = 0.0
 	feedback.shake_strength = 0.0
 	$Camera2D.offset = Vector2.ZERO
@@ -102,14 +127,12 @@ func _enter_room() -> void:
 	if carried_health >= 0.0:
 		player.health = carried_health
 		player.stamina = carried_stamina
+	player.combo.finisher_contact.connect(_third_impact)
+	player.combo.guard_broken.connect(feedback.show_guard_break)
 	player.weapon.heavy_hit.connect(func():
 		if player.combo.charged_swing:
 			feedback.shake_strength = maxf(feedback.shake_strength, 9.0)
-			feedback.shake_time = maxf(feedback.shake_time, 0.18)
-		else:
-			feedback.shake_strength = maxf(feedback.shake_strength, CONFIG.THIRD_SHAKE_STRENGTH)
-			feedback.shake_time = maxf(feedback.shake_time, CONFIG.THIRD_SHAKE_SECONDS)
-			_start_hitstop())
+			feedback.shake_time = maxf(feedback.shake_time, 0.18))
 	wave_index = 0
 	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
 	remaining = total
@@ -129,26 +152,6 @@ func _enter_room() -> void:
 	hud.update_room(remaining, total, triggered_count)
 	world.queue_redraw()
 	_update_camera()
-
-func _start_hitstop() -> void:
-	if not hitstop_active:
-		hitstop_previous_scale = Engine.time_scale
-	hitstop_active = true
-	hitstop_generation += 1
-	var generation := hitstop_generation
-	Engine.time_scale = CONFIG.THIRD_HITSTOP_SCALE
-	get_tree().create_timer(CONFIG.THIRD_HITSTOP_SECONDS, true, false, true).timeout.connect(func():
-		if hitstop_active and generation == hitstop_generation:
-			_clear_hitstop())
-
-func _clear_hitstop() -> void:
-	if hitstop_active:
-		Engine.time_scale = hitstop_previous_scale
-		hitstop_active = false
-	hitstop_generation += 1
-
-func _exit_tree() -> void:
-	_clear_hitstop()
 
 func _apply_rewards() -> void:
 	player.combo.stages = base_stages.duplicate(true)
@@ -228,7 +231,7 @@ func _connect_enemy(enemy: SurvivorEnemy) -> void:
 	enemy.killed.connect(_on_enemy_killed)
 	enemy.damaged.connect(func(point: Vector2, amount: float):
 		feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
-			not enemy.damage_shakes_camera and enemy.last_hit_blocked))
+			enemy.last_hit_blocked))
 
 func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	if phase != "combat":
