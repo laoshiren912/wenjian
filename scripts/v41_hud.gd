@@ -51,7 +51,7 @@ func show_rewards() -> void:
 	box.add_child(_modal_label("剑气斩：满蓄释放远程穿透剑气。残影步：翻滚起点延时范围爆炸。\n回身箭：每次翻滚最多一箭；滚中按下也会缓存。\n翻滚翻倍作用下一次剑击、蓄力或箭，挥空消耗；第三段自带破防，蓄力正面会被格挡、不破防。", 16))
 
 func show_card_debug() -> void:
-	var panel := _screen("GM 调试 · F8", "仅调试运行有效；滚动查看全部功能")
+	var panel := _screen("GM 调试 · `", "仅调试运行有效；滚动查看全部功能")
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(680, 460)
 	panel.add_child(scroll)

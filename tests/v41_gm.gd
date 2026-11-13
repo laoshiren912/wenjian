@@ -20,8 +20,11 @@ func run() -> void:
 	game.debug_opening(true)
 	var p = game.player
 	check(OS.is_debug_build() and not p.gm_invulnerable and not p.gm_infinite_stamina, "GM switches default off")
-	game._debug_menu()
-	check(paused and game.hud.modal_panel != null, "F8 panel opens paused")
+	var key := InputEventKey.new()
+	key.keycode = KEY_QUOTELEFT
+	key.pressed = true
+	game._input(key)
+	check(paused and game.hud.modal_panel != null, "backtick panel opens paused")
 	game.debug_toggle_invincible()
 	var hp: float = p.health
 	p.take_damage(12.0, Vector2.RIGHT)

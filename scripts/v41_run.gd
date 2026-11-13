@@ -278,7 +278,7 @@ func _physics_process(delta: float) -> void:
 		_enter_room.call_deferred()
 
 func _input(event: InputEvent) -> void:
-	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
 		_debug_menu()
 		get_viewport().set_input_as_handled()
 		return
