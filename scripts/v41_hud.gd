@@ -3,6 +3,12 @@ extends "res://scripts/combo_hud.gd"
 signal reward_selected(index: int)
 const CONFIG = preload("res://scripts/v41_config.gd")
 var run
+var gm_scroll: ScrollContainer
+
+func _resize_modal() -> void:
+	super._resize_modal()
+	if is_instance_valid(gm_scroll) and is_instance_valid(modal_panel) and gm_scroll.get_parent().get_parent() == modal_panel:
+		gm_scroll.custom_minimum_size.y = maxf(0.0, minf(460.0, root.size.y - 180.0))
 
 func _ready() -> void:
 	super._ready()
@@ -53,8 +59,10 @@ func show_rewards() -> void:
 func show_card_debug() -> void:
 	var panel := _screen("GM 调试 · `", "仅调试运行有效；滚动查看全部功能")
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(680, 460)
+	scroll.custom_minimum_size = Vector2(680, 0)
 	panel.add_child(scroll)
+	gm_scroll = scroll
+	_resize_modal()
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)

@@ -1,0 +1,181 @@
+WUXIA RTS PIXEL ASSET PACK - LITE EDITION LICENSE
+Version 1.0
+
+Product:  Wuxia RTS Pixel Asset Pack - Lite Edition v1.0
+File:     LICENSE_LITE.txt
+
+This document is a product licence, not legal advice. It defines what you may and
+may not do with the files in this pack. For a legal opinion about your specific
+situation, consult a qualified professional.
+
+
+--------------------------------------------------------------------------
+1. PERMITTED USE
+--------------------------------------------------------------------------
+
+You MAY:
+
+  a) Use these assets in personal, educational, hobby and commercial game or
+     software projects, with no royalty owed to the author.
+
+  b) Modify, recolour, crop, resize (with nearest-neighbour scaling), recombine,
+     re-animate, re-canvas and integrate the assets into your own project.
+
+  c) Use the assets in an unlimited number of your own projects.
+
+  d) Publish screenshots, gameplay video, trailers, store pages and other
+     promotional material that contains the assets, as part of promoting your
+     project.
+
+  e) Ship the assets inside a compiled or exported build of your project.
+
+
+--------------------------------------------------------------------------
+2. NOT PERMITTED
+--------------------------------------------------------------------------
+
+You MAY NOT:
+
+  a) Resell, redistribute, sublicense, share, repack, torrent or upload these
+     assets, or any derivative of them, as an asset pack, asset store item,
+     UI kit template, clip-art collection or similar product, whether paid or free.
+
+  b) Redistribute the assets, modified or unmodified, in a form that
+     substantially substitutes for this asset pack - including recoloured,
+     restyled, re-cut or partially re-drawn versions.
+
+  c) Include these assets in any collection whose primary value is the assets
+     themselves.
+
+  d) Claim authorship of this asset pack, or present it as your own work.
+
+  e) Use these assets as input to train, fine-tune, distil or otherwise build a
+     machine-learning model, generative model, or dataset for such a model.
+
+  f) Register these assets, or close derivatives of them, as a trademark, design
+     right, or copyright claim.
+
+  g) Use these assets in content that is unlawful, or in projects that promote
+     hate, harassment or the sexualisation of minors.
+
+
+--------------------------------------------------------------------------
+3. TEAM AND SEAT TERMS
+--------------------------------------------------------------------------
+
+This Lite Edition licence covers one individual or one studio/company entity.
+
+  - An individual user may use the assets in their own projects and in
+    projects for clients, but may not hand the source files to other parties.
+  - A studio covered by this Lite Edition licence may let any number of its own employees and
+    contractors use the assets on the studio's projects. Contractors may use the
+    assets only while working on the studio's project, and must
+    delete their copies when the engagement ends.
+
+This Lite Edition is a free sample of the Full Edition. You may use the included
+Lite assets in personal, educational, hobby and commercial games and software
+projects under this licence, with no royalty owed to the author.
+
+To license this pack for multiple separate entities, multiple products sold
+as asset collections, or resale channels, contact the author.
+
+
+--------------------------------------------------------------------------
+4. ATTRIBUTION
+--------------------------------------------------------------------------
+
+Attribution is NOT required. You do not have to credit the author in your game,
+store page or credits screen.
+
+It is appreciated but entirely optional. If you do credit, "Wuxia RTS Pixel
+Asset Pack" is enough.
+
+
+--------------------------------------------------------------------------
+5. WHAT YOU RECEIVE AND WHAT YOU DO NOT
+--------------------------------------------------------------------------
+
+This pack contains pre-rendered PNG image files and accompanying documentation
+and index files only.
+
+This pack does NOT include, and this licence grants no rights to:
+  - fonts, shaders, code, or engine-specific configuration assets
+    (no Godot TerrainSet, no Unity RuleTile, no RPG Maker database entries)
+  - runtime UI logic, prefabs or scenes
+  - music or sound effects
+  - any third-party trademark, character or franchise
+
+Engine-specific integration is your responsibility.
+
+
+--------------------------------------------------------------------------
+6. AI-ASSISTED PRODUCTION DISCLOSURE
+--------------------------------------------------------------------------
+
+Some visual assets in this pack were created with generative AI-assisted tools.
+The resulting assets were subsequently manually curated, selected, edited,
+cleaned, cut out, aligned, re-canvassed, organised and quality checked for
+game-development use.
+
+This pack is not advertised as 100% hand-drawn pixel art, and neither party
+should describe it that way.
+
+This asset pack does not intentionally reproduce third-party characters,
+trademarks, logos, or protected commercial game assets.
+
+
+--------------------------------------------------------------------------
+7. WARRANTY AND LIABILITY
+--------------------------------------------------------------------------
+
+The assets are provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose, and non-infringement.
+
+The author is not liable for any claim, damage or other liability arising from
+your use of the assets.
+
+Animation frame rates, canvas sizes, pivot positions and playback behaviours
+documented in this pack are recommended starting points based on production
+constraints. They have not been playtested in a shipping game and you are
+expected to tune them for your project.
+
+
+--------------------------------------------------------------------------
+8. REFUNDS AND SUPPORT
+--------------------------------------------------------------------------
+
+Refund and support terms are governed by the platform you obtained the pack
+from (for example itch.io's own policy), not by this licence.
+
+Support covers questions about what is in the pack and how to use it. It does
+not cover engine-specific integration work.
+
+
+--------------------------------------------------------------------------
+9. ACCEPTANCE
+--------------------------------------------------------------------------
+
+By downloading, installing or using any file in this pack, you agree to the
+terms above. If you do not agree, do not use the files and delete them.
+
+
+--------------------------------------------------------------------------
+ABOUT THE FULL EDITION
+--------------------------------------------------------------------------
+
+This Lite Edition is a free sample. It contains 5 of the 13 character entries, a
+terrain sample, four buildings, two props and one VFX set.
+
+The Full Edition adds the complete character collection, the full terrain system
+(V1-V3 variants, road overlays, edge decorations, finishing pieces and the full
+atlas sheets), 4 more buildings with 3 construction states, 16 more props, 8 more VFX,
+the complete 25-component UI kit, and the full documentation set.
+
+The licence terms above are identical in both editions. Upgrading adds content;
+it does not change what you are allowed to do with the assets.
+
+
+--------------------------------------------------------------------------
+END OF LICENCE
+--------------------------------------------------------------------------

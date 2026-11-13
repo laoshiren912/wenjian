@@ -193,6 +193,7 @@ func _spawn_wave() -> void:
 	for i in range(kinds.size()):
 		var type: int = kinds[i]
 		var enemy: SurvivorEnemy = ENEMY.instantiate()
+		enemy.get_node("VisualRoot").set_script(preload("res://scripts/v41_pixel_visual.gd"))
 		enemy.world = world
 		enemy.kind = SurvivorEnemy.Kind.RANGED if type == CONFIG.RANGED else SurvivorEnemy.Kind.HOSTILE
 		enemy.dodge_enabled = false
@@ -354,6 +355,8 @@ func debug_spawn(kind: int, count: int) -> void:
 	if not OS.is_debug_build() or kind < 0 or kind > 3: return
 	for i in range(clampi(count, 1, 20)):
 		var enemy: SurvivorEnemy = ENEMY.instantiate()
+		if kind != 3:
+			enemy.get_node("VisualRoot").set_script(preload("res://scripts/v41_pixel_visual.gd"))
 		if kind == 3:
 			enemy.set_script(MINI_BOSS)
 		enemy.world = world

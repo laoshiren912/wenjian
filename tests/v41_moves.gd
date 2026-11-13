@@ -187,7 +187,7 @@ func run() -> void:
 	game.start_room()
 	check(game.opening_choice and game.triggered_count == 0, "restart offers opening")
 	var f8 := InputEventKey.new()
-	f8.keycode = KEY_F8
+	f8.keycode = KEY_QUOTELEFT
 	f8.pressed = true
 	root.push_input(f8)
 	await process_frame
@@ -202,7 +202,7 @@ func run() -> void:
 			echo_button = button
 		if button.text.begins_with("残影步强化"):
 			echo_upgrade_button = button
-	check(skip_button != null and not skip_button.disabled, "F8 exposes debug skip")
+	check(skip_button != null and not skip_button.disabled, "backtick exposes debug skip")
 	check(echo_button != null and echo_upgrade_button != null and echo_upgrade_button.disabled, "debug upgrade initially disabled")
 	echo_button.pressed.emit()
 	check(game.player.move_echo and game.reward_counts[5] == 1, "debug button grants chosen card")
@@ -225,11 +225,32 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var small_rect := Rect2(Vector2.ZERO, Vector2(root.size))
-	check(small_rect.encloses(skip_button.get_global_rect()), "debug skip fits small viewport")
+	var scroll := game.hud.modal_panel.find_child("*", true, false) as ScrollContainer
+	if scroll == null:
+		for node in game.hud.modal_panel.find_children("*", "ScrollContainer", true, false):
+			scroll = node as ScrollContainer
+			break
+	if scroll != null:
+		scroll.ensure_control_visible(skip_button)
+	await process_frame
+	await process_frame
+	var button_rect := skip_button.get_global_rect()
+	print("PANEL=", game.hud.modal_panel.get_global_rect(), " SCROLL=", scroll.get_global_rect() if scroll != null else "missing")
+	print("SMALL_VIEWPORT=", small_rect, " BUTTON=", button_rect, " overflow_left=", maxf(0.0, -button_rect.position.x), " overflow_top=", maxf(0.0, -button_rect.position.y), " overflow_right=", maxf(0.0, button_rect.end.x - small_rect.end.x), " overflow_bottom=", maxf(0.0, button_rect.end.y - small_rect.end.y))
+	check(scroll != null and small_rect.encloses(button_rect) and scroll.get_global_rect().encloses(button_rect) and skip_button.is_visible_in_tree() and not skip_button.disabled, "debug skip visible and enabled in small viewport")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.position = button_rect.get_center()
+	click.global_position = click.position
+	click.pressed = true
+	root.push_input(click, true)
+	click = click.duplicate()
+	click.pressed = false
+	root.push_input(click, true)
+	await process_frame
+	check(game.phase == "combat" and not paused and game.triggered_count == 4, "debug skip clickable in small viewport")
 	root.size = Vector2i(1280, 720)
 	root.content_scale_size = Vector2i(1280, 720)
-	skip_button.pressed.emit()
-	check(game.phase == "combat" and not paused and game.triggered_count == 4, "debug skips opening")
 	game.player.combo.charge_time = CONFIG.CHARGE_DURATION
 	game.player.combo._release_charge(Vector2.RIGHT)
 	check(effects("energy").is_empty(), "full charge without energy card makes no projectile")
