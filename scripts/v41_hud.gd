@@ -51,7 +51,36 @@ func show_rewards() -> void:
 	box.add_child(_modal_label("剑气斩：满蓄释放远程穿透剑气。残影步：翻滚起点延时范围爆炸。\n回身箭：每次翻滚最多一箭；滚中按下也会缓存。\n翻滚翻倍作用下一次剑击、蓄力或箭，挥空消耗；第三段自带破防，蓄力正面会被格挡、不破防。", 16))
 
 func show_card_debug() -> void:
-	var box := _screen("调试得卡 · F8", "仅调试运行有效；强化须先获得对应招式")
+	var panel := _screen("GM 调试 · F8", "仅调试运行有效；滚动查看全部功能")
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(680, 460)
+	panel.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	var gm_row := HBoxContainer.new()
+	box.add_child(gm_row)
+	gm_row.add_child(PrototypeUI.button("无敌：" + ("开" if run.gm_invincible else "关"), func(): run.debug_toggle_invincible(), 38))
+	gm_row.add_child(PrototypeUI.button("无限体力：" + ("开" if run.gm_infinite_stamina else "关"), func(): run.debug_toggle_stamina(), 38))
+	gm_row.add_child(PrototypeUI.button("体力回满", func(): run.debug_fill_stamina(), 38))
+	box.add_child(_modal_label("跳关", 17))
+	var rooms := HBoxContainer.new()
+	box.add_child(rooms)
+	for i in range(CONFIG.RUN_ROOMS):
+		rooms.add_child(PrototypeUI.button("Boss" if i == CONFIG.BOSS_ROOM else str(i + 1), func(): run.debug_jump(i), 38))
+	var spawn_row := HBoxContainer.new()
+	box.add_child(spawn_row)
+	var types := OptionButton.new()
+	for label in ["普通近战", "举防近战", "远程", "Boss"]: types.add_item(label)
+	spawn_row.add_child(types)
+	var count := SpinBox.new()
+	count.min_value = 1
+	count.max_value = 20
+	count.value = 1
+	spawn_row.add_child(count)
+	spawn_row.add_child(PrototypeUI.button("玩家前方刷怪", func(): run.debug_spawn(types.selected, int(count.value)), 38))
+	spawn_row.add_child(PrototypeUI.button("清除当前敌人", func(): run.debug_clear_enemies(), 38))
+	box.add_child(_modal_label("调试得卡", 17))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	box.add_child(grid)

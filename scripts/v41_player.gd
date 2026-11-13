@@ -21,6 +21,7 @@ var return_window := 0.0
 var return_buffered := false
 var roll_action := ""
 var roll_primary_held := false
+var gm_infinite_stamina := false
 
 func v41_arrow_factor() -> float:
 	if combo.roll_reward and combo.roll_armed:
@@ -162,6 +163,8 @@ func _clear_ranged_input() -> void:
 	bow_windup_remaining = 0.0
 
 func spend_stamina(amount: float) -> bool:
+	if OS.is_debug_build() and gm_infinite_stamina:
+		return true
 	if not super.spend_stamina(amount):
 		return false
 	stamina_delay = V41_CONFIG.STAMINA_REGEN_DELAY

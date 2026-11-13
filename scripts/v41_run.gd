@@ -16,6 +16,9 @@ var wave_remaining := 0
 var reward_options: Array[int] = []
 var reward_rng := RandomNumberGenerator.new()
 var opening_choice := false
+var gm_invincible := false
+var gm_infinite_stamina := false
+var gm_spawned: Array[Node] = []
 var hitstop_generation := 0
 var saved_time_scale := 1.0
 var hitstop_active := false
@@ -62,6 +65,8 @@ func _build_ui() -> void:
 # All existing restart signals reset the run; room transitions use _enter_room.
 func start_room() -> void:
 	_end_hitstop()
+	gm_invincible = false
+	gm_infinite_stamina = false
 	room_index = 0
 	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
@@ -93,6 +98,9 @@ func _enter_room() -> void:
 	world.portal_open = false
 	phase = "combat"
 	player = _create_player()
+	gm_spawned.clear()
+	player.gm_invulnerable = OS.is_debug_build() and gm_invincible
+	player.gm_infinite_stamina = OS.is_debug_build() and gm_infinite_stamina
 	player.position = CONFIG.ENTRY_POINT
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
@@ -315,6 +323,75 @@ func _debug_menu() -> void:
 		return
 	get_tree().paused = true
 	hud.show_card_debug()
+
+func debug_toggle_invincible() -> void:
+	if not OS.is_debug_build(): return
+	gm_invincible = not gm_invincible
+	player.gm_invulnerable = gm_invincible
+	hud.show_card_debug()
+
+func debug_toggle_stamina() -> void:
+	if not OS.is_debug_build(): return
+	gm_infinite_stamina = not gm_infinite_stamina
+	player.gm_infinite_stamina = gm_infinite_stamina
+	hud.show_card_debug()
+
+func debug_fill_stamina() -> void:
+	if not OS.is_debug_build(): return
+	player.stamina = player.max_stamina
+
+func debug_jump(index: int) -> void:
+	if not OS.is_debug_build() or index < 0 or index >= CONFIG.RUN_ROOMS: return
+	room_index = index
+	opening_choice = false
+	_enter_room()
+	if index == 0:
+		debug_opening(true)
+	get_tree().paused = true
+	hud.show_card_debug()
+
+func debug_spawn(kind: int, count: int) -> void:
+	if not OS.is_debug_build() or kind < 0 or kind > 3: return
+	for i in range(clampi(count, 1, 20)):
+		var enemy: SurvivorEnemy = ENEMY.instantiate()
+		if kind == 3:
+			enemy.set_script(MINI_BOSS)
+		enemy.world = world
+		enemy.position = player.position + player.aim_direction.normalized() * 100.0 + player.aim_direction.orthogonal() * (i - (count - 1) * 0.5) * 35.0
+		enemy.collision_mask = 1 | 2 | 4
+		if kind != 3:
+			enemy.kind = SurvivorEnemy.Kind.RANGED if kind == 2 else SurvivorEnemy.Kind.HOSTILE
+			enemy.encounter_id = 0
+			enemy.v41_pressure = true
+			enemy.intro_room = room_index < 2
+			enemy.home_position = enemy.position
+		enemy.damaged.connect(func(point: Vector2, amount: float): feedback.show_damage(point, amount, false, enemy.damage_shakes_camera, enemy.last_hit_blocked))
+		world.actors.add_child(enemy)
+		gm_spawned.append(enemy)
+		if kind != 3:
+			var stats: Dictionary = CONFIG.ENEMY_STATS[CONFIG.RANGED if kind == 2 else CONFIG.MELEE]
+			enemy.speed = stats.speed
+			enemy.max_health = stats.health
+			enemy.health = enemy.max_health
+			enemy.damage = stats.damage
+			enemy.alert_encounter(player.global_position)
+			if kind == 1:
+				enemy.guard_direction = (player.global_position - enemy.global_position).normalized()
+				enemy.guard_time = CONFIG.GUARD_HOLD
+				enemy.guard_visual_time = CONFIG.GUARD_DISPLAY
+			if kind != 2:
+				if not is_instance_valid(scheduler):
+					scheduler = preload("res://scripts/pair_scheduler.gd").new()
+					scheduler.configure([enemy], CONFIG.PAIR_SIZE, CONFIG.PAIR_APPROACH_TIMEOUT)
+				else:
+					scheduler.groups.append([enemy])
+					enemy.pair_scheduler = scheduler
+
+func debug_clear_enemies() -> void:
+	if not OS.is_debug_build(): return
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(enemy) or enemy.dead: continue
+		enemy.take_damage(enemy.health * 4.0 + 1.0, Vector2.ZERO, true)
 
 func debug_grant(index: int) -> void:
 	if not OS.is_debug_build() or not CARD_POOL.eligible(index, reward_counts):
