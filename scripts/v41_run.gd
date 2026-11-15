@@ -184,7 +184,7 @@ func _spawn_wave() -> void:
 	phase = "combat"
 	var kinds: Array = CONFIG.WAVES[room_index][wave_index]
 	wave_remaining = kinds.size()
-	var points: Array[Vector2] = CONFIG.SPAWN_POINTS.duplicate()
+	var points: Array[Vector2] = (CONFIG.ROOM2_SPAWN_POINTS if room_index == 1 else CONFIG.SPAWN_POINTS).duplicate()
 	var melee: Array = []
 	# Six spaced courtyard points for at most five enemies; avoid the player.
 	points = points.filter(func(point): return point.distance_to(player.position) >= CONFIG.SPAWN_CLEARANCE)
@@ -273,7 +273,7 @@ func _physics_process(delta: float) -> void:
 	if phase == "combat" and is_instance_valid(scheduler):
 		scheduler.tick(delta)
 	_update_camera()
-	if phase == "exit_ready" and player.global_position.distance_to(CONFIG.EXIT_POINT) < 34.0:
+	if phase == "exit_ready" and player.global_position.distance_to(world.exit_point) < 34.0:
 		room_index += 1
 		phase = "transition"
 		_enter_room.call_deferred()
@@ -425,7 +425,7 @@ func _update_status() -> void:
 		"combat":
 			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
 		"reward_select": status.text = "已清场 · 选择奖励后开放出口"
-		"exit_ready": status.text = "已领奖 · 前往右侧出口"
+		"exit_ready": status.text = "已领奖 · 前往下方出口" if room_index == 1 else "已领奖 · 前往右侧出口"
 		"cleared": status.text = "守庭者已击败 · 本局通关"
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
 

@@ -211,7 +211,7 @@ func run() -> void:
 		check(game.can_select_reward(choice), "selectable room reward %d" % room)
 		game.select_reward(choice)
 		check(game.phase == "exit_ready" and game.world.portal_open and not paused, "reward opens exit %d" % room)
-		game.player.global_position = CONFIG.EXIT_POINT
+		game.player.global_position = game.world.exit_point
 		await frames(3)
 	check(game.room_index == CONFIG.BOSS_ROOM and is_instance_valid(game.boss), "boss room reached")
 	game.boss.take_damage(100000.0, Vector2.ZERO, true)

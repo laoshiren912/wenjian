@@ -6,38 +6,43 @@ const ROCKS = preload("res://assets/courtyard/guishan/mountain_rocks.png")
 const STEPPING_ROCKS = preload("res://assets/courtyard/guishan/stepping_rocks.png")
 const FERNS = preload("res://assets/courtyard/guishan/ferns.png")
 const BAMBOO = preload("res://assets/courtyard/guishan/bamboo_grove.png")
+const MASKS := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 23, 27, 31, 38, 39, 46, 47, 55, 63, 76, 77, 78, 79, 95, 110, 111, 127, 137, 139, 141, 143, 155, 159, 175, 191, 205, 207, 223, 239, 255]
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -9
 
+func _road(x: int, y: int) -> bool:
+	return (y >= 10 and y <= 12 and x <= 30) or (x >= 28 and x <= 30 and y >= 10)
+
 func _draw() -> void:
-	# Match the first room's three tile rows: top edge, path, bottom edge.
-	# The stone atlas uses the same masks as the first room's earth tiles.
 	for y in range(23):
-		var tile := 79 if y == 10 else (94 if y == 11 else (86 if y == 12 else 0))
-		var source := Rect2((tile % 16) * 32, int(tile / 16) * 32, 32, 32)
 		for x in range(40):
+			var tile := 0
+			if _road(x, y):
+				var n := _road(x, y - 1)
+				var e := _road(x + 1, y)
+				var s := _road(x, y + 1)
+				var w := _road(x - 1, y)
+				var mask := (1 if n else 0) + (2 if e else 0) + (4 if s else 0) + (8 if w else 0)
+				if n and e and _road(x + 1, y - 1): mask += 16
+				if e and s and _road(x + 1, y + 1): mask += 32
+				if s and w and _road(x - 1, y + 1): mask += 64
+				if w and n and _road(x - 1, y - 1): mask += 128
+				tile = 48 + MASKS.find(mask)
+			var source := Rect2((tile % 16) * 32, int(tile / 16) * 32, 32, 32)
 			draw_texture_rect_region(TERRAIN, Rect2(x * 32, y * 32, 32, 32), source)
-	# Uneven clusters remain on the background layer, without collision.
+	# Decorations form clusters outside the collision boundary, not separate obstacles.
 	for item in [
-		[ROCKS, Vector2(38, 112), 0.95], [FERNS, Vector2(93, 150), 0.48],
-		[STEPPING_ROCKS, Vector2(126, 96), 0.72], [BAMBOO, Vector2(218, 97), 0.8],
-		[ROCKS, Vector2(275, 124), 0.78], [STEPS, Vector2(340, 108), 0.85],
-		[STEPPING_ROCKS, Vector2(405, 130), 0.68],
-		[ROCKS, Vector2(565, 106), 0.9], [BAMBOO, Vector2(624, 95), 0.75],
-		[FERNS, Vector2(679, 149), 0.42], [STEPPING_ROCKS, Vector2(739, 112), 0.82],
-		[ROCKS, Vector2(842, 125), 0.84], [STEPS, Vector2(911, 98), 0.95],
-		[FERNS, Vector2(978, 144), 0.48], [ROCKS, Vector2(1104, 106), 0.95],
-		[STEPPING_ROCKS, Vector2(1167, 129), 0.62],
-		[BAMBOO, Vector2(43, 511), 0.78], [ROCKS, Vector2(98, 542), 0.85],
-		[STEPPING_ROCKS, Vector2(163, 516), 0.82], [FERNS, Vector2(255, 558), 0.47],
-		[ROCKS, Vector2(291, 525), 0.95], [STEPS, Vector2(359, 540), 0.8],
-		[STEPPING_ROCKS, Vector2(419, 516), 0.72],
-		[BAMBOO, Vector2(554, 515), 0.85], [ROCKS, Vector2(613, 539), 0.82],
-		[FERNS, Vector2(672, 558), 0.46], [STEPPING_ROCKS, Vector2(735, 530), 0.77],
-		[STEPS, Vector2(824, 516), 0.9], [ROCKS, Vector2(893, 540), 0.96],
-		[BAMBOO, Vector2(1004, 516), 0.72], [STEPPING_ROCKS, Vector2(1062, 535), 0.75],
-		[ROCKS, Vector2(1152, 515), 0.86]]:
+		[ROCKS, Vector2(45, 96), 0.95], [FERNS, Vector2(105, 150), 0.45], [STEPPING_ROCKS, Vector2(118, 100), 0.7],
+		[BAMBOO, Vector2(345, 95), 0.8], [ROCKS, Vector2(405, 110), 0.9], [FERNS, Vector2(465, 145), 0.42],
+		[STEPS, Vector2(670, 96), 0.85], [ROCKS, Vector2(735, 108), 0.85], [STEPPING_ROCKS, Vector2(795, 106), 0.7],
+		[ROCKS, Vector2(1050, 99), 0.95], [BAMBOO, Vector2(1120, 95), 0.75],
+		[BAMBOO, Vector2(45, 500), 0.75], [ROCKS, Vector2(102, 527), 0.9], [FERNS, Vector2(158, 555), 0.45],
+		[STEPPING_ROCKS, Vector2(266, 510), 0.78], [ROCKS, Vector2(350, 528), 0.85], [STEPS, Vector2(420, 530), 0.8],
+		[ROCKS, Vector2(570, 500), 1.0], [BAMBOO, Vector2(655, 487), 0.95], [FERNS, Vector2(690, 555), 0.5],
+		[ROCKS, Vector2(1160, 245), 0.8], [FERNS, Vector2(1190, 300), 0.4],
+		[STEPS, Vector2(1170, 400), 0.8], [ROCKS, Vector2(1190, 455), 0.75],
+		[ROCKS, Vector2(1160, 590), 0.9], [BAMBOO, Vector2(1210, 570), 0.7]]:
 		var texture: Texture2D = item[0]
 		draw_texture_rect(texture, Rect2(item[1], texture.get_size() * float(item[2])), false)

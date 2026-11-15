@@ -73,7 +73,7 @@ func reward(index: int) -> void:
 	game.select_reward(index)
 
 func advance() -> void:
-	game.player.position = CONFIG.EXIT_POINT
+	game.player.position = game.world.exit_point
 	await frames()
 
 func target_at(point: Vector2) -> SurvivorEnemy:
@@ -390,6 +390,10 @@ func run() -> void:
 	await advance()
 	game.player.set_physics_process(false)
 	check(game.room_index == 1 and game.total == 6 and game.remaining == 6 and enemies().size() == 3, "room2 starts only wave1 of six total")
+	check(game.world.exit_point == CONFIG.ROOM2_EXIT_POINT and not game.world.path_between(CONFIG.ENTRY_POINT, game.world.exit_point).is_empty(), "room2 L-shaped exit is reachable")
+	check(not Geometry2D.is_point_in_polygon(Vector2(600, 600), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(950, 600), game.world.walkable), "room2 inside corner blocked and vertical passage walkable")
+	for point in CONFIG.ROOM2_SPAWN_POINTS:
+		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "room2 spawn reachable: " + str(point))
 	check(game.player.health == 63.0 and game.player.stamina >= 47.0 and game.player.stamina < 50.0 and game.reward_counts[0] == 1, "vitals preserved; only normal stamina regeneration after entry")
 	var ranger: SurvivorEnemy
 	for e in enemies():
