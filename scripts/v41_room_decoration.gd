@@ -12,6 +12,20 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -9
 
+func _draw_first_room_border() -> void:
+	var textures: Array[Texture2D] = [BAMBOO, DENSE, ROCKS]
+	for i in range(14):
+		var x := float(i * 94 - 12)
+		draw_texture_rect(textures[i % 3], Rect2(x, 0, 115, 115), false)
+		draw_texture_rect(textures[(i + 1) % 3], Rect2(x, 605, 115, 115), false)
+	for i in range(6):
+		var y := float(95 + i * 88)
+		draw_texture_rect(textures[(i + 2) % 3], Rect2(0, y, 110, 110), false)
+		draw_texture_rect(textures[i % 3], Rect2(1170, y, 110, 110), false)
+	var source := STELE.get_size()
+	for x in [95, 1135]:
+		draw_texture_rect_region(STELE, Rect2(x, 295, 49.5, 88), Rect2(0, 0, source.x * 0.5625, source.y))
+
 func paint_room(second: bool) -> void:
 	for y in range(23):
 		for x in range(40):
@@ -23,6 +37,9 @@ func paint_room(second: bool) -> void:
 		var p = Vector2(s[0], s[1]) + (Vector2(12, -12) if second and i % 3 == 0 else Vector2.ZERO)
 		var size = float(s[2])
 		draw_texture_rect(FERNS if s[3] == 0 else STEPS, Rect2(p, Vector2(size * 1.25, size)), false, Color(0.48, 0.55, 0.43, 0.8))
+	if not second:
+		_draw_first_room_border()
+		return
 	# Irregular silhouettes stay at the original boundary, separate from collision.
 	var top = [[185,124,100,0],[258,137,85,2],[330,118,108,1],[425,130,91,0],[500,120,112,2],[595,138,85,1],[665,119,104,0],[755,133,91,2],[830,115,110,1],[925,132,94,0],[1002,121,100,2]]
 	var bottom = [[180,550,104,2],[267,560,90,0],[340,545,110,1],[435,558,88,2],[510,548,105,0],[600,560,91,1],[675,545,110,2],[770,558,90,0],[845,547,106,1],[935,560,90,2],[1010,548,100,0]]

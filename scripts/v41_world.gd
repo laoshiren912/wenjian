@@ -30,7 +30,7 @@ func build_battle() -> void:
 	grid.update()
 	original_walkable = walkable.duplicate()
 	boundaries.append(get_node("PaintedFloorBoundary"))
-	_add_boundary(PackedVector2Array([Vector2(260, 220), Vector2(1050, 220), Vector2(1050, 550), Vector2(260, 550)]))
+	_add_boundary(PackedVector2Array([Vector2(90, 110), Vector2(1190, 110), Vector2(1190, 610), Vector2(90, 610)]))
 	_add_boundary(PackedVector2Array([Vector2(260, 220), Vector2(1050, 220), Vector2(1050, 550), Vector2(260, 550)]))
 	for point in [Vector2(490, 320), Vector2(730, 475), Vector2(900, 310)]:
 		var body := StaticBody2D.new()
@@ -48,8 +48,8 @@ func build_battle() -> void:
 		body.add_child(sprite)
 		add_child(body)
 		room2_obstacles.append(body)
-	_make_room1_obstacle(Vector2(495, 285), preload("res://assets/courtyard/guishan/mountain_rocks.png"), 1.8, -65.0)
-	_make_room1_obstacle(Vector2(800, 535), preload("res://assets/courtyard/guishan/bamboo_grove.png"), 1.7, -60.0)
+	_make_room1_obstacle(Vector2(400, 220), preload("res://assets/courtyard/guishan/mountain_rocks.png"), 1.8, -65.0)
+	_make_room1_obstacle(Vector2(925, 590), preload("res://assets/courtyard/guishan/bamboo_grove.png"), 1.7, -60.0)
 
 func _make_room1_obstacle(point: Vector2, texture: Texture2D, factor: float, offset: float) -> void:
 	var body := StaticBody2D.new()
@@ -114,7 +114,7 @@ func set_room_style(room_index: int) -> void:
 	walkable = original_walkable if boundary_index == 0 else boundaries[boundary_index].get_meta("polygon")
 	lanterns[0].position = Vector2(500, 430) if room_index == 1 else Vector2(420, 444)
 	lanterns[1].position = Vector2(1070, 485) if room_index == 1 else Vector2(864, 438)
-	exit_point = CONFIG.ROOM2_EXIT_POINT if room_index == 1 else CONFIG.EXIT_POINT
+	exit_point = Vector2(1130, 370) if room_index == 0 else (CONFIG.ROOM2_EXIT_POINT if room_index == 1 else CONFIG.EXIT_POINT)
 	for lantern in lanterns:
 		lantern.visible = room_index > 1
 		lantern.collision_layer = 0 if room_index < 2 else 1

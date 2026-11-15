@@ -102,7 +102,7 @@ func _enter_room() -> void:
 	gm_spawned.clear()
 	player.gm_invulnerable = OS.is_debug_build() and gm_invincible
 	player.gm_infinite_stamina = OS.is_debug_build() and gm_infinite_stamina
-	player.position = CONFIG.ENTRY_POINT
+	player.position = Vector2(145, 370) if room_index == 0 else CONFIG.ENTRY_POINT
 	player.collision_mask = 1 | 4
 	world.actors.add_child(player)
 	player.enable_dual_attack()
@@ -463,8 +463,8 @@ func _update_camera() -> void:
 		return
 	var viewport := get_viewport_rect().size
 	if room_index == 0:
-		$Camera2D.zoom = Vector2.ONE * maxf(viewport.x / 1000.0, viewport.y / 562.5)
-		$Camera2D.position = Vector2(655, 385)
+		$Camera2D.zoom = Vector2.ONE * maxf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
+		$Camera2D.position = world.ART_SIZE * 0.5
 		return
 	if room_index == 1:
 		$Camera2D.zoom = Vector2.ONE * minf(viewport.x / 1100.0, viewport.y / 618.75)
