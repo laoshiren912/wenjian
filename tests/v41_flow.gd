@@ -390,8 +390,8 @@ func run() -> void:
 	await advance()
 	game.player.set_physics_process(false)
 	check(game.room_index == 1 and game.total == 6 and game.remaining == 6 and enemies().size() == 3, "room2 starts only wave1 of six total")
-	check(game.world.exit_point == CONFIG.ROOM2_EXIT_POINT and not game.world.path_between(CONFIG.ENTRY_POINT, game.world.exit_point).is_empty(), "room2 L-shaped exit is reachable")
-	check(not Geometry2D.is_point_in_polygon(Vector2(300, 600), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(600, 600), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(950, 600), game.world.walkable), "room2 inside corner blocked and vertical passage walkable")
+	check(game.world.exit_point == CONFIG.ROOM2_EXIT_POINT and not game.world.path_between(CONFIG.ENTRY_POINT, game.world.exit_point).is_empty(), "room2 small-room exit is reachable")
+	check(not Geometry2D.is_point_in_polygon(Vector2(600, 600), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(300, 480), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(950, 480), game.world.walkable), "room2 compact bounds contain both sides without L-shaped exclusion")
 	for point in CONFIG.ROOM2_SPAWN_POINTS:
 		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "room2 spawn reachable: " + str(point))
 	check(game.player.health == 63.0 and game.player.stamina >= 47.0 and game.player.stamina < 50.0 and game.reward_counts[0] == 1, "vitals preserved; only normal stamina regeneration after entry")
@@ -399,8 +399,8 @@ func run() -> void:
 	for e in enemies():
 		check(is_equal_approx(e.health, float(CONFIG.ENEMY_STATS[CONFIG.RANGED if e.kind == e.Kind.RANGED else (CONFIG.THRUST if e.thrust_type else CONFIG.MELEE)].health) * 1.2) and is_equal_approx(e.damage, float(CONFIG.ENEMY_STATS[CONFIG.RANGED if e.kind == e.Kind.RANGED else CONFIG.MELEE].damage) * 1.2), "room2 scales both health and damage")
 		if e.kind == e.Kind.RANGED: ranger = e
-	ranger.position = Vector2(680, 420)
-	game.player.position = Vector2(580, 420)
+	ranger.position = Vector2(470, 385)
+	game.player.position = Vector2(370, 385)
 	ranger.windup = 0.0
 	ranger.attack_cooldown = 0.45
 	var before: float = ranger.position.distance_to(game.player.position)

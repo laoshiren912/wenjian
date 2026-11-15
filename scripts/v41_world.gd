@@ -11,6 +11,7 @@ var mountain_steps_room: Node2D
 var original_walkable: PackedVector2Array
 var boundaries: Array[StaticBody2D] = []
 var exit_point := CONFIG.EXIT_POINT
+var room2_obstacles: Array[StaticBody2D] = []
 
 func build_battle() -> void:
 	build_courtyard()
@@ -29,7 +30,23 @@ func build_battle() -> void:
 	original_walkable = walkable.duplicate()
 	boundaries.append(get_node("PaintedFloorBoundary"))
 	_add_boundary(PackedVector2Array([Vector2(250, 260), Vector2(1030, 260), Vector2(1180, 340), Vector2(1100, 510), Vector2(180, 510), Vector2(100, 340)]))
-	_add_boundary(PackedVector2Array([Vector2(100, 180), Vector2(1150, 180), Vector2(1150, 690), Vector2(430, 690), Vector2(430, 540), Vector2(100, 540)]))
+	_add_boundary(PackedVector2Array([Vector2(260, 220), Vector2(1050, 220), Vector2(1050, 550), Vector2(260, 550)]))
+	for point in [Vector2(490, 320), Vector2(730, 475), Vector2(900, 310)]:
+		var body := StaticBody2D.new()
+		body.position = point
+		body.collision_layer = 0
+		body.collision_mask = 0
+		var shape := CollisionPolygon2D.new()
+		shape.polygon = PackedVector2Array([Vector2(-57, -18), Vector2(-37, -46), Vector2(24, -50), Vector2(57, -17), Vector2(52, 9), Vector2(-48, 9)])
+		body.add_child(shape)
+		var sprite := Sprite2D.new()
+		sprite.texture = preload("res://assets/courtyard/guishan/mountain_rocks.png")
+		sprite.scale = Vector2.ONE * 1.8
+		sprite.position = Vector2(0, -65)
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		body.add_child(sprite)
+		add_child(body)
+		room2_obstacles.append(body)
 
 func _add_boundary(polygon: PackedVector2Array) -> void:
 	var body := StaticBody2D.new()
@@ -58,8 +75,13 @@ func _rebuild_navigation() -> void:
 				if point.distance_to(Geometry2D.get_closest_point_to_segment(point, walkable[i], walkable[(i + 1) % walkable.size()])) < 20.0:
 					safe = false
 			for lantern in lanterns:
-				if point.distance_to(lantern.position) < 42.0:
+				if lantern.collision_layer != 0 and point.distance_to(lantern.position) < 42.0:
 					safe = false
+			for obstacle in room2_obstacles:
+				if obstacle.collision_layer != 0:
+					var local := point - obstacle.position
+					if absf(local.x) < 77.0 and local.y > -70.0 and local.y < 29.0:
+						safe = false
 			grid.set_point_solid(cell, not safe)
 			if safe:
 				floor_cells.append(cell)
@@ -74,6 +96,12 @@ func set_room_style(room_index: int) -> void:
 	lanterns[0].position = Vector2(500, 430) if room_index == 1 else Vector2(420, 444)
 	lanterns[1].position = Vector2(1070, 485) if room_index == 1 else Vector2(864, 438)
 	exit_point = CONFIG.ROOM2_EXIT_POINT if room_index == 1 else CONFIG.EXIT_POINT
+	for lantern in lanterns:
+		lantern.visible = room_index != 1
+		lantern.collision_layer = 0 if room_index == 1 else 1
+	for obstacle in room2_obstacles:
+		obstacle.visible = room_index == 1
+		obstacle.collision_layer = 1 if room_index == 1 else 0
 	_rebuild_navigation()
 	var is_boss := room_index == CONFIG.BOSS_ROOM
 	backdrop.visible = is_boss

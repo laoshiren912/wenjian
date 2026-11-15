@@ -425,7 +425,7 @@ func _update_status() -> void:
 		"combat":
 			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
 		"reward_select": status.text = "已清场 · 选择奖励后开放出口"
-		"exit_ready": status.text = "已领奖 · 前往下方出口" if room_index == 1 else "已领奖 · 前往右侧出口"
+		"exit_ready": status.text = "已领奖 · 前往右侧出口"
 		"cleared": status.text = "守庭者已击败 · 本局通关"
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
 
@@ -462,6 +462,10 @@ func _update_camera() -> void:
 	if not is_instance_valid(player):
 		return
 	var viewport := get_viewport_rect().size
+	if room_index == 1:
+		$Camera2D.zoom = Vector2.ONE * minf(viewport.x / 1100.0, viewport.y / 618.75)
+		$Camera2D.position = Vector2(655, 345)
+		return
 	var fit: float = maxf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
 	$Camera2D.zoom = Vector2.ONE * fit * (1.3 if close_view else 1.0)
 	var half: Vector2 = viewport / $Camera2D.zoom * 0.5
