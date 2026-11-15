@@ -102,6 +102,11 @@ func try_roll() -> bool:
 	var origin := global_position
 	var queued_action := roll_action
 	var queued_held := roll_charge_held
+	# A right-button press can arrive just before the roll request. Preserve a
+	# pending hold across reset_chain, but keep an established charge cancellable.
+	if queued_action == "" and combo.gesture_held and not combo.charging and not combo.release_pending:
+		queued_action = "charge"
+		queued_held = true
 	var succeeded := super.try_roll()
 	if succeeded:
 		roll_action = queued_action if queued_action in ["primary", "charge"] else ""

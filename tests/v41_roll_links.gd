@@ -55,6 +55,17 @@ func run() -> void:
 	check(player.combo.charging, "held input enters normal charge")
 	action("ranged_attack", false)
 	reset()
+	# The button is already held before the roll request reaches physics.
+	action("ranged_attack")
+	action("roll")
+	await frames(6)
+	check(player.is_rolling() and player.roll_action == "charge" and player.roll_charge_held, "right hold before roll survives roll reset")
+	await frames(8)
+	check(not player.is_rolling() and player.combo.gesture_held, "preserved right hold transfers when roll ends")
+	await frames(15)
+	check(player.combo.charging, "right held through roll enters charge")
+	action("ranged_attack", false)
+	reset()
 	# Roll and held attack arrive before the same physics tick starts the roll.
 	action("roll")
 	action("ranged_attack")
