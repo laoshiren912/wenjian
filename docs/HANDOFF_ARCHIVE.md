@@ -1132,3 +1132,7 @@
 ## 2026-11-15 普通战斗房像素场景
 - 前六房使用 Guishan 石砖及边缘图片装饰，隐藏原庭院画及前景；第七间恢复原庭院。原房间边界、两座石灯的碰撞及敌人刷新未改，新增图片不参与碰撞。素材来源和许可状态见 assets/characters/README.md。
 - Godot 4.7.2 无窗口：v41_moves 64/64、v41_flow 260/260、v41_roll_links 18/18；普通房含主角和敌人、Boss 房的原生截图已检查，未进行真人连续试玩。
+
+## 2026-11-15 普通房 Wuxia 石砖地面
+- 前六房使用 Wuxia RTS Pixel Lite 的 Stone_Variant_0 原色 64×64 最近邻平铺，保留 Guishan 边缘装饰与原有碰撞，Boss 房不变。来源及许可见 assets/characters/README.md。
+- Godot 4.7.2 无窗口：v41_moves 64/64、v41_flow 260/260、v41_roll_links 18/18；原生截图含主角和敌人，未进行真人连续试玩。

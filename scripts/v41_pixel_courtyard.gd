@@ -1,6 +1,6 @@
 extends Node2D
 
-const TERRAIN = preload("res://assets/courtyard/guishan/terrain.png")
+const TERRAIN = preload("res://assets/courtyard/wuxia/Stone_Variant_0.png")
 const TREE = preload("res://assets/courtyard/guishan/ginkgo_tree.png")
 const BAMBOO = preload("res://assets/courtyard/guishan/bamboo_grove.png")
 const LANTERN = preload("res://assets/courtyard/guishan/lantern_post.png")
@@ -13,11 +13,10 @@ func _ready() -> void:
 	z_index = -9
 
 func _draw() -> void:
-	# Guishan terrain atlas tile 94: fully paved stone, 32 x 32 pixels.
-	var stone := Rect2(448, 160, 32, 32)
-	for y in range(23):
-		for x in range(40):
-			draw_texture_rect_region(TERRAIN, Rect2(x * 32, y * 32, 32, 32), stone)
+	# Repeat the original 64 x 64 stone tile without smoothing or recoloring.
+	for y in range(12):
+		for x in range(20):
+			draw_texture_rect(TERRAIN, Rect2(x * 64, y * 64, 64, 64), false)
 	# All props are pictures on the background layer, outside the fighting floor.
 	for item in [
 		[TREE, Vector2(65, 110), 0.9], [BAMBOO, Vector2(255, 130), 1.0],
