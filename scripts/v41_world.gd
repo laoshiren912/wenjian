@@ -7,6 +7,7 @@ var room_cleared := false
 var portal_open := false
 var pixel_courtyard: Node2D
 var bamboo_room: Node2D
+var mountain_steps_room: Node2D
 
 func build_battle() -> void:
 	build_courtyard()
@@ -14,6 +15,8 @@ func build_battle() -> void:
 	add_child(pixel_courtyard)
 	bamboo_room = preload("res://scripts/v41_bamboo_room.gd").new()
 	add_child(bamboo_room)
+	mountain_steps_room = preload("res://scripts/v41_mountain_steps_room.gd").new()
+	add_child(mountain_steps_room)
 	actors.y_sort_enabled = true
 	grid.region = Rect2i(0, 0, 40, 23)
 	grid.cell_size = Vector2.ONE * NAV_CELL
@@ -40,11 +43,12 @@ func build_battle() -> void:
 func set_room_style(room_index: int) -> void:
 	var is_boss := room_index == CONFIG.BOSS_ROOM
 	backdrop.visible = is_boss
-	pixel_courtyard.visible = not is_boss and room_index != 0
+	pixel_courtyard.visible = not is_boss and room_index > 1
 	bamboo_room.visible = room_index == 0
+	mountain_steps_room.visible = room_index == 1
 	for lantern in lanterns:
-		lantern.bamboo_rock = room_index == 0
-		lantern.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if room_index == 0 else CanvasItem.TEXTURE_FILTER_PARENT_NODE
+		lantern.bamboo_rock = room_index == 0 or room_index == 1
+		lantern.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if room_index == 0 or room_index == 1 else CanvasItem.TEXTURE_FILTER_PARENT_NODE
 		lantern.queue_redraw()
 	for child in get_children():
 		if child is Polygon2D and child.texture == backdrop.texture:
