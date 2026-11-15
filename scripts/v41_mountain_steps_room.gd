@@ -32,17 +32,16 @@ func _draw() -> void:
 				tile = 48 + MASKS.find(mask)
 			var source := Rect2((tile % 16) * 32, int(tile / 16) * 32, 32, 32)
 			draw_texture_rect_region(TERRAIN, Rect2(x * 32, y * 32, 32, 32), source)
-	# Decorations form clusters outside the collision boundary, not separate obstacles.
+	# Three decoration areas remain outside the room boundary.
 	for item in [
-		[ROCKS, Vector2(45, 96), 0.95], [FERNS, Vector2(105, 150), 0.45], [STEPPING_ROCKS, Vector2(118, 100), 0.7],
-		[BAMBOO, Vector2(345, 95), 0.8], [ROCKS, Vector2(405, 110), 0.9], [FERNS, Vector2(465, 145), 0.42],
-		[STEPS, Vector2(670, 96), 0.85], [ROCKS, Vector2(735, 108), 0.85], [STEPPING_ROCKS, Vector2(795, 106), 0.7],
-		[ROCKS, Vector2(1050, 99), 0.95], [BAMBOO, Vector2(1120, 95), 0.75],
-		[BAMBOO, Vector2(45, 500), 0.75], [ROCKS, Vector2(102, 527), 0.9], [FERNS, Vector2(158, 555), 0.45],
-		[STEPPING_ROCKS, Vector2(266, 510), 0.78], [ROCKS, Vector2(350, 528), 0.85], [STEPS, Vector2(420, 530), 0.8],
-		[ROCKS, Vector2(570, 500), 1.0], [BAMBOO, Vector2(655, 487), 0.95], [FERNS, Vector2(690, 555), 0.5],
-		[ROCKS, Vector2(1160, 245), 0.8], [FERNS, Vector2(1190, 300), 0.4],
-		[STEPS, Vector2(1170, 400), 0.8], [ROCKS, Vector2(1190, 455), 0.75],
-		[ROCKS, Vector2(1160, 590), 0.9], [BAMBOO, Vector2(1210, 570), 0.7]]:
+		[ROCKS, Vector2(65, 55), 1.0], [BAMBOO, Vector2(130, 55), 0.95], [FERNS, Vector2(205, 90), 0.5],
+		[STEPS, Vector2(400, 65), 0.9], [ROCKS, Vector2(465, 55), 1.05], [BAMBOO, Vector2(540, 55), 0.9],
+		[ROCKS, Vector2(825, 58), 1.0], [STEPPING_ROCKS, Vector2(895, 60), 0.8], [BAMBOO, Vector2(1010, 55), 0.95],
+		[ROCKS, Vector2(1155, 215), 1.0], [BAMBOO, Vector2(1200, 205), 0.75],
+		[STEPS, Vector2(1160, 390), 0.9], [ROCKS, Vector2(1200, 425), 0.8],
+		[ROCKS, Vector2(1155, 585), 1.0], [BAMBOO, Vector2(1210, 580), 0.7],
+		[BAMBOO, Vector2(25, 550), 1.15], [ROCKS, Vector2(90, 565), 1.15],
+		[STEPPING_ROCKS, Vector2(160, 550), 0.9], [BAMBOO, Vector2(255, 555), 1.05],
+		[ROCKS, Vector2(325, 558), 1.0], [FERNS, Vector2(235, 615), 0.55]]:
 		var texture: Texture2D = item[0]
 		draw_texture_rect(texture, Rect2(item[1], texture.get_size() * float(item[2])), false)

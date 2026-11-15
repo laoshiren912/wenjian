@@ -29,7 +29,7 @@ func build_battle() -> void:
 	original_walkable = walkable.duplicate()
 	boundaries.append(get_node("PaintedFloorBoundary"))
 	_add_boundary(PackedVector2Array([Vector2(250, 260), Vector2(1030, 260), Vector2(1180, 340), Vector2(1100, 510), Vector2(180, 510), Vector2(100, 340)]))
-	_add_boundary(PackedVector2Array([Vector2(100, 220), Vector2(1150, 220), Vector2(1150, 690), Vector2(760, 690), Vector2(760, 470), Vector2(100, 470)]))
+	_add_boundary(PackedVector2Array([Vector2(100, 180), Vector2(1150, 180), Vector2(1150, 690), Vector2(430, 690), Vector2(430, 540), Vector2(100, 540)]))
 
 func _add_boundary(polygon: PackedVector2Array) -> void:
 	var body := StaticBody2D.new()
