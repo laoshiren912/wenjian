@@ -42,6 +42,10 @@ func set_room_style(room_index: int) -> void:
 	backdrop.visible = is_boss
 	pixel_courtyard.visible = not is_boss and room_index != 0
 	bamboo_room.visible = room_index == 0
+	for lantern in lanterns:
+		lantern.bamboo_rock = room_index == 0
+		lantern.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if room_index == 0 else CanvasItem.TEXTURE_FILTER_PARENT_NODE
+		lantern.queue_redraw()
 	for child in get_children():
 		if child is Polygon2D and child.texture == backdrop.texture:
 			child.visible = is_boss

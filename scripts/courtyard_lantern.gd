@@ -2,6 +2,7 @@ extends StaticBody2D
 
 var in_front := false
 var shimmer := 0.0
+var bamboo_rock := false
 
 func _ready() -> void:
 	collision_layer = 1
@@ -23,6 +24,9 @@ func update_depth(foot: Vector2, time: float, delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if bamboo_rock:
+		draw_texture_rect(preload("res://assets/courtyard/guishan/mountain_rocks.png"), Rect2(-32, -47, 64, 64), false)
+		return
 	var dark := Color("26363d")
 	var lit := Color("77858a")
 	var warm := Color("f5c47d")
