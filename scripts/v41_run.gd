@@ -462,6 +462,10 @@ func _update_camera() -> void:
 	if not is_instance_valid(player):
 		return
 	var viewport := get_viewport_rect().size
+	if room_index == 0:
+		$Camera2D.zoom = Vector2.ONE * maxf(viewport.x / 1000.0, viewport.y / 562.5)
+		$Camera2D.position = Vector2(655, 385)
+		return
 	if room_index == 1:
 		$Camera2D.zoom = Vector2.ONE * minf(viewport.x / 1100.0, viewport.y / 618.75)
 		$Camera2D.position = Vector2(655, 345)
