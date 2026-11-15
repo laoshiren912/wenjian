@@ -96,7 +96,7 @@ func _enter_room() -> void:
 	feedback.shake_strength = 0.0
 	$Camera2D.offset = Vector2.ZERO
 	world.portal_open = false
-	world.set_boss_room(room_index == CONFIG.BOSS_ROOM)
+	world.set_room_style(room_index)
 	phase = "combat"
 	player = _create_player()
 	gm_spawned.clear()

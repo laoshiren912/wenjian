@@ -4,4 +4,4 @@ Swordsman、Bandit 和 Herbalist 图集来自 DQYYY《Wuxia RTS Pixel Asset Pack
 
 普通战斗房地砖 `assets/courtyard/wuxia/Stone_Variant_0.png` 来自同一 Wuxia Lite 素材包的 `03_Terrain/Base_Tiles`，许可见 `LICENSE_LITE.txt`。
 
-普通战斗房边缘装饰来自用户提供的 Guishan Mountain Courtyard Trial 素材包，项目使用的文件位于 `assets/courtyard/guishan/`。素材包说明称免费基础环境可用于商业项目，但未附完整许可文本；分发源素材前需核对其具体授权条款。
+第 1 间普通战斗房地形及普通战斗房边缘装饰来自用户提供的 Guishan Mountain Courtyard Trial 素材包，项目使用的文件位于 `assets/courtyard/guishan/`。素材包说明称免费基础环境可用于商业项目，但未附完整许可文本；分发源素材前需核对其具体授权条款。
