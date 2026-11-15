@@ -55,7 +55,3 @@ func _draw() -> void:
 	var color := Color("86f5d3") if portal_open else (Color("e1cc9c") if room_cleared else Color("566b70"))
 	draw_circle(CONFIG.EXIT_POINT, 27.0, Color(color, 0.15))
 	draw_arc(CONFIG.EXIT_POINT, 27.0, 0.0, TAU, 40, color, 4.0, true)
-	if reward_visible:
-		var point := CONFIG.REWARD_POINT
-		draw_circle(point, CONFIG.REWARD_RADIUS, Color(1, 0.8, 0.3, 0.12))
-		draw_colored_polygon(PackedVector2Array([point + Vector2(0, -15), point + Vector2(15, 0), point + Vector2(0, 15), point + Vector2(-15, 0)]), Color("f4d278"))

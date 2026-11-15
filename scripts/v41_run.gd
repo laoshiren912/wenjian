@@ -258,10 +258,12 @@ func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 		wave_index += 1
 		_spawn_wave.call_deferred()
 	elif remaining == 0:
-		phase = "reward_wait"
+		phase = "reward_select"
 		world.room_cleared = true
-		world.reward_visible = true
 		world.queue_redraw()
+		get_tree().paused = true
+		_draw_rewards()
+		hud.show_rewards()
 	_update_status()
 
 func _physics_process(delta: float) -> void:
@@ -279,14 +281,6 @@ func _input(event: InputEvent) -> void:
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
 		_debug_menu()
 		get_viewport().set_input_as_handled()
-		return
-	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_E or event.physical_keycode == KEY_E):
-		if phase == "reward_wait" and not get_tree().paused and player.global_position.distance_to(CONFIG.REWARD_POINT) <= CONFIG.REWARD_RADIUS:
-			phase = "reward_select"
-			get_tree().paused = true
-			_draw_rewards()
-			hud.show_rewards()
-			get_viewport().set_input_as_handled()
 		return
 	super._input(event)
 
@@ -429,7 +423,7 @@ func _update_status() -> void:
 	match phase:
 		"combat":
 			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
-		"reward_wait", "reward_select": status.text = "已清场 · 靠近中央金色奖励按 E，选择后开放出口"
+		"reward_select": status.text = "已清场 · 选择奖励后开放出口"
 		"exit_ready": status.text = "已领奖 · 前往右侧出口"
 		"cleared": status.text = "守庭者已击败 · 本局通关"
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
@@ -437,7 +431,7 @@ func _update_status() -> void:
 func toggle_pause() -> void:
 	if menu_open:
 		resume_room()
-	elif phase in ["combat", "reward_wait", "exit_ready"]:
+	elif phase in ["combat", "exit_ready"]:
 		menu_open = true
 		stats_open = false
 		get_tree().paused = true
@@ -446,7 +440,7 @@ func toggle_pause() -> void:
 func toggle_stats() -> void:
 	if menu_open:
 		resume_room()
-	elif phase in ["combat", "reward_wait", "exit_ready"]:
+	elif phase in ["combat", "exit_ready"]:
 		menu_open = true
 		stats_open = true
 		get_tree().paused = true

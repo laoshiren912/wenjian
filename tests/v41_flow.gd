@@ -65,14 +65,7 @@ func clear_room() -> void:
 		await clear_wave()
 
 func reward(index: int) -> void:
-	game.player.position = CONFIG.ENTRY_POINT
-	key(KEY_E)
-	check(game.phase == "reward_wait" and not paused, "reward cannot be opened outside the central radius")
-	game.player.position = CONFIG.REWARD_POINT
-	await frames()
-	check(game.phase == "reward_wait" and not paused, "approaching reward waits for E")
-	key(KEY_E)
-	check(game.phase == "reward_select" and paused, "E at real reward point opens selection")
+	check(game.phase == "reward_select" and paused and not game.world.portal_open, "room clear directly opens selection before exit")
 	# Seed-independent deterministic choice fixture after verifying actual draw.
 	check(game.reward_options.size() == 3 and game.reward_options[0] != game.reward_options[1] and game.reward_options[1] != game.reward_options[2] and game.reward_options[0] != game.reward_options[2], "three random options are distinct")
 	game.reward_options.assign([index, (index + 1) % 4, (index + 2) % 4])
@@ -390,7 +383,7 @@ func run() -> void:
 	reset()
 	game.player.set_physics_process(false)
 	await clear_room()
-	check(game.phase == "reward_wait" and not game.world.portal_open, "full room clear required before reward")
+	check(game.phase == "reward_select" and paused and not game.world.portal_open, "full room clear opens reward before exit")
 	await reward(0)
 	game.player.health = 63.0
 	game.player.stamina = 47.0
@@ -436,7 +429,7 @@ func run() -> void:
 	for room in range(3, 6):
 		check(game.room_index == room and game.total == CONFIG.room_total(room) and game.phase == "combat", "enters ordinary room %d in sequence" % (room + 1))
 		await clear_room()
-		check(game.phase == "reward_wait" and not game.world.portal_open, "room %d clears before offering a reward" % (room + 1))
+		check(game.phase == "reward_select" and paused and not game.world.portal_open, "room %d clears before offering a reward" % (room + 1))
 		await reward(0)
 		check(game.world.portal_open, "room %d reward opens exit" % (room + 1))
 		await advance()
@@ -608,9 +601,6 @@ func run() -> void:
 	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "death R resets run and rewards")
 	game.debug_opening(true)
 	await clear_room()
-	game.player.position = CONFIG.REWARD_POINT
-	await frames()
-	key(KEY_E)
 	game.reward_options.assign([0, 1, 3])
 	game.reward_counts[1] = 1
 	game.hud.show_rewards()
@@ -666,9 +656,6 @@ func run() -> void:
 		await snapshot("%d_stats" % size.x)
 		game.resume_room()
 		await clear_room()
-		game.player.position = CONFIG.REWARD_POINT
-		await frames()
-		key(KEY_E)
 		await snapshot("%d_rewards" % size.x)
 		game.select_reward(game.reward_options.filter(game.can_select_reward)[0])
 	paused = false

@@ -106,7 +106,7 @@ func show_card_debug() -> void:
 
 func show_pause(_gold: int = -1) -> void:
 	var box := _screen("已暂停", "V4.1 · 六间战斗房与守庭者")
-	box.add_child(_modal_label("前六间清场领奖，第七间挑战守庭者。\n近战配对轮换，当前一组出手，其余侧移等待。\n左键松手连击；右键长按蓄力松手释放。\n清完全部波次，靠近金色奖励按 E 领奖，再走右侧出口。\n进入独立样板会结束本局，返回时重新开始。", 17))
+	box.add_child(_modal_label("前六间清场领奖，第七间挑战守庭者。\n近战配对轮换，当前一组出手，其余侧移等待。\n左键松手连击；右键长按蓄力松手释放。\n清完全部波次直接选择奖励，再走右侧出口。\n进入独立样板会结束本局，返回时重新开始。", 17))
 	_add_button(box, "继续  [Esc]", func(): resume_requested.emit())
 	_add_button(box, "重新开始", func(): restart_requested.emit())
 	_add_button(box, "庭院 / 镜头独立样板（结束本局）", func(): _open_sample("courtyard_trial"))

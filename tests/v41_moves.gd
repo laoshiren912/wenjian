@@ -201,12 +201,7 @@ func run() -> void:
 				if not enemy.dead and not enemy.is_queued_for_deletion():
 					enemy.take_damage(100000.0, Vector2.ZERO, true)
 			await frames(2)
-		check(game.phase == "reward_wait", "room cleared %d" % room)
-		game.player.global_position = CONFIG.REWARD_POINT
-		var key := InputEventKey.new()
-		key.keycode = KEY_E
-		key.pressed = true
-		root.push_input(key)
+		check(game.phase == "reward_select" and paused and not game.world.portal_open, "room clear directly opens reward %d" % room)
 		var eligible_count := 0
 		for card in range(CONFIG.reward_names().size()):
 			if POOL.eligible(card, game.reward_counts): eligible_count += 1
