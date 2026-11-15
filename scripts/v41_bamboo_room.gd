@@ -6,49 +6,18 @@ const BAMBOO = preload("res://assets/courtyard/guishan/bamboo_grove.png")
 const FERNS = preload("res://assets/courtyard/guishan/ferns.png")
 const ROCKS = preload("res://assets/courtyard/guishan/mountain_rocks.png")
 const STELE = preload("res://assets/courtyard/guishan/wayfinding_stele.png")
-const EARTH_TILES := {
-	0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10,
-	10: 11, 11: 12, 12: 13, 13: 14, 14: 15, 15: 16, 19: 17, 23: 18,
-	27: 19, 31: 20, 38: 21, 39: 22, 46: 23, 47: 24, 55: 25, 63: 26,
-	76: 27, 77: 28, 78: 29, 79: 30, 95: 31, 110: 32, 111: 33, 127: 34,
-	137: 35, 139: 36, 141: 37, 143: 38, 155: 39, 159: 40, 175: 41,
-	191: 42, 205: 43, 207: 44, 223: 45, 239: 46, 255: 47,
-}
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	z_index = -9
 
-func _is_path(x: int, y: int) -> bool:
-	x = clampi(x, 0, 39)
-	var upper := 9 if x in range(14, 22) else (11 if x in range(28, 32) else 10)
-	var lower := 11 if x in range(17, 24) else (13 if x in range(25, 34) else 12)
-	return y >= upper and y <= lower
-
-func _path_tile(x: int, y: int) -> int:
-	if not _is_path(x, y):
-		return 0
-	var mask := 0
-	var top := _is_path(x, y - 1)
-	var right := _is_path(x + 1, y)
-	var bottom := _is_path(x, y + 1)
-	var left := _is_path(x - 1, y)
-	if top: mask |= 1
-	if right: mask |= 2
-	if bottom: mask |= 4
-	if left: mask |= 8
-	if top and right and _is_path(x + 1, y - 1): mask |= 16
-	if bottom and right and _is_path(x + 1, y + 1): mask |= 32
-	if bottom and left and _is_path(x - 1, y + 1): mask |= 64
-	if top and left and _is_path(x - 1, y - 1): mask |= 128
-	return EARTH_TILES[mask]
-
 func _draw() -> void:
-	# Use the atlas transition masks to follow the gently bending path.
+	# The path crosses the room from the existing entrance to the exit.
+	# Atlas IDs 0, 32, 47, 39 are grass, upper edge, earth, lower edge.
 	for y in range(23):
+		var tile := 32 if y == 10 else (47 if y == 11 else (39 if y == 12 else 0))
+		var source := Rect2((tile % 16) * 32, int(tile / 16) * 32, 32, 32)
 		for x in range(40):
-			var tile := _path_tile(x, y)
-			var source := Rect2((tile % 16) * 32, int(tile / 16) * 32, 32, 32)
 			draw_texture_rect_region(TERRAIN, Rect2(x * 32, y * 32, 32, 32), source)
 	# Decorations are drawn behind the actors and carry no collision shapes.
 	for item in [
