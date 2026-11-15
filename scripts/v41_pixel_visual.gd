@@ -17,6 +17,8 @@ var animation_clock := 0.0
 var player_death := false
 var player_death_age := 0.0
 var herbalist_visual := false
+var charge_was_full := false
+var charge_flash_time := 0.0
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -43,6 +45,16 @@ func update_pose(actual_motion: Vector2, look: Vector2, color: Color, leg_look: 
 func _physics_process(delta: float) -> void:
 	if not get_tree().paused:
 		animation_clock += delta
+		var player := get_parent() as SurvivorPlayer
+		var charging: bool = player != null and is_instance_valid(player.combo) and player.combo.charging
+		var full: bool = charging and player.combo.charge_fraction() >= 1.0
+		if full and not charge_was_full:
+			charge_flash_time = 0.15
+		elif charging:
+			charge_flash_time = maxf(0.0, charge_flash_time - delta)
+		else:
+			charge_flash_time = 0.0
+		charge_was_full = full
 		super._physics_process(delta)
 
 func _direction_index(direction: Vector2) -> int:
@@ -53,7 +65,9 @@ func _draw() -> void:
 		_draw_herbalist()
 		return
 	var is_player := get_parent() is SurvivorPlayer or player_death
-	var direction := attack_direction if attack_time > 0.0 and attack_weapon == 0 else look_direction
+	var player := get_parent() as SurvivorPlayer
+	var charging: bool = player != null and is_instance_valid(player.combo) and player.combo.charging and not player.dead
+	var direction: Vector2 = player.aim_direction if charging else (attack_direction if attack_time > 0.0 and attack_weapon == 0 else look_direction)
 	var index := _direction_index(direction)
 	var size := Vector2(156, 180 if is_player else 164)
 	var pivot := Vector2(79, 135) if is_player else Vector2(78, 126)
@@ -71,6 +85,9 @@ func _draw() -> void:
 			row = 0 if index in [0, 1, 2, 7] else (2 if index in [5, 6] else 1)
 		else:
 			row = 1 if index in [5, 6, 7] else 0
+	elif charging:
+		sheet = S_ATTACK
+		frame = 1
 	elif attack_time > 0.0 and attack_weapon == 0 or enemy_attacking:
 		sheet = S_ATTACK if is_player else B_ATTACK
 		var progress: float = 1.0 - attack_time / attack_duration if is_player else (1.0 - enemy.windup / maxf(enemy.attack_duration, 0.001) if enemy.windup > 0.0 else 0.8)
@@ -88,6 +105,10 @@ func _draw() -> void:
 	var destination := Rect2(-pivot * ART_SCALE + Vector2(0, 15), size * ART_SCALE)
 	var source := Rect2(Vector2(frame * size.x, row * size.y), size)
 	var color := Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE
+	if charging:
+		var strength: float = player.combo.charge_fraction()
+		var flash := charge_flash_time / 0.15
+		draw_arc(Vector2(0, -12), 31.0, 0.0, TAU, 48, Color(1.0, 0.86, 0.46, 0.2 + 0.55 * strength + 0.25 * flash), 2.5 + flash, true)
 	if flip:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
 	draw_texture_rect_region(sheet, destination, source, color)
