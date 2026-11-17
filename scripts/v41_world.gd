@@ -129,6 +129,7 @@ func set_room_style(room_index: int) -> void:
 	backdrop.visible = is_boss
 	pixel_courtyard.visible = not is_boss and room_index > 1
 	bamboo_room.visible = room_index == 0
+	bamboo_room.set_cloud_shadows_active(room_index == 0)
 	mountain_steps_room.visible = room_index == 1
 	for lantern in lanterns:
 		lantern.bamboo_rock = room_index == 0 or room_index == 1

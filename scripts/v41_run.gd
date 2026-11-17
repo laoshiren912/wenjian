@@ -4,6 +4,7 @@ const CONFIG = preload("res://scripts/v41_config.gd")
 const MINI_BOSS = preload("res://scripts/v41_boss.gd")
 const COMBO_PLAYER = preload("res://scenes/player_v41.tscn")
 const CARD_POOL = preload("res://scripts/v41_card_pool.gd")
+const MELEE_DEATH_SMOKE = preload("res://assets/vfx/pvfx-small-explosion-tail/smoke-frames.tres")
 var room_index := 0
 var reward_counts: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var run_kills := 0
@@ -207,6 +208,8 @@ func _spawn_wave() -> void:
 		enemy.home_position = enemy.position
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
 		_connect_enemy(enemy)
+		if room_index == 0 and type == CONFIG.MELEE:
+			enemy.killed.connect(_play_melee_death_smoke, CONNECT_ONE_SHOT)
 		world.actors.add_child(enemy)
 		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
 		enemy.speed = float(stats.speed)
@@ -239,6 +242,18 @@ func _connect_enemy(enemy: SurvivorEnemy) -> void:
 	enemy.damaged.connect(func(point: Vector2, amount: float):
 		feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
 			enemy.last_hit_blocked))
+
+func _play_melee_death_smoke(point: Vector2, _xp: int) -> void:
+	var smoke := AnimatedSprite2D.new()
+	smoke.sprite_frames = MELEE_DEATH_SMOKE
+	smoke.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	smoke.centered = false
+	# Align the source ground pivot with the Bandit's feet, below its body origin.
+	smoke.offset = Vector2(-32, -57)
+	smoke.animation_finished.connect(smoke.queue_free)
+	world.actors.add_child(smoke)
+	smoke.global_position = point + Vector2(0, 12)
+	smoke.play()
 
 func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	if phase != "combat":
