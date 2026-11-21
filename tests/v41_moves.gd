@@ -1,10 +1,15 @@
 extends SceneTree
 
 const CONFIG = preload("res://scripts/v41_config.gd")
-const POOL = preload("res://scripts/v41_card_pool.gd")
+const Trace = preload("res://scripts/v41_dash_trace.gd")
+const ORIGIN := Vector2(460, 397)
 var game
+var player
 var checks := 0
 var failures := 0
+
+func _initialize() -> void:
+	run.call_deferred()
 
 func check(ok: bool, label: String) -> void:
 	checks += 1
@@ -12,210 +17,229 @@ func check(ok: bool, label: String) -> void:
 		failures += 1
 		printerr("FAIL: ", label)
 
-func frames(n: int = 1) -> void:
+func frames(n: int) -> void:
 	for i in range(n):
 		await physics_frame
 	await process_frame
 
-func action(name: String, pressed: bool) -> void:
-	var event := InputEventAction.new()
-	event.action = name
+func button(index: MouseButton, pressed: bool, point: Vector2) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = index
 	event.pressed = pressed
-	root.push_input(event)
+	event.position = root.get_canvas_transform() * point
+	event.global_position = event.position
+	root.push_input(event, true)
 
-func effects(kind: String) -> Array:
-	return game.world.actors.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://scripts/v41_move_effect.gd" and n.kind == kind and not n.is_queued_for_deletion())
+func tap(index: MouseButton, point: Vector2) -> void:
+	button(index, true, point)
+	button(index, false, point)
 
-func arrows() -> Array:
-	return get_nodes_in_group("projectiles").filter(func(n): return not n.is_queued_for_deletion() and not n.hostile)
+func space(point: Vector2, held = null) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = root.get_canvas_transform() * point
+	root.push_input(motion, true)
+	var event := InputEventKey.new()
+	event.keycode = KEY_SPACE
+	event.physical_keycode = KEY_SPACE
+	event.pressed = true if held == null else held
+	root.push_input(event, true)
+	if held == null:
+		event = event.duplicate()
+		event.pressed = false
+		root.push_input(event, true)
 
-func _initialize() -> void:
-	run.call_deferred()
+func traces() -> Array:
+	return game.world.actors.get_children().filter(func(child): return child is Trace and not child.is_queued_for_deletion())
+
+func fresh(rank: int = 0) -> Array[Node]:
+	game.start_room()
+	player = game.player
+	player.position = ORIGIN
+	player.cultivation = rank
+	game.scheduler = null
+	var enemies := get_nodes_in_group("enemies")
+	for i in range(enemies.size()):
+		var enemy: SurvivorEnemy = enemies[i]
+		enemy.set_physics_process(false)
+		enemy.position = Vector2(930, 410 + i * 45)
+		enemy.health = 1000.0
+		enemy.max_health = 1000.0
+		enemy.guard_cooldown = 10.0
+	return enemies
 
 func run() -> void:
-	root.size = Vector2i(1280, 720)
-	root.content_scale_size = Vector2i(1280, 720)
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
-	await process_frame
-	check(game.phase == "reward_select" and paused and game.triggered_count == 0, "opening choice before spawn")
-	check(game.reward_options == [4, 5], "opening offers two moves")
-	var opening_button: Button
-	for button in game.hud.modal_panel.find_children("*", "Button", true, false):
-		if button.text.begins_with("剑气斩"):
-			opening_button = button
-	check(opening_button != null, "opening card button exists")
-	opening_button.pressed.emit()
-	check(not paused and game.phase == "combat" and game.player.move_energy and game.triggered_count == 4, "selection equips and starts")
-	var p = game.player
-	p.gm_invulnerable = true
-	for e in get_nodes_in_group("enemies"):
-		e.set_physics_process(false)
-	var sword = p.combo
-	check(not p.move_echo, "unselected slots inactive")
-	p._roll_cooldown = 0.0
-	p.try_roll()
-	check(effects("echo").is_empty(), "roll without echo makes no explosion")
-	p._finish_roll()
-	p.stamina = p.max_stamina
-	p._roll_cooldown = 0.0
-	sword.charge_time = CONFIG.CHARGE_DURATION * 0.5
-	sword._release_charge(Vector2.RIGHT)
-	check(effects("energy").is_empty(), "partial charge no energy")
-	sword.swing_time = 0.0
-	sword.charge_time = CONFIG.CHARGE_DURATION
-	sword._release_charge(Vector2.RIGHT)
-	check(effects("energy").size() == 1, "full charge energy")
-	check(is_equal_approx(effects("energy")[0].damage, CONFIG.CHARGE_MAX * CONFIG.ENERGY_DAMAGE_FACTOR), "energy configured damage")
-	check(is_equal_approx(effects("energy")[0].distance, CONFIG.ENERGY_DISTANCE), "energy initial distance")
-	var first = get_nodes_in_group("enemies")[0]
-	var second = get_nodes_in_group("enemies")[1]
-	first.global_position = p.global_position + Vector2(35, 0)
-	second.global_position = p.global_position + Vector2(75, 0)
-	first.guard_cooldown = 10.0
-	second.guard_cooldown = 10.0
-	var hp1: float = first.health
-	var hp2: float = second.health
-	effects("energy")[0]._physics_process(0.2)
-	check(is_equal_approx(hp1 - first.health, CONFIG.CHARGE_MAX * CONFIG.ENERGY_DAMAGE_FACTOR) and is_equal_approx(hp2 - second.health, CONFIG.CHARGE_MAX * CONFIG.ENERGY_DAMAGE_FACTOR), "energy penetrates and damages both targets")
-	first.guard_cooldown = 0.0
-	first.guard_time = 0.0
-	first.guard_direction = Vector2.LEFT
-	first.encounter_state = first.EncounterState.CHASE
-	var guarded_energy = preload("res://scripts/v41_move_effect.gd").new()
-	guarded_energy.direction = Vector2.RIGHT
-	guarded_energy.distance = CONFIG.ENERGY_DISTANCE
-	guarded_energy.damage = CONFIG.CHARGE_MAX * CONFIG.ENERGY_DAMAGE_FACTOR
-	game.world.actors.add_child(guarded_energy)
-	guarded_energy.global_position = p.global_position
-	hp1 = first.health
-	guarded_energy._physics_process(0.1)
-	check(is_equal_approx(hp1 - first.health, CONFIG.CHARGE_MAX * CONFIG.ENERGY_DAMAGE_FACTOR * CONFIG.GUARD_DAMAGE_FACTOR), "front guard reduces sword energy")
-	game.debug_grant(7)
-	sword.charge_time = CONFIG.CHARGE_DURATION
-	sword._release_charge(Vector2.RIGHT)
-	check(is_equal_approx(effects("energy").back().distance, CONFIG.ENERGY_DISTANCE + CONFIG.ENERGY_EXTRA_DISTANCE), "energy upgrade")
-	game.debug_grant(5)
-	game.debug_grant(1)
-	sword.swing_time = 0.0
-	p._roll_cooldown = 0.0
-	check(p.try_roll(), "roll starts")
-	check(effects("echo").size() == 1 and p.combo.roll_armed, "echo leaves roll multiplier armed")
-	var echo = effects("echo")[0]
-	first.global_position = echo.global_position + Vector2(40, 0)
-	first.guard_cooldown = 0.0
-	first.guard_time = 0.0
-	first.guard_direction = Vector2.LEFT
-	hp1 = first.health
-	echo._physics_process(CONFIG.ECHO_DELAY + 0.01)
-	check(is_equal_approx(hp1 - first.health, CONFIG.ECHO_DAMAGE), "echo damages nearby target")
-	check(p.combo.roll_armed, "echo does not consume roll multiplier")
-	p._finish_roll()
-	game.debug_grant(8)
-	check(p.upgrade_echo, "debug grants echo upgrade")
-	p._roll_cooldown = 0.0
-	p.weapon.swing_time = 0.0
-	p.try_roll()
-	check(is_equal_approx(effects("echo").back().radius, CONFIG.ECHO_UPGRADED_RADIUS), "upgraded echo radius")
-	p._finish_roll()
-	game._draw_rewards()
-	check(game.reward_options.size() == 3 and 4 not in game.reward_options and 5 not in game.reward_options, "clear rewards exclude equipped cards")
-	for slot in range(2):
-		var empty: Array[int] = [0,0,0,0,0,0,0,0,0,0]
-		check(not POOL.eligible(7 + slot, empty), "upgrade requires move")
-	game.start_room()
-	check(game.opening_choice and game.triggered_count == 0, "restart offers opening")
-	var f8 := InputEventKey.new()
-	f8.keycode = KEY_QUOTELEFT
-	f8.pressed = true
-	root.push_input(f8)
-	await process_frame
-	await process_frame
-	var skip_button: Button
-	var echo_button: Button
-	var echo_upgrade_button: Button
-	for button in game.hud.modal_panel.find_children("*", "Button", true, false):
-		if button.text == "跳过开局选卡":
-			skip_button = button
-		if button.text.begins_with("残影步 ·"):
-			echo_button = button
-		if button.text.begins_with("残影步强化"):
-			echo_upgrade_button = button
-	check(skip_button != null and not skip_button.disabled, "backtick exposes debug skip")
-	check(echo_button != null and echo_upgrade_button != null and echo_upgrade_button.disabled, "debug upgrade initially disabled")
-	echo_button.pressed.emit()
-	check(game.player.move_echo and game.reward_counts[5] == 1, "debug button grants chosen card")
-	for button in game.hud.modal_panel.find_children("*", "Button", true, false):
-		if button.text.begins_with("残影步强化"):
-			echo_upgrade_button = button
-		if button.text == "跳过开局选卡":
-			skip_button = button
-	check(not echo_upgrade_button.disabled, "debug upgrade enabled after move")
-	echo_upgrade_button.pressed.emit()
-	check(game.player.upgrade_echo, "debug button grants upgrade")
-	for button in game.hud.modal_panel.find_children("*", "Button", true, false):
-		if button.text == "跳过开局选卡":
-			skip_button = button
-	await process_frame
-	var viewport_rect := Rect2(Vector2.ZERO, Vector2(root.size))
-	check(viewport_rect.encloses(skip_button.get_global_rect()), "debug skip fits viewport")
-	root.size = Vector2i(960, 540)
-	root.content_scale_size = Vector2i(960, 540)
-	await process_frame
-	await process_frame
-	var small_rect := Rect2(Vector2.ZERO, Vector2(root.size))
-	var scroll := game.hud.modal_panel.find_child("*", true, false) as ScrollContainer
-	if scroll == null:
-		for node in game.hud.modal_panel.find_children("*", "ScrollContainer", true, false):
-			scroll = node as ScrollContainer
-			break
-	if scroll != null:
-		scroll.ensure_control_visible(skip_button)
-	await process_frame
-	await process_frame
-	var button_rect := skip_button.get_global_rect()
-	print("PANEL=", game.hud.modal_panel.get_global_rect(), " SCROLL=", scroll.get_global_rect() if scroll != null else "missing")
-	print("SMALL_VIEWPORT=", small_rect, " BUTTON=", button_rect, " overflow_left=", maxf(0.0, -button_rect.position.x), " overflow_top=", maxf(0.0, -button_rect.position.y), " overflow_right=", maxf(0.0, button_rect.end.x - small_rect.end.x), " overflow_bottom=", maxf(0.0, button_rect.end.y - small_rect.end.y))
-	check(scroll != null and small_rect.encloses(button_rect) and scroll.get_global_rect().encloses(button_rect) and skip_button.is_visible_in_tree() and not skip_button.disabled, "debug skip visible and enabled in small viewport")
-	var click := InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
-	click.position = button_rect.get_center()
-	click.global_position = click.position
-	click.pressed = true
-	root.push_input(click, true)
-	click = click.duplicate()
-	click.pressed = false
-	root.push_input(click, true)
-	await process_frame
-	check(game.phase == "combat" and not paused and game.triggered_count == 4, "debug skip clickable in small viewport")
-	root.size = Vector2i(1280, 720)
-	root.content_scale_size = Vector2i(1280, 720)
-	game.player.combo.charge_time = CONFIG.CHARGE_DURATION
-	game.player.combo._release_charge(Vector2.RIGHT)
-	check(effects("energy").is_empty(), "full charge without energy card makes no projectile")
-	game.player.combo.swing_time = 0.0
-	for room in range(CONFIG.BOSS_ROOM):
-		check(game.room_index == room and game.phase == "combat", "combat room %d" % room)
-		while game.phase == "combat":
-			for enemy in get_nodes_in_group("enemies"):
-				if not enemy.dead and not enemy.is_queued_for_deletion():
-					enemy.take_damage(100000.0, Vector2.ZERO, true)
-			await frames(2)
-		check(game.phase == "reward_select" and paused and not game.world.portal_open, "room clear directly opens reward %d" % room)
-		var eligible_count := 0
-		for card in range(CONFIG.reward_names().size()):
-			if POOL.eligible(card, game.reward_counts): eligible_count += 1
-		var expected_count := mini(3, eligible_count) if room >= 4 else 3
-		check(game.phase == "reward_select" and paused and game.reward_options.size() == expected_count and expected_count >= 1, "room reward menu %d" % room)
-		var choice: int = game.reward_options[0]
-		check(game.can_select_reward(choice), "selectable room reward %d" % room)
-		game.select_reward(choice)
-		check(game.phase == "exit_ready" and game.world.portal_open and not paused, "reward opens exit %d" % room)
-		game.player.global_position = game.world.exit_point
-		await frames(3)
-	check(game.room_index == CONFIG.BOSS_ROOM and is_instance_valid(game.boss), "boss room reached")
-	game.boss.take_damage(100000.0, Vector2.ZERO, true)
+	current_scene = game
 	await frames(2)
-	check(game.phase == "cleared" and paused, "boss victory")
-	print("V41 moves: %d / %d passed" % [checks - failures, checks])
+	check(game.phase == "combat" and not paused and game.reward_options.is_empty(), "F5 opens directly in combat")
+	check(get_nodes_in_group("enemies").size() == 4 and game.player.cultivation == 0, "first wave and base cultivation")
+	await check_growth()
+	await check_group_dashes()
+	await check_terrain()
+	await check_interrupts()
+	await check_action_links()
+	await check_combo()
+	print("V41 MOVES: %d / %d passed" % [checks - failures, checks])
+	game.free()
+	await process_frame
 	quit(1 if failures else 0)
+
+func check_growth() -> void:
+	var enemies := fresh()
+	for i in range(3):
+		enemies[i].take_damage(2000.0, Vector2.ZERO)
+		check(player.cultivation == [0, 1, 2][i] and game.run_kills == i + 1, "natural cultivation kill %d" % (i + 1))
+	game._debug_menu()
+	game.debug_cultivation(0)
+	check(player.cultivation == 0 and game.run_kills == 3, "GM changes rank without changing kills")
+	game.debug_cultivation(-1)
+	check(player.cultivation == 2, "GM restores earned rank")
+	game.debug_close()
+	enemies[3].take_damage(2000.0, Vector2.ZERO)
+	check(game.phase == "reward_select" and game.reward_options.size() == 3 and game.reward_options.all(func(index): return index < 4), "regular reward after clearing room")
+	game.reward_options.assign([0, 1, 2])
+	game.select_reward(0)
+	check(is_equal_approx(player.combo.stages[0].damage, 41.6) and player.cultivation == 2, "attribute cards apply independently of rank")
+	game._apply_rewards()
+	check(is_equal_approx(player.combo.stages[0].damage, 41.6), "reapplying rewards does not compound")
+	await frames(2)
+
+func check_group_dashes() -> void:
+	for rank in range(3):
+		var enemies := fresh(rank)
+		var near: SurvivorEnemy = enemies[0]
+		var middle: SurvivorEnemy = enemies[1]
+		var far: SurvivorEnemy = enemies[2]
+		var outside: SurvivorEnemy = enemies[3]
+		var distance: float = CONFIG.DASH_DISTANCE[rank]
+		near.position = ORIGIN + Vector2(distance * 0.23, 8)
+		middle.position = ORIGIN + Vector2(distance / 3.0, -9)
+		far.position = ORIGIN + Vector2(distance * 0.86, 5)
+		outside.position = ORIGIN + Vector2(distance * 0.5, CONFIG.DASH_MARK_WIDTH[rank] + 45.0)
+		await frames(2)
+		var aim := ORIGIN + Vector2(390, 0)
+		space(aim, true)
+		await frames(2)
+		check(player.dash_state == player.Dash.WINDUP and player.position.is_equal_approx(ORIGIN), "press starts stationary windup %d" % rank)
+		check(is_equal_approx(player.stamina, 80.0) and player.invulnerability == 0.0, "one stamina cost and no invulnerability %d" % rank)
+		await frames(18)
+		var trace: Trace = traces()[0]
+		check(absf(trace.tip.x - ORIGIN.x - distance) < 0.9 and absf(trace.tip.y - ORIGIN.y) < 0.8, "real shape travels declared distance and stays on line %d" % rank)
+		check(trace.sealed and trace.marks.size() == [0, 1, 3][rank], "correct seal and mark count %d" % rank)
+		for enemy in [near, middle, far]:
+			check(is_equal_approx(1000.0 - enemy.health, CONFIG.DASH_DAMAGE[rank]), "along-path direct hit exactly once %d" % rank)
+		var end: Vector2 = player.position
+		space(aim)
+		await frames(50)
+		var total: float = CONFIG.DASH_DAMAGE[rank] + CONFIG.DASH_MARK_DAMAGE[rank]
+		for enemy in [near, middle, far]:
+			check(is_equal_approx(1000.0 - enemy.health, total), "separate mark hit dedupes overlaps %d" % rank)
+		check(outside.health == 1000.0 and traces().is_empty(), "off-strip enemy safe and traces expire %d" % rank)
+		check(player.position.distance_to(end) < 5.0 and player.stamina <= 86.0, "repeated press ignored during cooldown %d" % rank)
+		space(aim, false)
+		await frames(103)
+		check(traces().is_empty() and player.dash_state == player.Dash.IDLE and not player.combo.charging, "holding then releasing never repeats or charges")
+
+func check_terrain() -> void:
+	var enemies := fresh(2)
+	var obstacle: StaticBody2D = game.world.room1_obstacles[0]
+	var axis := Vector2.RIGHT
+	var start := obstacle.position - axis * 115.0
+	player.position = start
+	enemies[0].position = obstacle.position + axis * 98.0
+	await frames(2)
+	var probe := PhysicsRayQueryParameters2D.create(start, enemies[0].position, player.terrain_mask)
+	var wall: Dictionary = player.get_world_2d().direct_space_state.intersect_ray(probe)
+	check(not wall.is_empty(), "obstacle crosses the test line")
+	space(obstacle.position + axis * 170.0)
+	await frames(42)
+	check(not wall.is_empty() and player.position.x <= float(wall.position.x) - 12.0 and player.position.x > start.x, "real obstacle truncates at hull edge")
+	check(enemies[0].health == 1000.0, "obstacle protects enemy behind it")
+	fresh(2)
+	player.position = Vector2(650, 463)
+	await frames(2)
+	space(Vector2(650, 710))
+	await frames(42)
+	check(player.position.y < 700.0 and Geometry2D.is_point_in_polygon(player.position, game.world.walkable), "room perimeter keeps dash inside walkable boundary")
+
+func check_interrupts() -> void:
+	fresh(2)
+	await frames(2)
+	player.stamina = 19.0
+	space(ORIGIN + Vector2.RIGHT * 200.0)
+	await frames(3)
+	check(traces().is_empty() and player.dash_cooldown == 0.0, "insufficient stamina does not consume cooldown")
+	player.stamina = 100.0
+	space(ORIGIN + Vector2.RIGHT * 200.0)
+	await frames(10)
+	check(player.dash_state == player.Dash.TRAVEL and not player.try_roll(), "space cannot cancel committed travel")
+	check(player.take_damage(5.0, Vector2.UP), "real damage interrupts without invulnerability")
+	check(player.dash_state == player.Dash.IDLE and player.dash_cooldown > 0.0, "damage interrupts while keeping the cost and cooldown")
+	check(traces().is_empty() or traces()[0].marks.is_empty(), "interrupted travel creates no delayed hit")
+	fresh(2)
+	await frames(2)
+	space(ORIGIN + Vector2.RIGHT * 320.0)
+	await frames(21)
+	check(traces().size() == 1 and traces()[0].marks.size() == 3, "lethal cleanup fixture has pending marks")
+	player.take_damage(1000.0, Vector2.ZERO)
+	check(paused and game.phase == "dead" and traces().is_empty(), "death clears pending sword marks")
+	var key := InputEventKey.new()
+	key.keycode = KEY_R
+	key.pressed = true
+	root.push_input(key, true)
+	check(not paused and game.player.cultivation == 0 and game.run_kills == 0 and game.player.dash_cooldown == 0.0, "R opens fresh rank-zero combat")
+
+func check_combo() -> void:
+	var enemies := fresh(0)
+	var enemy: SurvivorEnemy = enemies[0]
+	enemy.position = ORIGIN + Vector2(70, 0)
+	await frames(2)
+	var aim := ORIGIN + Vector2(300, 0)
+	tap(MOUSE_BUTTON_LEFT, aim)
+	await frames(12)
+	tap(MOUSE_BUTTON_LEFT, aim)
+	await frames(22)
+	tap(MOUSE_BUTTON_LEFT, aim)
+	await frames(28)
+	check(player.combo.attack_count == 3 and player.combo.stage == 2, "three left clicks buffer through active frames")
+	check(is_equal_approx(1000.0 - enemy.health, 132.0), "32/40/60 base damage on real target")
+	check(enemy.v41_heavy_stun > 0.0 and enemy.guard_visual_time == 0.0, "third hit interrupts and clears guard")
+	for rank in range(3):
+		for index in range(8):
+			fresh(rank)
+			var sword = player.combo
+			var aim_direction := Vector2.from_angle(index * PI / 4.0)
+			sword.swing_direction = aim_direction
+			sword.swing_rank = rank
+			for stage in range(3):
+				sword.stage = stage
+				var segment: PackedVector2Array = sword.blade_segment(1.0 if stage == 2 else 0.5)
+				var display: PackedVector2Array = sword.display_segment(1.0 if stage == 2 else 0.5)
+				var hand: Vector2 = player.visual.sword_hand(aim_direction, stage, 1.0 if stage == 2 else 0.5)
+				var blade := display[0] - hand
+				check(blade.length() >= 20.0 and blade.length() <= 32.0,
+					"existing straight blade length rank=%d row=%d stage=%d" % [rank, index, stage])
+				check(blade.normalized().dot(hand.direction_to(segment[1])) > 0.999 and segment[1].is_equal_approx(display[1]) and segment[1].dot(aim_direction) > 80.0,
+					"eight-way hand anchor and shared reach rank=%d row=%d stage=%d" % [rank, index, stage])
+
+func check_action_links() -> void:
+	fresh(1)
+	await frames(2)
+	var aim := ORIGIN + Vector2.RIGHT * 380.0
+	button(MOUSE_BUTTON_LEFT, true, aim)
+	await frames(8)
+	space(aim)
+	await frames(3)
+	check(player.combo.swing_time > 0.0 and not player.dash_request.is_zero_approx() and player.dash_state == player.Dash.IDLE,
+		"Space queues without cancelling a committed primary")
+	await frames(11)
+	check(player.dash_state == player.Dash.WINDUP and player.combo.next_stage == 0, "buffered Space starts after primary recovery and clears chain")
+	button(MOUSE_BUTTON_LEFT, false, aim)
+	await frames(22)
+	check(player.dash_state == player.Dash.RECOVERY, "dash has a terminal recovery")
+	tap(MOUSE_BUTTON_LEFT, aim)
+	await frames(7)
+	check(player.dash_state == player.Dash.IDLE and player.combo.attack_count == 2 and player.combo.stage == 0, "late recovery buffers a new first swing")
+	await frames(25)
+	check(player.combo.attack_count == 2, "holding and the delayed release did not auto repeat")

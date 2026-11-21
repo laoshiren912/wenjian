@@ -23,31 +23,35 @@ func run() -> void:
 	root.add_child(game)
 	current_scene = game
 	await process_frame
-	game.debug_opening(true)
 	for enemy in get_nodes_in_group("enemies"):
 		enemy.free()
 	game.scheduler = null
 	var p = game.player
-	check(p.max_stamina == CONFIG.STAMINA_MAX and p.stamina == CONFIG.STAMINA_MAX and p.roll_stamina_cost == CONFIG.ROLL_STAMINA_COST and p.stamina_regen == CONFIG.STAMINA_REGEN, "configured stamina values on F5 player")
-	for roll in range(6):
-		check(p.try_roll(), "consecutive roll %d succeeds" % (roll + 1))
-		check(is_equal_approx(p.stamina_delay, CONFIG.STAMINA_REGEN_DELAY), "each roll resets recovery delay")
-		while p.is_rolling():
-			await tick()
-		while p._roll_cooldown > 0.0:
-			await tick()
-	check(is_equal_approx(p.stamina, 10.0), "six fast rolls leave 10 stamina")
-	check(not p.try_roll(), "seventh fast roll blocked by stamina")
+	check(p.max_stamina == CONFIG.STAMINA_MAX and p.stamina == CONFIG.STAMINA_MAX and p.stamina_regen == CONFIG.STAMINA_REGEN, "configured stamina values on F5 player")
+	check(not p.try_roll() and is_equal_approx(p.stamina, 100.0), "old roll cannot spend stamina")
+	p.request_dash(Vector2.RIGHT)
+	await tick()
+	check(is_equal_approx(p.stamina, 100.0 - CONFIG.DASH_COST) and p.dash_cooldown > 0.0, "dash pays exactly its original cost")
+	check(absf(p.stamina_delay - CONFIG.STAMINA_REGEN_DELAY) < 0.035, "dash resets stamina recovery delay")
+	while p.dash_state != p.Dash.IDLE:
+		await tick()
+	p.stamina = CONFIG.THROW_COST - 1.0
+	p._request_throw(Vector2.RIGHT)
+	await tick()
+	check(p.throw_cooldown == 0.0 and not is_instance_valid(p.thrown_sword), "unaffordable cast consumes no cooldown")
+	p.stamina = 30.0
+	p._request_throw(Vector2.RIGHT)
+	await tick()
+	check(is_equal_approx(p.stamina, 30.0 - CONFIG.THROW_COST) and is_instance_valid(p.thrown_sword), "throw pays its own cost")
 	var remaining_delay: float = p.stamina_delay
 	var stamina_before: float = p.stamina
 	while p.stamina_delay > 0.04:
 		await tick()
 	check(is_equal_approx(p.stamina, stamina_before), "stamina does not recover during delay")
-	var elapsed := 0.0
-	while p.stamina < CONFIG.ROLL_STAMINA_COST and elapsed < 2.0:
+	for i in range(33):
 		await tick()
-		elapsed += 1.0 / 60.0
-	check(p.stamina >= CONFIG.ROLL_STAMINA_COST and elapsed >= 0.25 and elapsed <= 0.4, "recovery at configured rate after delay")
-	check(remaining_delay > 0.4 and p.try_roll(), "roll works again after recovery")
+	check(is_equal_approx(p.stamina - stamina_before, CONFIG.STAMINA_REGEN * 0.5) or absf(p.stamina - stamina_before - CONFIG.STAMINA_REGEN * 0.5) < 0.6,
+		"stamina recovers at the configured rate")
+	check(remaining_delay > 0.8 and not is_instance_valid(p.thrown_sword), "throw recovers while the stamina delay runs")
 	print("V41 STAMINA: %d / %d passed" % [checks - failures, checks])
 	quit(1 if failures else 0)

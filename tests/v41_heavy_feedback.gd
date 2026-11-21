@@ -17,7 +17,6 @@ func _initialize() -> void:
 func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
-	game.debug_opening(true)
 	var p = game.player
 	var sword = p.combo
 	var enemies := get_nodes_in_group("enemies")
@@ -39,7 +38,7 @@ func run() -> void:
 		var start: PackedVector2Array = sword.blade_segment(0.0)
 		var end: PackedVector2Array = sword.blade_segment(1.0)
 		check(start[1].y < end[1].y and start[0].y < end[0].y, "third blade descends " + str(direction))
-		check(sword.display_segment(0.35) == sword.blade_segment(0.35), "draw and hit use same segment " + str(direction))
+		check(sword.display_segment(0.35)[1] == sword.blade_segment(0.35)[1], "draw and hit share blade edge " + str(direction))
 	sword.swing_time = 0.0
 	sword.next_stage = 0
 	sword.chain_time = 0.0

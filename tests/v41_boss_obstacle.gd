@@ -14,9 +14,12 @@ func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	await tick()
-	for pillar in game.world.lanterns:
+	for point in [Vector2(420, 444), Vector2(864, 438)]:
+		var pillar := preload("res://scripts/courtyard_lantern.gd").new()
+		pillar.position = point
+		game.world.add_child(pillar)
+		game.world.lanterns.append(pillar)
 		for setup in [[Vector2.RIGHT, 0.0], [Vector2.LEFT, 0.0], [Vector2.UP, 0.0], [Vector2.DOWN, 0.0], [Vector2.RIGHT, 18.0], [Vector2.LEFT, 18.0], [Vector2.UP, 18.0], [Vector2.DOWN, 18.0]]:
 			var side: Vector2 = setup[0]
 			for mode in ["still", "along", "open"]:
@@ -59,6 +62,8 @@ func run() -> void:
 				print("PILLAR ",pillar.position," margin=",setup[1]," side=",side," mode=",mode," hp=",p.health," displacement=",max_displacement," casts=",casts," boss=",b.position," player=",p.position," ok=",ok)
 				for action in ["move_right", "move_left", "move_down", "move_up"]:
 					Input.action_release(action)
+		game.world.lanterns.erase(pillar)
+		pillar.free()
 	print("PILLAR_RESULT failures=", failures)
 	quit(1 if failures else 0)
 

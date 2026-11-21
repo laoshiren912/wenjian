@@ -32,7 +32,6 @@ func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	var player = game.player
 	var enemies := get_nodes_in_group("enemies")
 	var enemy = enemies[0]

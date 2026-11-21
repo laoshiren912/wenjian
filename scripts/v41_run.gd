@@ -16,7 +16,7 @@ var wave_index := 0
 var wave_remaining := 0
 var reward_options: Array[int] = []
 var reward_rng := RandomNumberGenerator.new()
-var opening_choice := false
+var cultivation_override := -1
 var gm_invincible := false
 var gm_infinite_stamina := false
 var gm_spawned: Array[Node] = []
@@ -71,10 +71,11 @@ func start_room() -> void:
 	room_index = 0
 	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
+	cultivation_override = -1
 	reward_options.clear()
 	_enter_room()
 
-func _enter_room() -> void:
+func _enter_room(returning_to_room_one := false) -> void:
 	_end_hitstop()
 	var carried_health := -1.0
 	var carried_stamina := -1.0
@@ -93,6 +94,7 @@ func _enter_room() -> void:
 	feedback.popups.clear()
 	feedback.bursts.clear()
 	feedback.guard_effects.clear()
+	feedback.reset_sword_cues()
 	feedback.shake_time = 0.0
 	feedback.shake_strength = 0.0
 	$Camera2D.offset = Vector2.ZERO
@@ -103,15 +105,16 @@ func _enter_room() -> void:
 	gm_spawned.clear()
 	player.gm_invulnerable = OS.is_debug_build() and gm_invincible
 	player.gm_infinite_stamina = OS.is_debug_build() and gm_infinite_stamina
-	player.position = Vector2(145, 370) if room_index == 0 else CONFIG.ENTRY_POINT
-	player.collision_mask = 1 | 4
+	player.position = CONFIG.ROOM1_RETURN if returning_to_room_one else CONFIG.ROOM_ENTRY_POINTS[room_index]
+	player.collision_mask = world.terrain_movement_mask | 4
+	player.terrain_mask = world.terrain_movement_mask
 	world.actors.add_child(player)
+	if room_index == 0 and not returning_to_room_one:
+		player.visual.update_pose(Vector2.ZERO, Vector2.UP, Color.WHITE, Vector2.UP)
 	player.enable_dual_attack()
-	player.roll_cooldown = 0.0
 	player.max_stamina = CONFIG.STAMINA_MAX
 	player.stamina = CONFIG.STAMINA_MAX
 	player.stamina_regen = CONFIG.STAMINA_REGEN
-	player.roll_stamina_cost = CONFIG.ROLL_STAMINA_COST
 	player.camera.enabled = false
 	world.visitor = player
 	$Camera2D.make_current()
@@ -128,32 +131,19 @@ func _enter_room() -> void:
 	world.room_cleared = false
 	base_stages = player.combo.stages.duplicate(true)
 	_apply_rewards()
-	player.combo.hold_threshold = CONFIG.HOLD_THRESHOLD
-	player.combo.charge_duration = CONFIG.CHARGE_DURATION
-	player.combo.charged_attack = player.combo.charged_attack.duplicate(true)
-	player.combo.charged_attack.reach = CONFIG.CHARGE_REACH
-	player.combo.charged_attack.angle = CONFIG.CHARGE_ANGLE
+	player.cultivation = _cultivation_rank()
 	if carried_health >= 0.0:
 		player.health = carried_health
 		player.stamina = carried_stamina
 	player.combo.finisher_contact.connect(_third_impact)
 	player.combo.guard_broken.connect(feedback.show_guard_break)
-	player.weapon.heavy_hit.connect(func():
-		if player.combo.charged_swing:
-			feedback.shake_strength = maxf(feedback.shake_strength, 9.0)
-			feedback.shake_time = maxf(feedback.shake_time, 0.18))
+	player.sword_cue.connect(feedback.play_sword_cue)
 	wave_index = 0
 	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
 	remaining = total
 	triggered_count = 0
 	reward_options.clear()
-	if room_index == 0:
-		opening_choice = true
-		phase = "reward_select"
-		reward_options.assign([4, 5])
-		get_tree().paused = true
-		hud.show_rewards()
-	elif room_index == CONFIG.BOSS_ROOM:
+	if room_index == CONFIG.BOSS_ROOM:
 		_spawn_boss()
 	else:
 		_spawn_wave()
@@ -164,20 +154,19 @@ func _enter_room() -> void:
 
 func _apply_rewards() -> void:
 	player.combo.stages = base_stages.duplicate(true)
-	player.combo.stages[0].recovery = CONFIG.COMBO_FIRST_RECOVERY
-	player.combo.stages[1].recovery = CONFIG.COMBO_SECOND_RECOVERY
-	player.combo.stages[2].windup = CONFIG.COMBO_THIRD_WINDUP
-	player.combo.stages[2].recovery = CONFIG.COMBO_THIRD_RECOVERY
+	player.combo.card_multiplier = 1.0 + CONFIG.SWORD_BONUS * reward_counts[0]
 	for data in player.combo.stages:
-		data.damage = float(data.damage) * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
-	player.combo.charge_damage_min = CONFIG.CHARGE_MIN * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
-	player.combo.charge_damage_max = CONFIG.CHARGE_MAX * (1.0 + CONFIG.SWORD_BONUS * reward_counts[0])
-	player.combo.roll_reward = reward_counts[1] > 0
+		data.damage = float(data.damage) * player.combo.card_multiplier
+	player.combo.dash_reward = reward_counts[1] > 0
 	player.combo.heavy_reward = reward_counts[3] > 0
-	player.move_energy = reward_counts[4] > 0
-	player.move_echo = reward_counts[5] > 0
-	player.upgrade_energy = reward_counts[7] > 0
-	player.upgrade_echo = reward_counts[8] > 0
+
+func _cultivation_rank() -> int:
+	if cultivation_override >= 0:
+		return cultivation_override
+	for rank in range(CONFIG.CULTIVATION_KILLS.size() - 1, 0, -1):
+		if run_kills >= CONFIG.CULTIVATION_KILLS[rank]:
+			return rank
+	return 0
 
 func _spawn_wave() -> void:
 	if phase == "dead":
@@ -202,7 +191,7 @@ func _spawn_wave() -> void:
 		enemy.v41_pressure = true
 		enemy.intro_room = room_index < 2
 		enemy.max_simultaneous_attackers = CONFIG.ATTACK_LIMIT
-		enemy.collision_mask = 1 | 2 | 4
+		enemy.collision_mask = world.terrain_movement_mask | 2 | 4
 		enemy.position = points[i]
 		enemy.waiting_radius = 180.0 if room_index < 2 else CONFIG.WAITING_RADIUS
 		enemy.home_position = enemy.position
@@ -263,6 +252,10 @@ func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
 	run_kills += 1
 	if not player.dead:
 		player.health = minf(player.max_health, player.health + CONFIG.KILL_HEAL * reward_counts[2])
+		var rank := _cultivation_rank()
+		if player.cultivation != rank:
+			player.cultivation = rank
+			hud.show_notice("修为进阶 · " + CONFIG.CULTIVATION_NAMES[rank])
 	if room_index == CONFIG.BOSS_ROOM:
 		phase = "cleared"
 		world.room_cleared = true
@@ -288,7 +281,7 @@ func _physics_process(delta: float) -> void:
 	if phase == "combat" and is_instance_valid(scheduler):
 		scheduler.tick(delta)
 	_update_camera()
-	if phase == "exit_ready" and player.global_position.distance_to(world.exit_point) < 34.0:
+	if phase == "exit_ready" and world.at_exit(player.global_position):
 		room_index += 1
 		phase = "transition"
 		_enter_room.call_deferred()
@@ -301,7 +294,7 @@ func _input(event: InputEvent) -> void:
 	super._input(event)
 
 func _draw_rewards() -> void:
-	reward_options = CARD_POOL.draw(reward_counts, reward_rng, CONFIG.FORCE_NEW_CARD)
+	reward_options = CARD_POOL.draw(reward_counts, reward_rng)
 
 func can_select_reward(index: int) -> bool:
 	return index in reward_options and CARD_POOL.eligible(index, reward_counts)
@@ -311,13 +304,6 @@ func select_reward(index: int) -> void:
 		return
 	reward_counts[index] += 1
 	_apply_rewards()
-	if opening_choice:
-		opening_choice = false
-		hud.hide_screen()
-		get_tree().paused = false
-		_spawn_wave()
-		_update_status()
-		return
 	phase = "exit_ready"
 	world.reward_visible = false
 	world.portal_open = true
@@ -350,25 +336,38 @@ func debug_fill_stamina() -> void:
 
 func debug_jump(index: int) -> void:
 	if not OS.is_debug_build() or index < 0 or index >= CONFIG.RUN_ROOMS: return
+	var returning_to_room_one := room_index == 1 and index == 0
 	room_index = index
-	opening_choice = false
-	_enter_room()
-	if index == 0:
-		debug_opening(true)
+	_enter_room(returning_to_room_one)
 	get_tree().paused = true
 	hud.show_card_debug()
 
 func debug_spawn(kind: int, count: int) -> void:
 	if not OS.is_debug_build() or kind < 0 or kind > 3: return
-	for i in range(clampi(count, 1, 20)):
+	var spawn_count := clampi(count, 1, 20)
+	var use_walkable_spawns := room_index == 0 or room_index >= 3
+	var available: Array[Vector2] = []
+	if use_walkable_spawns:
+		available.assign(world.floor_cells.map(world.cell_center))
+		for actor in world.actors.get_children():
+			if actor is CharacterBody2D:
+				available = available.filter(func(point): return point.distance_squared_to(actor.position) >= 32.0 * 32.0)
+	for i in range(spawn_count):
+		var target: Vector2 = player.position + player.aim_direction.normalized() * 100.0 + player.aim_direction.orthogonal() * (i - (spawn_count - 1) * 0.5) * 35.0
+		var point := target
+		if use_walkable_spawns:
+			if available.is_empty():
+				break
+			available.sort_custom(func(a, b): return a.distance_squared_to(target) < b.distance_squared_to(target))
+			point = available.pop_front()
 		var enemy: SurvivorEnemy = ENEMY.instantiate()
 		if kind != 3:
 			enemy.get_node("VisualRoot").set_script(preload("res://scripts/v41_pixel_visual.gd"))
 		if kind == 3:
 			enemy.set_script(MINI_BOSS)
 		enemy.world = world
-		enemy.position = player.position + player.aim_direction.normalized() * 100.0 + player.aim_direction.orthogonal() * (i - (count - 1) * 0.5) * 35.0
-		enemy.collision_mask = 1 | 2 | 4
+		enemy.position = point
+		enemy.collision_mask = world.terrain_movement_mask | 2 | 4
 		if kind != 3:
 			enemy.kind = SurvivorEnemy.Kind.RANGED if kind == 2 else SurvivorEnemy.Kind.HOSTILE
 			enemy.encounter_id = 0
@@ -410,26 +409,24 @@ func debug_grant(index: int) -> void:
 	_apply_rewards()
 	hud.show_card_debug()
 
-func debug_opening(skip: bool) -> void:
-	if not OS.is_debug_build() or room_index != 0 or triggered_count != 0:
+func debug_cultivation(rank: int) -> void:
+	if not OS.is_debug_build() or not is_instance_valid(player) or player.dead:
 		return
-	if skip:
-		opening_choice = false
-		hud.hide_screen()
-		get_tree().paused = false
-		_spawn_wave()
-	else:
-		opening_choice = true
-		phase = "reward_select"
-		reward_options.assign([4, 5])
-		hud.show_rewards()
+	cultivation_override = clampi(rank, -1, CONFIG.CULTIVATION_NAMES.size() - 1)
+	player.clear_dash_effects()
+	player.clear_throw()
+	player.combo.reset_chain()
+	player.combo.swing_time = 0.0
+	player.visual.cancel_attack()
+	player.dash_cooldown = 0.0
+	player.throw_cooldown = 0.0
+	player.cultivation = _cultivation_rank()
+	hud.show_card_debug()
 
 func debug_close() -> void:
 	if not OS.is_debug_build():
 		return
-	if opening_choice:
-		hud.show_rewards()
-	elif phase == "reward_select":
+	if phase == "reward_select":
 		hud.show_rewards()
 	else:
 		hud.hide_screen()
@@ -440,7 +437,7 @@ func _update_status() -> void:
 		"combat":
 			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
 		"reward_select": status.text = "已清场 · 选择奖励后开放出口"
-		"exit_ready": status.text = "已领奖 · 前往右侧出口"
+		"exit_ready": status.text = "已领奖 · 前往" + CONFIG.ROOM_EXIT_LABELS[room_index]
 		"cleared": status.text = "守庭者已击败 · 本局通关"
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
 
@@ -477,16 +474,11 @@ func _update_camera() -> void:
 	if not is_instance_valid(player):
 		return
 	var viewport := get_viewport_rect().size
-	if room_index == 0:
-		$Camera2D.zoom = Vector2.ONE * maxf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
+	var fit: float = minf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
+	if room_index <= 1 or not close_view:
+		$Camera2D.zoom = Vector2.ONE * fit
 		$Camera2D.position = world.ART_SIZE * 0.5
 		return
-	if room_index == 1:
-		$Camera2D.zoom = Vector2.ONE * minf(viewport.x / 1100.0, viewport.y / 618.75)
-		$Camera2D.position = Vector2(655, 345)
-		return
-	var fit: float = maxf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
-	$Camera2D.zoom = Vector2.ONE * fit * (1.3 if close_view else 1.0)
-	var half: Vector2 = viewport / $Camera2D.zoom * 0.5
-	var focus: Vector2 = player.position if close_view else world.ART_SIZE * 0.5
-	$Camera2D.position = Vector2(clampf(focus.x, half.x, world.ART_SIZE.x - half.x), clampf(focus.y, half.y, world.ART_SIZE.y - half.y))
+	$Camera2D.zoom = Vector2.ONE * fit * 1.3
+	var half: Vector2 = (viewport / $Camera2D.zoom * 0.5).min(world.ART_SIZE * 0.5)
+	$Camera2D.position = player.position.clamp(half, world.ART_SIZE - half)

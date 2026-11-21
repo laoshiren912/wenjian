@@ -570,7 +570,7 @@ func _v41_path_clear(target: Vector2) -> bool:
 	query.shape = $CollisionShape2D.shape
 	query.transform = global_transform
 	query.motion = target - global_position
-	query.collision_mask = 1
+	query.collision_mask = world.terrain_movement_mask
 	return get_world_2d().direct_space_state.cast_motion(query)[0] >= 1.0
 
 func _v41_follow_path(target: Vector2) -> Vector2:

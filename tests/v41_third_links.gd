@@ -12,7 +12,6 @@ func tap():
 	await tick()
 func fresh():
 	game.start_room()
-	game.debug_opening(true)
 	for e in get_nodes_in_group("enemies"): e.free()
 	game.player.position = Vector2(620,420)
 	await tick()
@@ -22,7 +21,6 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	await tick()
 	for pause in [16,20]:
 		await fresh()
@@ -44,14 +42,14 @@ func run():
 	await tap()
 	await wait_frames(12)
 	check(game.player.combo.stage == 1, "in action buffer")
-	for action in ["roll", "bow", "charge"]:
+	for action in ["dash", "throw"]:
 		await fresh()
 		await tap()
 		await finish()
-		if action == "roll":
-			roll()
-			await wait_frames(23)
-		elif action == "bow":
+		if action == "dash":
+			dash()
+			await wait_frames(32)
+		else:
 			var ev := InputEventMouseButton.new()
 			ev.button_index = MOUSE_BUTTON_RIGHT
 			ev.pressed = true
@@ -61,14 +59,7 @@ func run():
 			ev = ev.duplicate()
 			ev.pressed = false
 			root.push_input(ev,true)
-			await wait_frames(68)
-		else:
-			click(true,Vector2(900,420))
-			await wait_frames(15)
-			check(game.player.combo.charging and game.player.combo.next_stage == 0, "charge resets on entry")
-			click(false,Vector2(900,420))
-			await tick()
-			await finish()
+			await wait_frames(42)
 		await tap()
 		check(game.player.combo.stage == 0, action + " next first")
 	print("LINK_RESULT failures=",failures)

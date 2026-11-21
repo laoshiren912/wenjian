@@ -81,7 +81,7 @@ func _follow_path(target: Vector2) -> Vector2:
 	query.shape = $CollisionShape2D.shape
 	query.transform = global_transform
 	query.motion = target - global_position
-	query.collision_mask = 1
+	query.collision_mask = world.terrain_movement_mask
 	var clearance := get_world_2d().direct_space_state.cast_motion(query)
 	if global_position.distance_to(target) < 130.0 and clearance[0] >= 1.0:
 		return (target - global_position).normalized()

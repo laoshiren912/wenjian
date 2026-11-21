@@ -9,11 +9,9 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	await tick()
 	for mode in ["front21", "front30", "rear", "obstacle", "scaled", "thrust", "ranged", "boss"]:
 		game.start_room()
-		game.debug_opening(true)
 		await tick()
 		var p = game.player
 		var enemies = get_nodes_in_group("enemies")
@@ -31,8 +29,10 @@ func run():
 		p.position = Vector2(600, 400)
 		e.position = Vector2(690, 400)
 		if mode == "obstacle":
-			p.position = Vector2(360, 444)
-			e.position = Vector2(480, 444)
+			var rock: Vector2 = game.world.room1_obstacles[0].position
+			p.position = rock - Vector2(115, 0)
+			e.position = rock + Vector2(115, 0)
+			e.set_physics_process(false)
 		e.health = 21.0 if mode == "front21" else 100.0
 		if mode == "front30": e.health = 30.0
 		if mode == "scaled": p.damage_multiplier = 1.5

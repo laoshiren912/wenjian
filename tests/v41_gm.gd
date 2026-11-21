@@ -17,7 +17,6 @@ func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	var p = game.player
 	check(OS.is_debug_build() and not p.gm_invulnerable and not p.gm_infinite_stamina, "GM switches default off")
 	var key := InputEventKey.new()

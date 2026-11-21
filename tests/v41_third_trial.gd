@@ -13,7 +13,10 @@ func click(down: bool, point: Vector2):
 	ev.position = root.get_canvas_transform() * point
 	ev.global_position = ev.position
 	root.push_input(ev, true)
-func roll():
+func dash(direction: Vector2 = Vector2.RIGHT):
+	var motion := InputEventMouseMotion.new()
+	motion.position = root.get_canvas_transform() * (game.player.global_position + direction * 200.0)
+	root.push_input(motion, true)
 	var ev := InputEventKey.new()
 	ev.keycode = KEY_SPACE
 	ev.physical_keycode = KEY_SPACE
@@ -34,7 +37,6 @@ func run():
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
-	game.debug_opening(true)
 	await tick()
 	for count in [1, 2]:
 		for reward in [false, true]:
@@ -44,7 +46,6 @@ func run():
 func trial(count: int, reward: bool, tactic: int):
 	release_move()
 	game.start_room()
-	game.debug_opening(true)
 	await tick()
 	var p = game.player
 	var es = get_nodes_in_group("enemies")
@@ -98,9 +99,9 @@ func trial(count: int, reward: bool, tactic: int):
 			if frame - mark.third > 110: break
 		if state == 0 and windup_seen:
 			Input.action_press("move_up" if tactic != 1 else "move_down")
-			roll()
+			dash(Vector2.UP if tactic != 1 else Vector2.DOWN)
 			state = 1
-		elif state == 1 and not p.is_rolling():
+		elif state == 1 and p.dash_state == p.Dash.IDLE:
 			release_move()
 			state = 2
 		elif state == 2:

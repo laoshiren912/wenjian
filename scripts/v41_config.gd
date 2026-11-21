@@ -13,6 +13,7 @@ const WAVES: Array[Array] = [
 	[[MELEE, THRUST, RANGED, RANGED], [THRUST, MELEE, MELEE, MELEE, RANGED]],
 ]
 const BOSS_ROOM := 6
+const FLOATING_RUINS_ROOM := 4
 const RUN_ROOMS := BOSS_ROOM + 1
 const ENEMY_STATS: Array[Dictionary] = [
 	{"health": 215.0, "damage": 12.0, "speed": 222.0},
@@ -35,46 +36,56 @@ const GUARD_ARC_DOT := 0.34
 const GUARD_HOLD := 0.16
 const GUARD_COOLDOWN := 0.72
 const HEAVY_BASE_BREAK := 0.85
-const SWORD_TIMINGS := [Vector3(0.08, 0.10, 0.14), Vector3(0.10, 0.12, 0.16), Vector3(0.12, 0.14, 0.20)]
+const SWORD_TIMINGS := [Vector3(0.08, 0.10, 0.14), Vector3(0.10, 0.12, 0.16), Vector3(0.085, 0.14, 0.20)]
+const THIRD_IMPACT_PROGRESS := 0.22
 const BREAK_STUN := 0.65
 const THIRD_MOB_PUSH := 90.0
 const THIRD_GRIP_LIFT := 20.0
 const THIRD_TIP_LIFT := 52.0
-const THIRD_HITSTOP := 0.06
-const THIRD_HITSTOP_SCALE := 0.01
+const THIRD_HITSTOP := 0.035
+const THIRD_HITSTOP_SCALE := 0.18
 const THIRD_SHAKE := 5.0
 const THIRD_SHAKE_TIME := 0.18
 const GUARD_DISPLAY := 0.42 # Display only; GUARD_HOLD still controls AI.
 const GUARD_SPARK_TIME := 0.24
 const BREAK_SPARK_TIME := 0.36
 const GUARD_SOUND_DB := -16.0
-const ENTRY_POINT := Vector2(340, 370)
-const EXIT_POINT := Vector2(960, 370)
-const ROOM2_EXIT_POINT := Vector2(1010, 385)
+const ROOM1_SPAWN := Vector2(640, 550)
+const ROOM1_RETURN := Vector2(640, 305)
+# Coordinates use the full 1280x720 room artwork, indexed by room_index.
+const ROOM_ENTRY_POINTS: Array[Vector2] = [
+	ROOM1_SPAWN,
+	Vector2(640, 492),
+	Vector2(346, 365),
+	Vector2(280, 363),
+	Vector2(280, 419),
+	Vector2(640, 539),
+	Vector2(640, 552),
+]
+# Room one uses its gate rectangle; the terminal room has no exit.
+const ROOM_EXIT_POINTS: Array[Vector2] = [
+	Vector2.ZERO,
+	Vector2(640, 277), # Foot of the mountain stair
+	Vector2(1038, 274), # Northeast bridge approach
+	Vector2(1038, 374), # Right hall stair
+	Vector2(1026, 286), # Northeast pavilion approach
+	Vector2(640, 272), # Central heaven gate
+]
+const ROOM_EXIT_LABELS: Array[String] = [
+	"北侧山门", "北侧石阶", "东北栈道", "右上殿前石阶", "右上亭前石阶", "北侧天门",
+]
 const ROOM2_SPAWN_POINTS: Array[Vector2] = [Vector2(560, 375), Vector2(650, 285), Vector2(845, 410), Vector2(970, 490), Vector2(450, 470), Vector2(770, 310)]
 const REWARD_POINT := Vector2(640, 420)
 const SPAWN_POINTS: Array[Vector2] = [Vector2(535, 365), Vector2(540, 485), Vector2(690, 345), Vector2(680, 490), Vector2(780, 365), Vector2(905, 375)]
-const HOLD_THRESHOLD := 0.22
-const COMBO_FIRST_RECOVERY := 0.14
-const COMBO_SECOND_RECOVERY := 0.16
-const COMBO_THIRD_WINDUP := 0.12
-const COMBO_THIRD_RECOVERY := 0.20
 const COMBO_FIRST_TWO_MOVE_FACTOR := 0.9
-const CHARGE_DURATION := 0.60
-const CHARGE_MIN := 65.0
-const CHARGE_MAX := 95.0
-const CHARGE_REACH := 140.0
-const CHARGE_ANGLE := 120.0
 const SPAWN_CLEARANCE := 36.0
 const REWARD_RADIUS := 40.0
 const SWORD_BONUS := 0.30
-const ROLL_SWORD_FACTOR := 2.0
+const DASH_SWORD_FACTOR := 2.0
 const KILL_HEAL := 5.0
 const HEAVY_PUSH := 420.0
 const GUARD_BREAK_TIME := 1.5
-const FORCE_NEW_CARD := true
 const STAMINA_MAX := 100.0
-const ROLL_STAMINA_COST := 15.0
 const STAMINA_REGEN := 16.0
 const STAMINA_REGEN_DELAY := 0.9
 const BODY_WIDTH := 30.0
@@ -88,8 +99,34 @@ const ECHO_DAMAGE := 55.0
 const ECHO_RADIUS := 100.0
 const ECHO_UPGRADED_RADIUS := 135.0
 
+const CULTIVATION_NAMES := ["实体剑招", "剑气外放", "仙术成型"]
+const CULTIVATION_KILLS := [0, 2, 3]
+const SWORD_EXTENSION := [0.0, 28.0, 54.0]
+const DASH_DISTANCE := [156.0, 202.0, 246.0]
+const DASH_DAMAGE := [65.0, 72.0, 80.0]
+const DASH_MARK_DAMAGE := [0.0, 18.0, 30.0]
+const DASH_WIDTH := [18.0, 22.0, 26.0]
+const DASH_MARK_WIDTH := [0.0, 23.0, 30.0]
+const DASH_COST := 20.0
+const DASH_COOLDOWN := 2.0
+const DASH_WINDUP := 0.10
+const DASH_TRAVEL := 0.18
+const DASH_RECOVERY := 0.16
+const DASH_MARK_DELAY := 0.24
+const DASH_MARK_INTERVAL := 0.085
+const THROW_COST := 8.0
+const THROW_COOLDOWN := 1.50
+const THROW_DISTANCE := [146.0, 174.0, 202.0]
+const THROW_SPIN_TIME := [0.13, 0.16, 0.19]
+const THROW_RADIUS := [29.0, 37.0, 45.0]
+const THROW_OUT_DAMAGE := [28.0, 31.0, 34.0]
+const THROW_SPIN_DAMAGE := [18.0, 22.0, 26.0]
+const THROW_RETURN_DAMAGE := [20.0, 22.0, 24.0]
+const THROW_OUT_SPEED := 890.0
+const THROW_RETURN_SPEED := 1040.0
+
 static func reward_names() -> Array[String]:
-	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "翻滚后下一剑伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒", "剑气斩 · 满蓄释放穿透剑气", "残影步 · 翻滚起点延时爆炸", "", "剑气斩强化 · 射程增加一个身位", "残影步强化 · 爆炸半径扩大", ""]
+	return ["剑伤害 +%.0f%%" % (SWORD_BONUS * 100.0), "冲刺后下一剑伤害翻倍", "击杀回复 %.0f 生命" % KILL_HEAL, "第三段破防延长至1.5秒"]
 
 static func room_total(index: int) -> int:
 	var count := 0

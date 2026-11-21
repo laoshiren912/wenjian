@@ -1,4 +1,4 @@
-extends "res://scripts/v41_room_decoration.gd"
+extends Node2D
 
 const SHADOW_SPEED := 12.0
 const CLOUD_SPEED := 24.0
@@ -18,7 +18,6 @@ const FOREGROUND_CLOUD_Z := 24
 var cloud_shadows: Node2D
 
 func _ready() -> void:
-	super._ready()
 	set_process(false)
 
 func set_cloud_shadows_active(in_first_room: bool) -> void:
@@ -70,6 +69,3 @@ func _process(delta: float) -> void:
 			var band_start := floorf(sprite.position.y / CLOUD_BAND_HEIGHT) * CLOUD_BAND_HEIGHT
 			var laps := floorf(travel / span)
 			sprite.position.y = band_start + fposmod(sprite.position.y - band_start + laps * CLOUD_ENTRY_STEP, CLOUD_BAND_HEIGHT)
-
-func _draw() -> void:
-	paint_room(false)

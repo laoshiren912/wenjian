@@ -9,7 +9,7 @@ var backdrop: Sprite2D
 var elapsed := 0.0
 var visitor: SurvivorPlayer
 
-func build_courtyard() -> void:
+func build_courtyard(with_lanterns := true) -> void:
 	var art := load(ART_PATH) as Texture2D
 	backdrop = Sprite2D.new()
 	backdrop.name = "ApprovedCourtyardArt"
@@ -35,11 +35,12 @@ func build_courtyard() -> void:
 	actors = Node2D.new()
 	actors.name = "Actors"
 	add_child(actors)
-	for point in [Vector2(420, 444), Vector2(864, 438)]:
-		var lantern := preload("res://scripts/courtyard_lantern.gd").new()
-		lantern.position = point
-		add_child(lantern)
-		lanterns.append(lantern)
+	if with_lanterns:
+		for point in [Vector2(420, 444), Vector2(864, 438)]:
+			var lantern := preload("res://scripts/courtyard_lantern.gd").new()
+			lantern.position = point
+			add_child(lantern)
+			lanterns.append(lantern)
 	# Reuse the approved painting as exact foreground cutouts, not new artwork.
 	# These cover the near terrace faces when a sword/actor overlaps their edge.
 	_add_foreground(art, [Vector2(0, 0.62), Vector2(0.095, 0.68), Vector2(0.34, 0.87), Vector2(0.35, 0.84), Vector2(0.375, 0.85), Vector2(0.37, 1), Vector2(0, 1)])

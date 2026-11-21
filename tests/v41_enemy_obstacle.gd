@@ -21,8 +21,15 @@ func run() -> void:
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	current_scene = game
+	# Keep the navigation regression independent of production room decoration.
+	for point in [Vector2(420, 444), Vector2(864, 438)]:
+		var pillar := preload("res://scripts/courtyard_lantern.gd").new()
+		pillar.position = point
+		game.world.add_child(pillar)
+		game.world.lanterns.append(pillar)
+	game.room_index = 3
+	game._enter_room()
 	await process_frame
-	game.debug_opening(true)
 	var probe = get_nodes_in_group("enemies")[0]
 	var pillar_pos: Vector2 = game.world.lanterns[0].position
 	probe.global_position = pillar_pos + Vector2(-60, 25)
@@ -35,7 +42,8 @@ func run() -> void:
 		for side in [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN]:
 			for offset in [-30.0, -25.0, -15.0, 0.0, 15.0, 25.0, 30.0]:
 				game.start_room()
-				game.debug_opening(true)
+				game.room_index = 3
+				game._enter_room()
 				var p = game.player
 				p.gm_invulnerable = true
 				p.set_physics_process(false)

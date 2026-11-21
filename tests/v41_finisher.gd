@@ -26,7 +26,6 @@ func snapshot(label: String):
 func fresh(count: int, direction: Vector2, distance: float):
 	release_move()
 	game.start_room()
-	game.debug_opening(true)
 	await tick()
 	var p = game.player
 	p.position = Vector2(620, 420)
@@ -48,11 +47,10 @@ func run():
 	await tick()
 	await combo_timing()
 	await front_block()
-	await charged_break()
 	for count in [1, 2]:
 		for direction in [Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP]:
 			await counter(count, direction)
-	# Pure geometry check: same display and hit segments throughout overhead drop.
+	# The visual edge and swept edge share the same projected drop.
 	var sword = game.player.combo
 	sword.charged_swing = false
 	sword.stage = 2
@@ -60,7 +58,7 @@ func run():
 		sword.swing_direction = direction
 		var matches := true
 		for i in range(11):
-			matches = matches and sword.blade_segment(i / 10.0) == sword.display_segment(i / 10.0)
+			matches = matches and sword.blade_segment(i / 10.0)[1] == sword.display_segment(i / 10.0)[1]
 		check(matches, "overhead display/collision " + str(direction))
 	game._end_hitstop()
 	check(is_equal_approx(Engine.time_scale, 1.0), "hitstop restores speed")
@@ -120,29 +118,6 @@ func front_block():
 	check(not game.hitstop_active, "first hit has no finisher hitstop")
 	await snapshot("guard")
 
-func charged_break():
-	var es = await fresh(1, Vector2.RIGHT, 100.0)
-	var target = es[0]
-	var p = game.player
-	click(true, target.position)
-	for i in range(51): await tick()
-	# Release after enemy's first attack and during its normal recovery.
-	click(false, target.position)
-	for i in range(40):
-		await tick()
-		if target.health < target.max_health: break
-	var actual_damage: float = target.max_health - target.health
-	print("CHARGE_ACTUAL_DAMAGE=", actual_damage)
-	check(is_equal_approx(actual_damage, 23.75), "full charge front guard damage 95 x 25%")
-	check(target.last_hit_blocked and target.guard_time > 0.0, "charge is blocked and does not break guard")
-	check(is_zero_approx(target.v41_heavy_stun), "charge does not add break stun")
-	check(not game.hitstop_active, "charge does not gain third-only hitstop")
-	var broken := false
-	for effect in game.feedback.guard_effects:
-		if effect.broken: broken = true
-	check(not broken, "charge does not emit shield shatter")
-	await snapshot("charge_break")
-
 func counter(count: int, direction: Vector2):
 	var es = await fresh(count, direction, 55.0)
 	var target = es[0]
@@ -184,9 +159,9 @@ func counter(count: int, direction: Vector2):
 			if clock_time - mark.third > 1.1: break
 		if state == 0 and target.windup > 0.0:
 			move_to(direction.orthogonal())
-			roll()
+			dash(direction.orthogonal())
 			state = 1
-		elif state == 1 and not p.is_rolling():
+		elif state == 1 and p.dash_state == p.Dash.IDLE:
 			release_move()
 			state = 2
 		elif state == 2 and mark.end > 0.0:

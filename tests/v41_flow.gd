@@ -29,7 +29,6 @@ func reset() -> void:
 	Input.action_release("attack")
 	Input.action_release("ranged_attack")
 	game.start_room()
-	game.debug_opening(true)
 	game.player.gm_invulnerable = true
 
 func click_mouse(down: bool, point := Vector2(670, 390), right := false) -> void:
@@ -177,8 +176,7 @@ func check_final_boss() -> void:
 	await frames(22)
 	check(game.phase == "cleared" and paused and game.hud.overlay.visible and game.run_kills == CONFIG.run_total() and not game.world.reward_visible, "real sword finishes boss and opens existing victory result")
 	key(KEY_ENTER)
-	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "Enter after boss win restarts a fresh run")
-	game.debug_opening(true)
+	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "Enter after boss win restarts a fresh run")
 	game.room_index = CONFIG.BOSS_ROOM
 	game.reward_counts[0] = 2
 	game._enter_room()
@@ -190,10 +188,9 @@ func check_final_boss() -> void:
 	await frames(58)
 	check(game.phase == "dead" and paused and game.hud.overlay.visible, "lethal boss attack opens death result")
 	key(KEY_R)
-	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "R after boss death clears rewards and returns to room one")
-	game.debug_opening(true)
+	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "R after boss death clears rewards and returns to room one")
 
-func check_roll_links() -> void:
+func check_dash_links() -> void:
 	for target_stage in range(3):
 		reset()
 		var player: SurvivorPlayer = game.player
@@ -210,22 +207,20 @@ func check_roll_links() -> void:
 				while sword.swing_time > 0.0:
 					await frames(1)
 		check(sword.stage == target_stage and sword.phase() == "recovery", "real input reaches recovery stage " + str(target_stage))
-		var origin := player.position
-		Input.action_press("move_right")
+		var attacks: int = sword.attack_count
 		key(KEY_SPACE)
 		await frames(2)
-		check(player.is_rolling() and sword.swing_time == 0.0 and player.position.distance_to(origin) > 5.0, "recovery roll cancels and physically moves at stage " + str(target_stage))
-		var attacks: int = sword.attack_count
-		click_mouse(true)
-		click_mouse(false)
-		for tick in range(30):
-			if not player.is_rolling():
+		check(not player.is_rolling() and not game.player.dash_request.is_zero_approx(), "Space buffers after stage " + str(target_stage))
+		for tick in range(60):
+			if game.player.dash_state == game.player.Dash.RECOVERY and game.player.dash_time <= 0.10:
 				break
 			await frames(1)
-		Input.action_release("move_right")
-		await frames(2)
-		check(sword.attack_count == attacks + 1 and sword.swing_time > 0.0, "tap during roll starts next sword within two frames")
-		check(player._roll_cooldown <= 0.0, "roll cooldown has ended with the roll")
+		check(game.player.dash_state == game.player.Dash.RECOVERY and sword.swing_time == 0.0, "dash starts after sword recovery")
+		click_mouse(true)
+		click_mouse(false)
+		await frames(9)
+		check(sword.attack_count == attacks + 1 and sword.stage == 0, "late dash recovery buffers a fresh sword chain")
+		check(game.player.dash_cooldown > 0.0 and not player.is_rolling(), "dash has one cooldown and no roll state")
 	reset()
 	game.room_index = 1
 	game._enter_room()
@@ -240,31 +235,6 @@ func check_roll_links() -> void:
 		pair_seen = pair_seen or busy.filter(func(e): return e.kind == e.Kind.HOSTILE).size() == 2
 	check(cap_ok and pair_seen, "room two keeps a real melee pair and at most two simultaneous threats")
 
-
-func check_buffered_charge_links() -> void:
-	for target_stage in range(3):
-		reset()
-		var sword = game.player.combo
-		for stage_index in range(target_stage + 1):
-			click_mouse(true)
-			click_mouse(false)
-			await frames(2)
-			if stage_index < target_stage:
-				while sword.swing_time > 0.0:
-					await frames(1)
-		check(sword.stage == target_stage and sword.phase() == "windup", "real click starts stage for held-charge link")
-		var origin: int = sword.attack_count
-		click_mouse(true, Vector2(670, 390), true)
-		var saw_active := false
-		for tick in range(30):
-			if sword.charging:
-				break
-			saw_active = saw_active or sword.phase() == "active"
-			await frames(1)
-		check(saw_active and sword.charging and sword.charge_time <= 0.017 and sword.attack_count == origin, "held input enters fresh charge after stage " + str(target_stage))
-		click_mouse(false, Vector2(670, 390), true)
-		await frames(2)
-		check(sword.charged_swing and sword.attack_count == origin + 1, "same held gesture releases charged sword")
 
 func snapshot(label: String) -> void:
 	await frames(4)
@@ -288,7 +258,7 @@ func run() -> void:
 	await frames()
 	reset()
 	check(game.total == 4 and enemies().size() == 4 and game.scheduler.groups.size() == 2, "room1: four spawned melee, two real pairs")
-	check(game.world.backdrop.texture != null and game.world.lanterns.size() == 2, "approved courtyard texture and two collidable lanterns")
+	check(game.world.backdrop.texture != null and game.world.lanterns.is_empty(), "courtyard texture available without legacy lanterns")
 	check(game.player.combo.get_script() == load("res://scripts/v41_sword.gd") and game.player.combo.has_method("motion_pose"), "F5 uses orbit sword with rewards")
 	var draws := {}
 	var offered := {}
@@ -299,9 +269,9 @@ func run() -> void:
 		for index in game.reward_options: offered[index] = true
 	check(draws.size() > 1 and draws.keys().all(func(draw):
 		var cards: Array = JSON.parse_string(draw).map(func(value): return int(value))
-		return cards.has(4) and cards.has(5) and not cards.has(6)), "empty slots have priority")
-	for point in CONFIG.SPAWN_POINTS + [CONFIG.ENTRY_POINT, CONFIG.REWARD_POINT, CONFIG.EXIT_POINT]:
-		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "configured point reachable: " + str(point))
+		return cards.size() == 3 and cards.all(func(card): return card < 4)) and offered.size() == 4, "attribute-only draws expose all four cards")
+	for point in CONFIG.SPAWN_POINTS + [CONFIG.ROOM1_SPAWN, CONFIG.REWARD_POINT, game.world.exit_point]:
+		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ROOM1_SPAWN, point).is_empty(), "configured point reachable: " + str(point))
 	for e in enemies():
 		check(e.encounter_id == 0 and e.max_simultaneous_attackers == 3 and e.health == CONFIG.ENEMY_STATS[CONFIG.MELEE].health and e.damage == CONFIG.ENEMY_STATS[CONFIG.MELEE].damage, "spawn enables encounter mechanics and configured stats")
 	# Actual spawned defender: let real physics update its direction, then inspect hit.
@@ -390,10 +360,10 @@ func run() -> void:
 	await advance()
 	game.player.set_physics_process(false)
 	check(game.room_index == 1 and game.total == 6 and game.remaining == 6 and enemies().size() == 3, "room2 starts only wave1 of six total")
-	check(game.world.exit_point == CONFIG.ROOM2_EXIT_POINT and not game.world.path_between(CONFIG.ENTRY_POINT, game.world.exit_point).is_empty(), "room2 small-room exit is reachable")
+	check(game.world.exit_point == CONFIG.ROOM_EXIT_POINTS[1] and not game.world.path_between(CONFIG.ROOM_ENTRY_POINTS[1], game.world.exit_point).is_empty(), "room2 small-room exit is reachable")
 	check(not Geometry2D.is_point_in_polygon(Vector2(600, 600), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(300, 480), game.world.walkable) and Geometry2D.is_point_in_polygon(Vector2(950, 480), game.world.walkable), "room2 compact bounds contain both sides without L-shaped exclusion")
 	for point in CONFIG.ROOM2_SPAWN_POINTS:
-		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ENTRY_POINT, point).is_empty(), "room2 spawn reachable: " + str(point))
+		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ROOM_ENTRY_POINTS[1], point).is_empty(), "room2 spawn reachable: " + str(point))
 	check(game.player.health == 63.0 and game.player.stamina >= 47.0 and game.player.stamina < 50.0 and game.reward_counts[0] == 1, "vitals preserved; only normal stamina regeneration after entry")
 	var ranger: SurvivorEnemy
 	for e in enemies():
@@ -458,71 +428,42 @@ func run() -> void:
 					ranged_active += 1
 		cap_violation = cap_violation or active > CONFIG.ATTACK_LIMIT or ranged_active > 1
 	check(not cap_violation and ranged_started, "real mixed melee/ranged wave respects two melee slots and one ranged slot")
-	await check_roll_links()
-	await check_buffered_charge_links()
+	await check_dash_links()
 	await check_melee_cue_and_facing()
 	# Input boundaries use real GUI-dispatched press/release and 60Hz physics.
 	reset()
 	var sword = game.player.combo
 	click_mouse(true)
 	await frames(6)
-	check(sword.attack_count == 0 and not sword.charging, "short hold does not attack on press")
+	check(sword.attack_count == 1 and sword.stage == 0, "press begins the first sword attack")
 	click_mouse(false)
 	await frames(2)
-	check(sword.attack_count == 1 and sword.stage == 0 and not sword.charged_swing, "short release attacks first stage")
+	check(sword.attack_count == 1 and sword.stage == 0 and not sword.charged_swing, "release does not start another attack")
 	await frames(3)
 	click_mouse(true)
 	click_mouse(false)
 	await frames(26)
-	check(sword.attack_count == 2 and sword.stage == 1, "short release buffers second stage")
+	check(sword.attack_count == 2 and sword.stage == 1, "tap buffers second stage")
 	click_mouse(true)
 	click_mouse(false)
 	await frames(28)
-	check(sword.attack_count == 3 and sword.stage == 2, "short release buffers third stage")
-	reset()
-	sword = game.player.combo
-	click_mouse(true, Vector2(670, 390), true)
-	await frames(14)
-	check(sword.charging and sword.attack_count == 0, "0.22 threshold starts charge without extra ordinary hit")
-	await frames(40)
-	check(sword.charge_fraction() == 1.0 and sword.attack_count == 0, "0.60 more seconds reaches full charge without auto release")
-	click_mouse(false, Vector2(670, 390), true)
-	await frames(1)
-	check(sword.charged_swing and sword.attack_count == 1 and not sword.charging, "release starts exactly one charged attack")
-	reset()
-	sword = game.player.combo
-	click_mouse(true, Vector2(670, 390), true)
-	await frames(18)
-	key(KEY_SPACE)
-	await frames(2)
-	check(game.player.is_rolling() and not sword.charging, "real Space cancels charging only on successful roll")
-	click_mouse(false, Vector2(670, 390), true)
-	await frames(30)
-	check(sword.attack_count == 0, "release after cancelled charge never produces delayed attack")
+	check(sword.attack_count == 3 and sword.stage == 2, "tap buffers third stage")
 	reset()
 	game.reward_counts[1] = 1
 	game._apply_rewards()
 	sword = game.player.combo
-	game.player.try_roll()
-	await frames(24)
-	check(sword.roll_armed, "successful roll arms reward while rolling does not consume it")
+	key(KEY_SPACE)
+	await frames(31)
+	check(sword.dash_armed, "successful dash arms the next attack")
 	click_mouse(true)
 	click_mouse(false)
 	await frames(2)
-	check(sword.swing_bonus == 2.0 and not sword.roll_armed, "ordinary short-release attack consumes roll reward even on miss")
+	check(sword.swing_bonus == 2.0 and not sword.dash_armed, "ordinary attack consumes dash reward even on miss")
 	await frames(24)
 	click_mouse(true)
 	click_mouse(false)
 	await frames(2)
-	check(sword.swing_bonus == 1.0, "roll multiplier is not reused for second ordinary attack")
-	reset()
-	sword = game.player.combo
-	click_mouse(true, Vector2(670, 390), true)
-	await frames(20)
-	game.player._notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
-	click_mouse(false, Vector2(670, 390), true)
-	await frames(3)
-	check(not sword.charging and sword.attack_count == 0, "focus loss clears hold and release cannot attack")
+	check(sword.swing_bonus == 1.0, "dash multiplier is not reused for second ordinary attack")
 	# Actual contact tests use the current F5's spawned enemy and orbit blade.
 	reset()
 	game.player.set_physics_process(false)
@@ -532,38 +473,17 @@ func run() -> void:
 	game._apply_rewards()
 	sword = game.player.combo
 	var target := target_at(game.player.position + Vector2(65, 0))
-	check(is_equal_approx(sword.stages[0].damage, 41.6) and is_equal_approx(sword.charge_damage_max, 123.5), "+30 percent applies to ordinary and charged base, without shared bow multiplier")
-	game.player.try_roll()
-	game.player._finish_roll()
-	check(sword.roll_armed, "roll arms one empowered sword")
-	sword.gesture_held = true
-	sword.charging = true
-	sword.charge_time = sword.charge_duration
-	sword._release_charge(Vector2.RIGHT)
-	check(not sword.roll_armed and sword.swing_bonus == 2.0, "charge release consumes roll bonus once")
+	check(is_equal_approx(sword.stages[0].damage, 41.6) and is_equal_approx(sword.card_multiplier, 1.3), "+30 percent applies to sword and dash base")
+	game.player.request_dash(Vector2.UP)
+	game.player._start_dash()
+	game.player.clear_dash_effects()
+	check(sword.dash_armed, "dash arms one empowered sword")
+	sword.attack(Vector2.RIGHT)
+	check(not sword.dash_armed and sword.swing_bonus == 2.0, "attack consumes roll bonus once")
 	tick_sword(40)
-	check(is_equal_approx(1000.0 - target.health, 247.0), "actual charged orbit hit combines 95 x 1.3 x 2")
-	check(target.knockback.length() <= 260.1, "third-stage reward never boosts charged knockback")
-	# Fresh full charge hits multiple real spawned targets once each.
-	reset()
-	game.player.set_physics_process(false)
-	game.player.combo.set_physics_process(false)
-	game.player.position = Vector2(580, 420)
-	sword = game.player.combo
-	var targets := enemies()
-	for i in range(targets.size()):
-		targets[i].position = game.player.position + Vector2.RIGHT.rotated(-0.6 + i * 0.4) * 90.0
-		targets[i].health = 1000.0
-		targets[i].guard_cooldown = 10.0
-	sword.charging = true
-	sword.charge_time = sword.charge_duration
-	sword._release_charge(Vector2.RIGHT)
-	tick_sword(70)
-	for e in targets:
-		check(is_equal_approx(1000.0 - e.health, 95.0), "charged multi-target deals exactly one 95 hit per spawned enemy")
+	check(is_equal_approx(1000.0 - target.health, 83.2), "actual light hit combines 32 x 1.3 x 2")
 	# Base third hit opens guard; the reward extends that opening and push.
-	for mode in ["base", "reward", "charge"]:
-		var charged: bool = mode == "charge"
+	for mode in ["base", "reward"]:
 		reset()
 		game.player.set_physics_process(false)
 		game.player.combo.set_physics_process(false)
@@ -575,22 +495,17 @@ func run() -> void:
 		target.guard_cooldown = 0.0
 		target.guard_direction = Vector2.LEFT
 		target.encounter_state = target.EncounterState.CHASE
-		if charged:
-			sword.charging = true
-			sword.charge_time = sword.charge_duration
-			sword._release_charge(Vector2.RIGHT)
-		else:
-			sword.next_stage = 2
-			sword.chain_time = 0.2
-			sword.attack(Vector2.RIGHT)
+		sword.next_stage = 2
+		sword.chain_time = 0.2
+		sword.attack(Vector2.RIGHT)
 		tick_sword(40)
-		check(is_equal_approx(1000.0 - target.health, 23.75 if charged else 60.0), "guard interaction on front contact: " + mode)
-		var guard_window := CONFIG.GUARD_COOLDOWN if charged else (CONFIG.HEAVY_BASE_BREAK if mode == "base" else CONFIG.GUARD_BREAK_TIME)
+		check(is_equal_approx(1000.0 - target.health, 60.0), "guard interaction on front contact: " + mode)
+		var guard_window := CONFIG.HEAVY_BASE_BREAK if mode == "base" else CONFIG.GUARD_BREAK_TIME
 		check(is_equal_approx(target.guard_cooldown, guard_window), "guard window: " + mode)
-		check(is_equal_approx(target.v41_heavy_stun, 0.0 if charged else CONFIG.BREAK_STUN), "third stun and charge no stun: " + mode)
-		check(charged or (target.guard_time == 0.0 and target.guard_visual_time == 0.0), "third break clears guard and blue arc: " + mode)
+		check(is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "third stun: " + mode)
+		check(target.guard_time == 0.0 and target.guard_visual_time == 0.0, "third break clears guard and blue arc: " + mode)
 		if mode != "base":
-			check(is_equal_approx(target.knockback.length(), 65.0 if charged else CONFIG.THIRD_MOB_PUSH), "correct charged vs suppressed third knockback")
+			check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MOB_PUSH), "correct suppressed third knockback")
 	reset()
 	game.reward_counts[2] = 2
 	game.player.health = 91.0
@@ -602,8 +517,7 @@ func run() -> void:
 	game.player.take_damage(10000.0, Vector2.ZERO)
 	check(game.phase == "dead" and paused, "real damage enters death result")
 	key(KEY_R)
-	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and paused and game.opening_choice, "death R resets run and rewards")
-	game.debug_opening(true)
+	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "death R resets run and rewards")
 	await clear_room()
 	game.reward_options.assign([0, 1, 3])
 	game.reward_counts[1] = 1
@@ -613,7 +527,7 @@ func run() -> void:
 	var disabled: Button
 	for item in game.hud.modal_panel.find_children("*", "Button", true, false):
 		if item.text.begins_with("剑伤害"): chosen = item
-		if item.text.begins_with("翻滚后"): disabled = item
+		if item.text.begins_with("冲刺后"): disabled = item
 	check(disabled != null and disabled.disabled, "already unlocked unique reward is visibly disabled")
 	game.select_reward(1)
 	check(game.phase == "reward_select", "disabled unique reward cannot be selected through code")
@@ -623,16 +537,16 @@ func run() -> void:
 	await frames(1)
 	click_mouse(false, point)
 	await frames(2)
-	check(game.phase == "exit_ready" and game.reward_counts[0] == 1 and game.player.weapon.attack_count == count_before, "real reward button applies once without ordinary or charged attack")
-	game.player.combo.roll_armed = true
+	check(game.phase == "exit_ready" and game.reward_counts[0] == 1 and game.player.weapon.attack_count == count_before, "real reward button applies once without ordinary attack")
+	game.player.combo.dash_armed = true
 	click_mouse(true, Vector2(670, 390), true)
 	await frames(18)
-	# Change rooms through the real exit while holding a charge.
+	# Change rooms through the real exit while the thrown sword is airborne.
 	await advance()
 	click_mouse(false, Vector2(670, 390), true)
 	await frames(2)
-	check(game.room_index == 1 and game.reward_counts[1] == 1 and not game.player.combo.roll_armed and not game.player.combo.charging and game.player.combo.attack_count == 0, "room transition preserves unlock but clears armed multiplier and held charge")
-	# All original imported samples must load with compatible charge-aware player.
+	check(game.room_index == 1 and game.reward_counts[1] == 1 and not game.player.combo.dash_armed and game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword) and game.player.combo.attack_count == 0, "room transition preserves unlock but clears armed multiplier and thrown sword")
+	# All original imported samples must load with their existing player.
 	for path in ["courtyard_trial", "sword_motion_trial", "sword_motion_combat"]:
 		var sample = load("res://scenes/" + path + ".tscn").instantiate()
 		root.add_child(sample)
@@ -650,10 +564,10 @@ func run() -> void:
 		game.toggle_view()
 		click_mouse(true, Vector2(670, 390), true)
 		await frames(55)
-		await snapshot("%d_charge" % size.x)
+		await snapshot("%d_combat" % size.x)
 		game.toggle_pause()
 		await snapshot("%d_pause" % size.x)
-		check(not game.player.combo.charging and not game.player.combo.gesture_held, "pause clears charge gesture")
+		check(game.player.dash_request.is_zero_approx(), "pause clears dash buffer")
 		game.resume_room()
 		click_mouse(false, Vector2(670, 390), true)
 		game.toggle_stats()
