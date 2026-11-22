@@ -14,6 +14,7 @@ const B_DEATH = preload("res://assets/characters/Bandit/Bandit_Death_Sheet_1404x
 const H_WALK = preload("res://assets/characters/Herbalist/Herbalist_Walk_Sheet_972x928.png")
 const H_DEATH = preload("res://assets/characters/Herbalist/Herbalist_Death_Sheet_972x348.png")
 const HIT_FLASH_SHADER = preload("res://assets/shaders/v41_hit_flash.gdshader")
+const PLAYER_HIT_FLASH_SHADER = preload("res://assets/shaders/v41_player_hit_flash.gdshader")
 const ART_SCALE := 0.55
 const S_CELL := Vector2(156, 180)
 const S_ORIGIN := -Vector2(79, 135) * ART_SCALE + Vector2(0, 15)
@@ -24,6 +25,15 @@ const DOWNCUT_TIP := [Vector2(135, 144), Vector2(125, 156), Vector2(132, 137), V
 const RAISED_HAND := [Vector2(100, 112), Vector2(74, 51), Vector2(101, 84), Vector2(68, 65),
 	Vector2(109, 78), Vector2(77, 65), Vector2(58, 84), Vector2(64, 51)]
 const DASH_TINTS := [Color("f3f8ff"), Color("86eafa"), Color("c4b8ff")]
+const FACE_PALETTE := {
+	Color("eb983c"): Color("fcd491"),
+	Color("c87728"): Color("fdba5d"),
+	Color("a6581c"): Color("d4965a"),
+	Color("ddb920"): Color("fed075"),
+	Color("de9616"): Color("fdba5d"),
+}
+static var player_attack_sheet: ImageTexture
+static var player_strike_sheet: ImageTexture
 static var empty_hand_sheet: ImageTexture
 
 var look_direction := Vector2.DOWN
@@ -33,6 +43,7 @@ var player_death_age := 0.0
 var herbalist_visual := false
 var spawn_pop_time := 0.0
 var hit_flash_mat: ShaderMaterial
+var player_hit_flash_mat: ShaderMaterial
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -42,13 +53,22 @@ func _ready() -> void:
 		hit_flash_mat.shader = HIT_FLASH_SHADER
 		material = hit_flash_mat
 	if get_parent() is SurvivorPlayer:
+		player_hit_flash_mat = ShaderMaterial.new()
+		player_hit_flash_mat.shader = PLAYER_HIT_FLASH_SHADER
+		player_hit_flash_mat.set_shader_parameter("hurt_flash", 0.0)
+		material = player_hit_flash_mat
 		process_mode = Node.PROCESS_MODE_ALWAYS
 		get_parent().died.connect(_player_died)
 		if empty_hand_sheet == null:
-			_prepare_empty_hand_pose()
+			_prepare_player_poses()
 
 func play_hurt() -> void:
+	if hit_flash_mat != null:
+		start_limited_hurt_flash(CONFIG.ENEMY_FLASH_INTERVAL, CONFIG.ENEMY_FLASH_DURATION)
+		return
 	hurt_time = 0.07
+	if player_hit_flash_mat != null:
+		player_hit_flash_mat.set_shader_parameter("hurt_flash", 1.0)
 	queue_redraw()
 
 func play_spawn_pop() -> void:
@@ -85,15 +105,36 @@ func update_pose(actual_motion: Vector2, look: Vector2, color: Color, leg_look: 
 func _physics_process(delta: float) -> void:
 	if not get_tree().paused:
 		animation_clock += delta
-		super._physics_process(delta)
+	var was_hurt := hurt_time > 0.0
+	super._physics_process(delta)
+	if hit_flash_mat != null and was_hurt and hurt_time == 0.0 and not dying:
+		modulate = Color.WHITE
+		self_modulate = Color.WHITE
+	if player_hit_flash_mat != null and was_hurt and hurt_time == 0.0:
+		player_hit_flash_mat.set_shader_parameter("hurt_flash", 0.0)
+		modulate = Color.WHITE
+		self_modulate = Color.WHITE
 
 func _direction_index(direction: Vector2) -> int:
 	return posmod(roundi((direction.angle() + PI / 2.0) / (PI / 4.0)), 8)
 
-func _prepare_empty_hand_pose() -> void:
+func _prepare_player_poses() -> void:
+	# The diagonal downcut cels have an orange face baked into the source art.
+	# Match only their face swatches to the idle atlas. Keep weapons, clothes
+	# and the original atlas used by the boss intact.
+	var attack := S_ATTACK.get_image()
+	var strike := S_STRIKE_POSE.get_image()
+	for row in [3, 5]:
+		var face := Rect2i(49 if row == 3 else 81, row * 180 + 70, 28, 20)
+		_restore_face_palette(strike, face)
+		for frame in [5, 6]:
+			_restore_face_palette(attack, Rect2i(face.position + Vector2i(frame * 156, 0), face.size))
+	player_attack_sheet = ImageTexture.create_from_image(attack)
+	player_strike_sheet = ImageTexture.create_from_image(strike)
+
 	# Reuse the existing split attack body. Mask the small gold guard at the
 	# wrist only in the temporary throw pose; the source atlases stay untouched.
-	var body := S_STRIKE_POSE.get_image().get_region(Rect2i(0, 0, 156, 1440))
+	var body := strike.get_region(Rect2i(0, 0, 156, 1440))
 	for row in range(8):
 		var grip := Vector2i(DOWNCUT_HAND[row]) + Vector2i(0, 180 * row)
 		for y in range(grip.y - 11, grip.y + 8):
@@ -102,6 +143,13 @@ func _prepare_empty_hand_pose() -> void:
 				if pixel.r > 0.75 and pixel.g > 0.47 and pixel.b < 0.30:
 					body.set_pixel(x, y, Color("9a663e"))
 	empty_hand_sheet = ImageTexture.create_from_image(body)
+
+func _restore_face_palette(sheet: Image, rect: Rect2i) -> void:
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var pixel := sheet.get_pixel(x, y)
+			if FACE_PALETTE.has(pixel):
+				sheet.set_pixel(x, y, FACE_PALETTE[pixel])
 
 func _throw_pose_offset() -> Vector2:
 	return Vector2(0.0, -1.2 * absf(sin(animation_clock * 27.0))) if motion.length_squared() > 4.0 else Vector2.ZERO
@@ -115,9 +163,8 @@ func throw_blade_angle(direction: Vector2) -> float:
 
 func _draw_throw_pose(direction: Vector2) -> void:
 	var row := _direction_index(direction)
-	var tint := Color(2.0, 2.0, 2.0) if hurt_time > 0.0 else Color.WHITE
 	draw_texture_rect_region(empty_hand_sheet, Rect2(S_ORIGIN + _throw_pose_offset(), S_CELL * ART_SCALE),
-		Rect2(Vector2(0, row * S_CELL.y), S_CELL), tint)
+		Rect2(Vector2(0, row * S_CELL.y), S_CELL))
 
 func _strike_row(direction: Vector2, chain_stage: int) -> int:
 	var index := _direction_index(direction)
@@ -152,7 +199,7 @@ func _heavy_lean(direction: Vector2, progress: float) -> Vector2:
 	return direction * thrust + Vector2(0.0, crouch)
 
 func dash_ghost_pose(direction: Vector2) -> Dictionary:
-	return {"sheet": S_ATTACK, "destination": Rect2(S_ORIGIN + direction * 3.0, S_CELL * ART_SCALE),
+	return {"sheet": player_attack_sheet, "destination": Rect2(S_ORIGIN + direction * 3.0, S_CELL * ART_SCALE),
 		"source": Rect2(Vector2(5 * S_CELL.x, _direction_index(direction) * S_CELL.y), S_CELL)}
 
 func _draw_dash(player) -> void:
@@ -163,14 +210,12 @@ func _draw_dash(player) -> void:
 	var color: Color = DASH_TINTS[rank]
 	var frame := 5
 	var destination: Rect2 = pose.destination
-	var tint := Color.WHITE
 	match int(player.dash_state):
 		1:
 			frame = 1
 			destination.position -= direction * 5.0
 			draw_line(-direction * 20.0, direction * 33.0, Color(color, 0.48), 2.0, true)
 		2:
-			tint = Color(color.lightened(0.38), 0.38 if rank == 2 else 0.93)
 			if rank == 2:
 				var front := direction * 34.0
 				var side := direction.orthogonal() * 12.0
@@ -181,7 +226,7 @@ func _draw_dash(player) -> void:
 			frame = 6 if player.dash_time > 0.065 else 8
 			destination.position += direction * 3.0
 	var source := Rect2(Vector2(frame * S_CELL.x, index * S_CELL.y), S_CELL)
-	draw_texture_rect_region(S_ATTACK, destination, source, tint)
+	draw_texture_rect_region(player_attack_sheet, destination, source)
 
 func _draw_player_attack(player) -> void:
 	var sword = player.combo
@@ -194,13 +239,12 @@ func _draw_player_attack(player) -> void:
 	var elapsed: float = (sword.swing_duration - sword.swing_time) * player.attack_speed_multiplier
 	var wound: bool = sword.phase() == "windup"
 	var recover: bool = sword.phase() == "recovery"
-	var color := Color(2.0, 2.0, 2.0) if hurt_time > 0.0 else Color.WHITE
 	var lift := stage == 2 and progress < CONFIG.THIRD_IMPACT_PROGRESS
 	var rec_ratio := clampf((elapsed - float(data.windup) - float(data.active)) / maxf(0.001, float(data.recovery)), 0.0, 1.0) if recover else 0.0
 	var settling: bool = recover and (rec_ratio >= 0.42 if stage == 2 else rec_ratio >= 0.34)
 	if not wound and not lift and not settling:
 		var edge: Vector2 = sword.blade_segment(progress)[1]
-		_draw_strike_pose(direction, stage, progress, edge, color, rec_ratio)
+		_draw_strike_pose(direction, stage, progress, edge, rec_ratio)
 		return
 	var body_offset := Vector2.ZERO
 	var body_scale := Vector2.ONE
@@ -241,11 +285,11 @@ func _draw_player_attack(player) -> void:
 			frame = 6 if rec_ratio < 0.62 else 7
 	var foot_comp := Vector2(0.0, 15.0 * (1.0 - body_scale.y))
 	draw_set_transform(body_offset + foot_comp, body_tilt, Vector2(mirror_x * body_scale.x, body_scale.y))
-	draw_texture_rect_region(S_ATTACK, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
-		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL), color)
+	draw_texture_rect_region(player_attack_sheet, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
+		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL))
 	draw_set_transform(Vector2.ZERO)
 
-func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Vector2, color: Color, rec_ratio: float = 0.0) -> void:
+func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Vector2, rec_ratio: float) -> void:
 	var row := _strike_row(direction, stage)
 	var mirror := Vector2(-1, 1) if stage == 1 else Vector2.ONE
 	var hand := sword_hand(direction, stage, progress)
@@ -272,19 +316,19 @@ func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Ve
 		body_tilt = 0.065 * slam * signf(direction.x if absf(direction.x) > 0.15 else 1.0)
 	var behind := direction.y < -0.55 and blade_direction.y < -0.4
 	if behind:
-		_draw_strike_blade(row, hand_cell, hand, angle, mirror, color)
+		_draw_strike_blade(row, hand_cell, hand, angle, mirror)
 	var foot_comp := Vector2(0.0, 15.0 * (1.0 - body_scale.y))
 	draw_set_transform(offset + foot_comp, body_tilt, Vector2(mirror.x * body_scale.x, mirror.y * body_scale.y))
-	draw_texture_rect_region(S_STRIKE_POSE, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
-		Rect2(Vector2(0, row * S_CELL.y), S_CELL), color)
+	draw_texture_rect_region(player_strike_sheet, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
+		Rect2(Vector2(0, row * S_CELL.y), S_CELL))
 	if not behind:
-		_draw_strike_blade(row, hand_cell, hand, angle, mirror, color)
+		_draw_strike_blade(row, hand_cell, hand, angle, mirror)
 	draw_set_transform(Vector2.ZERO)
 
-func _draw_strike_blade(row: int, hand_cell: Vector2, hand: Vector2, angle: float, mirror: Vector2, color: Color) -> void:
+func _draw_strike_blade(row: int, hand_cell: Vector2, hand: Vector2, angle: float, mirror: Vector2) -> void:
 	draw_set_transform(hand, angle, mirror)
 	draw_texture_rect_region(S_STRIKE_POSE, Rect2(-hand_cell * ART_SCALE, S_CELL * ART_SCALE),
-		Rect2(Vector2(S_CELL.x, row * S_CELL.y), S_CELL), color)
+		Rect2(Vector2(S_CELL.x, row * S_CELL.y), S_CELL))
 
 func _draw() -> void:
 	if herbalist_visual:
@@ -292,13 +336,13 @@ func _draw() -> void:
 		return
 	var is_player := get_parent() is SurvivorPlayer or player_death
 	var player = get_parent() if is_player and not player_death else null
-	if player != null and is_instance_valid(player.combo) and player.combo.dash_reward and player.combo.dash_armed:
+	if player != null and is_instance_valid(player.combo) and player.combo.dash_armed:
 		_draw_thunder_armed_aura()
-	if player != null and is_instance_valid(player.thrown_sword):
-		_draw_throw_pose(player.thrown_sword.aim)
-		return
 	if player != null and player.dash_state != 0:
 		_draw_dash(player)
+		return
+	if player != null and is_instance_valid(player.thrown_sword):
+		_draw_throw_pose(player.thrown_sword.aim)
 		return
 	if player != null and is_instance_valid(player.combo) and player.combo.swing_time > 0.0:
 		_draw_player_attack(player)
@@ -316,6 +360,7 @@ func _draw() -> void:
 	var flip := false
 	var enemy = get_parent() if not is_player and not dying else null
 	var enemy_attacking: bool = enemy != null and (enemy.windup > 0.0 or enemy.lunge_time > 0.0)
+	var enemy_guarding: bool = enemy != null and not enemy_attacking and enemy.has_method("is_guarding_stance") and enemy.is_guarding_stance()
 	if dying or player_death:
 		sheet = S_DEATH if is_player else B_DEATH
 		var age: float = player_death_age if player_death else death_age
@@ -331,20 +376,27 @@ func _draw() -> void:
 		var rows := [0, 0, 1, 1, 2, 3, 3, 0]
 		row = rows[index]
 		flip = index in [6, 7]
+	elif enemy_guarding:
+		# 持剑横挡架势：定格在横刃起手帧并略微沉肩稳姿
+		sheet = B_ATTACK
+		frame = 2
+		var guard_idx := _direction_index(enemy.guard_direction)
+		var rows := [0, 0, 1, 1, 2, 3, 3, 0]
+		row = rows[guard_idx]
+		flip = guard_idx in [6, 7]
 	elif motion.length_squared() >= 1.0 and roll_time <= 0.0:
 		sheet = S_WALK if is_player else B_WALK
 		frame = int(animation_clock * 8.0) % 9
 	var destination := Rect2(-pivot * ART_SCALE + Vector2(0, 15), size * ART_SCALE)
 	var source := Rect2(Vector2(frame * size.x, row * size.y), size)
 	if is_instance_valid(hit_flash_mat):
-		hit_flash_mat.set_shader_parameter("hurt_flash", 1.0 if hurt_time > 0.0 else 0.0)
-	var color := Color.WHITE if is_instance_valid(hit_flash_mat) else (Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE)
-	var recoil_sx := 1.08 if (not is_player and hurt_time > 0.0) else 1.0
-	var recoil_sy := 0.92 if (not is_player and hurt_time > 0.0) else 1.0
+		hit_flash_mat.set_shader_parameter("hurt_flash", CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
+	var recoil_sx := 1.035 if (not is_player and hurt_time > 0.0) else (1.05 if enemy_guarding else 1.0)
+	var recoil_sy := 0.965 if (not is_player and hurt_time > 0.0) else (0.95 if enemy_guarding else 1.0)
 	var sx := -recoil_sx if flip else recoil_sx
 	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2(0.0, 15.0 * (1.0 - recoil_sy)), 0.0, Vector2(sx, recoil_sy))
-	draw_texture_rect_region(sheet, destination, source, color)
+	draw_texture_rect_region(sheet, destination, source)
 	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2.ZERO)
 
@@ -364,14 +416,13 @@ func _draw_herbalist() -> void:
 	var destination := Rect2(-Vector2(54, 103) * ART_SCALE + Vector2(0, 15), Vector2(108, 116) * ART_SCALE)
 	var source := Rect2(Vector2(frame * 108, row * 116), Vector2(108, 116))
 	if is_instance_valid(hit_flash_mat):
-		hit_flash_mat.set_shader_parameter("hurt_flash", 1.0 if hurt_time > 0.0 else 0.0)
-	var color := Color.WHITE if is_instance_valid(hit_flash_mat) else (Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE)
-	var recoil_sx := 1.08 if hurt_time > 0.0 else 1.0
-	var recoil_sy := 0.92 if hurt_time > 0.0 else 1.0
+		hit_flash_mat.set_shader_parameter("hurt_flash", CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
+	var recoil_sx := 1.035 if hurt_time > 0.0 else 1.0
+	var recoil_sy := 0.965 if hurt_time > 0.0 else 1.0
 	var sx := -recoil_sx if flip else recoil_sx
 	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2(0.0, 15.0 * (1.0 - recoil_sy)), 0.0, Vector2(sx, recoil_sy))
-	draw_texture_rect_region(sheet, destination, source, color)
+	draw_texture_rect_region(sheet, destination, source)
 	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2.ZERO)
 
@@ -396,7 +447,7 @@ func _draw_sword_rain_cast(player) -> void:
 	var row := _direction_index(aim)
 	var rank: int = clampi(player.cultivation, 0, 2)
 	var ring_col := Color("8be6ff") if rank == 0 else (Color("56eee8") if rank == 1 else Color("44d2ff"))
-	var core_col := Color("ffe17d") if player.sword_rain_card_level > 0 else Color("f6ffff")
+	var core_col := Color("ffe17d") if rain.empowered else Color("f6ffff")
 
 	# 脚下双层聚灵法环
 	draw_set_transform(Vector2(0, 14), 0.0, Vector2(1.0, 0.38))
@@ -409,10 +460,9 @@ func _draw_sword_rain_cast(player) -> void:
 	var sy := lerpf(1.0, 0.92, sin(t * PI))
 	var sx := lerpf(1.0, 1.06, sin(t * PI))
 	var foot_comp := Vector2(0.0, 15.0 * (1.0 - sy))
-	var tint := Color(2.0, 2.0, 2.0) if hurt_time > 0.0 else Color.WHITE
 	draw_set_transform(foot_comp, 0.0, Vector2(sx, sy))
-	draw_texture_rect_region(S_ATTACK, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
-		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL), tint)
+	draw_texture_rect_region(player_attack_sheet, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
+		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL))
 	draw_set_transform(Vector2.ZERO)
 
 	# 胸前结印微芒 + 周身旋升 4 枚法诀灵点

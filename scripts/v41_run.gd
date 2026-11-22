@@ -11,7 +11,14 @@ var audio_mgr: Node
 var room_index := 0
 var reward_counts: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var run_kills := 0
-var base_stages: Array[Dictionary] = []
+var run_elapsed := 0.0
+var room_entry_kills := 0
+var retry_rank_floor := 0
+const DEFEAT_SLOWMO := 0.50
+var defeat_left := 0.0
+var defeat_base_scale := 1.0
+var victory_slowmo_left := 0.0
+var cast_zoom_left := 0.0
 var close_view := false
 var scheduler: RefCounted
 var boss: SurvivorEnemy
@@ -46,8 +53,13 @@ func _end_hitstop() -> void:
 	if hitstop_active:
 		Engine.time_scale = saved_time_scale
 		hitstop_active = false
+	hitstop_current_duration = 0.0
+	if victory_slowmo_left > 0.0:
+		victory_slowmo_left = 0.0
+		Engine.time_scale = 1.0
 
 func _exit_tree() -> void:
+	_end_defeat_slowmo()
 	_end_hitstop()
 
 func _trigger_combo_shake(strength: float, duration: float) -> void:
@@ -55,8 +67,7 @@ func _trigger_combo_shake(strength: float, duration: float) -> void:
 	if now - last_combo_shake_ms < CONFIG.COMBO_SHAKE_GAP_MS:
 		return
 	last_combo_shake_ms = now
-	feedback.shake_strength = maxf(feedback.shake_strength, strength)
-	feedback.shake_time = maxf(feedback.shake_time, duration)
+	feedback.request_camera_shake(strength, duration)
 
 func _trigger_combo_hitstop(duration: float, scale: float, allow_upgrade: bool = false, min_gap_ms: int = CONFIG.COMBO_HITSTOP_GAP_MS) -> void:
 	var now := Time.get_ticks_msec()
@@ -81,9 +92,16 @@ func _third_impact(_point: Vector2) -> void:
 	_trigger_combo_hitstop(CONFIG.THIRD_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
 
 func _on_sword_cue(kind: String, point: Vector2) -> void:
+	if kind == "thunder_burst":
+		feedback.spawn_thunder_burst(point, player.dash_direction)
+		return
 	feedback.play_sword_cue(kind, point)
-	if kind == "sword_rain_hit":
-		_trigger_combo_hitstop(CONFIG.RAIN_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, false, 160)
+	if kind == "sword_rain_cast":
+		hud.play_cast_focus()
+		cast_zoom_left = 0.34
+		_trigger_combo_hitstop(0.09, 0.16, true)
+	elif kind == "sword_rain_hit":
+		_trigger_combo_hitstop(CONFIG.RAIN_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, false, 180)
 
 func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) -> void:
 	if not is_instance_valid(player) or not is_instance_valid(player.combo):
@@ -96,10 +114,7 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 		"miss":
 			pass
 		"hit":
-			if is_instance_valid(target) and is_instance_valid(target.visual):
-				target.visual.hurt_time = maxf(target.visual.hurt_time, 0.07)
 			if sword.swing_bonus > 1.01:
-				feedback.spawn_thunder_burst(point, dir)
 				if is_instance_valid(sword.slash_vfx):
 					sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.18)
 				feedback.trigger_camera_kick(dir, 7.8)
@@ -120,7 +135,7 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 			_trigger_combo_shake(1.8, 0.08)
 		"guard_break":
 			if is_instance_valid(target):
-				var break_dur := CONFIG.GUARD_BREAK_TIME if sword.heavy_reward else CONFIG.HEAVY_BASE_BREAK
+				var break_dur := CONFIG.HEAVY_BASE_BREAK
 				feedback.register_guard_break_target(target, break_dur)
 			if is_instance_valid(sword.slash_vfx):
 				sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.24)
@@ -166,6 +181,8 @@ func _build_ui() -> void:
 	hud.reward_selected.connect(select_reward)
 	hud.title_start_requested.connect(start_run_from_title)
 	hud.title_mute_requested.connect(_toggle_master_mute)
+	hud.return_to_title_requested.connect(enter_title_screen)
+	hud.retry_room_requested.connect(retry_current_room)
 
 func _toggle_master_mute() -> void:
 	if not is_instance_valid(audio_mgr):
@@ -209,19 +226,27 @@ func start_room(open_title: bool = false) -> void:
 	room_index = 0
 	reward_counts.assign([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 	run_kills = 0
+	run_elapsed = 0.0
+	victory_slowmo_left = 0.0
 	cultivation_override = -1
 	reward_options.clear()
 	_enter_room(false, open_title)
 
-func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> void:
+func _enter_room(returning_to_room_one := false, enter_title: bool = false, retry: bool = false) -> void:
+	_end_defeat_slowmo()
 	_end_hitstop()
 	last_combo_impact_ms = -10000
 	last_combo_shake_ms = -10000
 	var carried_health := -1.0
 	var carried_stamina := -1.0
-	if room_index > 0 and is_instance_valid(player):
+	var carried_rank := 0
+	if not retry:
+		retry_rank_floor = 0
+		room_entry_kills = run_kills
+	if room_index > 0 and not retry and is_instance_valid(player):
 		carried_health = player.health
 		carried_stamina = player.stamina
+		carried_rank = player.cultivation
 	get_tree().paused = false
 	menu_open = false
 	stats_open = false
@@ -235,8 +260,7 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> v
 	feedback.bursts.clear()
 	feedback.guard_effects.clear()
 	feedback.reset_sword_cues()
-	feedback.shake_time = 0.0
-	feedback.shake_strength = 0.0
+	feedback.show()
 	$Camera2D.offset = Vector2.ZERO
 	world.set_portal_active(false, false)
 	world.set_room_style(room_index)
@@ -273,6 +297,9 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> v
 	hud.hurt_flash.color.a = 0.0
 	hud.notice_time = 0.0
 	hud.notice.text = ""
+	hud.set_domain_alert(false)
+	hud.show_boss_mechanic(-1)
+	hud.set_defeat_ink(0.0)
 	hud.clear_screen_banner()
 	hud.hide_screen()
 	clear_celebration_elapsed = 0.0
@@ -287,7 +314,7 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> v
 	pending_wave_points.clear()
 	world.reward_visible = false
 	world.room_cleared = false
-	base_stages = player.combo.stages.duplicate(true)
+	cast_zoom_left = 0.0
 	_apply_rewards()
 	player.cultivation = _cultivation_rank()
 	if carried_health >= 0.0:
@@ -298,6 +325,8 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> v
 	player.combo.guard_broken.connect(feedback.show_guard_break)
 	player.sword_cue.connect(_on_sword_cue)
 	player.thunder_afterimage.connect(feedback.spawn_thunder_afterimage)
+	player.card_lightning.connect(feedback.spawn_card_lightning)
+	player.card_slash.connect(feedback.spawn_card_slash)
 	wave_index = 0
 	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
 	remaining = total
@@ -311,34 +340,77 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> v
 			_spawn_boss()
 		else:
 			_spawn_wave()
+		if carried_health >= 0.0 and player.cultivation > carried_rank:
+			_trigger_breakthrough(player.cultivation)
 	_update_status()
 	hud.update_room(remaining, total, triggered_count)
 	world.queue_redraw()
 	_update_camera()
 
 func _apply_rewards() -> void:
-	player.combo.stages = base_stages.duplicate(true)
-	player.combo.sword_rain_reward = reward_counts[0] > 0
-	player.sword_rain_card_level = reward_counts[0]
-	player.combo.card_multiplier = 1.0 + CONFIG.SWORD_BONUS * reward_counts[0]
-	for data in player.combo.stages:
-		data.damage = float(data.damage) * player.combo.card_multiplier
-	player.combo.dash_reward = reward_counts[1] > 0
-	player.combo.heavy_reward = reward_counts[3] > 0
+	player.learned_cards.assign(reward_counts)
 
 func _cultivation_rank() -> int:
 	if cultivation_override >= 0:
 		return cultivation_override
-	for rank in range(CONFIG.CULTIVATION_KILLS.size() - 1, 0, -1):
+	for rank in range(_room_grade_ceiling(), 0, -1):
 		if run_kills >= CONFIG.CULTIVATION_KILLS[rank]:
-			return rank
-	return 0
+			return maxi(rank, retry_rank_floor)
+	return retry_rank_floor
+
+func retry_current_room() -> void:
+	if phase != "dead":
+		return
+	retry_rank_floor = player.cultivation
+	run_kills = room_entry_kills
+	_enter_room(false, false, true)
+
+func _on_player_died() -> void:
+	_end_hitstop()
+	phase = "defeat_transition"
+	menu_open = false
+	stats_open = false
+	cast_zoom_left = 0.0
+	player.input_locked = true
+	_clear_hostile_projectiles()
+	if is_instance_valid(boss):
+		boss.cancel_demon_domain()
+	hud.clear_screen_banner()
+	hud.hurt_flash.color.a = 0.0
+	hud.set_defeat_ink(0.001)
+	feedback.play_sword_cue("defeat", player.global_position)
+	defeat_base_scale = Engine.time_scale
+	defeat_left = DEFEAT_SLOWMO
+	Engine.time_scale = defeat_base_scale * 0.18
+
+func _end_defeat_slowmo() -> void:
+	if defeat_left > 0.0:
+		defeat_left = 0.0
+		Engine.time_scale = defeat_base_scale
 
 func _pick_wave_spawn_points() -> Array[Vector2]:
 	var kinds: Array = CONFIG.WAVES[room_index][wave_index]
 	var pool: Array[Vector2] = (CONFIG.ROOM2_SPAWN_POINTS if room_index == 1 else CONFIG.SPAWN_POINTS).duplicate()
 	pool = pool.filter(func(point): return point.distance_to(player.position) >= CONFIG.SPAWN_CLEARANCE)
 	var chosen: Array[Vector2] = []
+	if room_index >= 2:
+		var available: Array[Vector2] = []
+		available.assign(world.floor_cells.map(world.cell_center))
+		for i in range(kinds.size()):
+			var anchor: Vector2 = CONFIG.SPAWN_POINTS[(i + wave_index * 2) % CONFIG.SPAWN_POINTS.size()]
+			var best := Vector2.INF
+			var distance := INF
+			for point in available:
+				if point.distance_squared_to(player.position) < CONFIG.SPAWN_CLEARANCE ** 2:
+					continue
+				var score := point.distance_squared_to(anchor)
+				if score < distance:
+					best = point
+					distance = score
+			assert(best.is_finite(), "Room has no safe spawn cell")
+			chosen.append(best)
+			available = available.filter(func(point): return point.distance_squared_to(best) >= 40.0 ** 2)
+		return chosen
 	for i in range(kinds.size()):
 		chosen.append(pool[i % pool.size()])
 	return chosen
@@ -360,6 +432,7 @@ func _spawn_wave(fixed_points: Array[Vector2] = [], from_summon: bool = false) -
 		enemy.dodge_enabled = false
 		enemy.fast_chaser = type == CONFIG.THRUST
 		enemy.thrust_type = type == CONFIG.THRUST
+		enemy.v41_guard_elite = type == CONFIG.ELITE
 		enemy.encounter_id = 0
 		enemy.v41_pressure = true
 		enemy.intro_room = room_index < 2
@@ -371,7 +444,7 @@ func _spawn_wave(fixed_points: Array[Vector2] = [], from_summon: bool = false) -
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
 		_connect_enemy(enemy)
 		world.actors.add_child(enemy)
-		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
+		var stats: Dictionary = CONFIG.ENEMY_STATS[CONFIG.MELEE if type == CONFIG.ELITE else type]
 		enemy.speed = float(stats.speed)
 		enemy.guard_cooldown = 0.0
 		enemy.attack_cooldown = maxf(0.25 if type == CONFIG.RANGED else 0.0, CONFIG.WAVE_LANDING_GRACE if from_summon else 0.0)
@@ -399,9 +472,24 @@ func _spawn_boss() -> void:
 	boss.position = CONFIG.REWARD_POINT
 	boss.collision_mask = 1 | 2
 	_connect_enemy(boss)
+	boss.domain_alert_changed.connect(_on_boss_domain_alert)
+	boss.domain_burst_cue.connect(_on_boss_domain_burst)
 	world.actors.add_child(boss)
 	wave_remaining = 1
 	triggered_count = 1
+
+func _on_boss_domain_alert(pattern: int) -> void:
+	var active := pattern >= 0
+	if is_instance_valid(hud):
+		hud.set_domain_alert(active)
+		hud.show_boss_mechanic(pattern)
+	if active and is_instance_valid(feedback):
+		feedback.request_camera_shake(3.8, 0.16)
+
+func _on_boss_domain_burst(point: Vector2) -> void:
+	if is_instance_valid(feedback):
+		feedback.request_camera_shake(6.5, 0.18)
+		feedback.play_sword_cue("heavy_hit", point)
 
 func _connect_enemy(enemy: SurvivorEnemy) -> void:
 	enemy.killed.connect(_on_enemy_killed)
@@ -409,7 +497,7 @@ func _connect_enemy(enemy: SurvivorEnemy) -> void:
 	enemy.killed.connect(func(point: Vector2, xp: int): _play_melee_death_smoke(point, xp, is_boss), CONNECT_ONE_SHOT)
 	enemy.damaged.connect(func(point: Vector2, amount: float):
 		feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
-			enemy.last_hit_blocked))
+			enemy.last_hit_blocked, enemy.last_hit_crit))
 
 func _play_melee_death_smoke(point: Vector2, _xp: int, is_boss: bool = false) -> void:
 	feedback.spawn_death_dissolve(point, is_boss)
@@ -469,14 +557,21 @@ func _trigger_portal_reward() -> void:
 
 func _begin_clear_celebration(is_boss: bool, had_breakthrough: bool = false, kill_point: Vector2 = Vector2.ZERO) -> void:
 	_clear_hostile_projectiles()
+	hud.set_domain_alert(false)
 	phase = "clear_celebration"
 	clear_is_boss = is_boss
 	clear_celebration_elapsed = 0.0
-	clear_celebration_duration = CONFIG.BOSS_CLEAR_CELEBRATION_TIME if is_boss else CONFIG.CLEAR_CELEBRATION_TIME
+	clear_celebration_duration = 1.45 if is_boss else CONFIG.CLEAR_CELEBRATION_TIME
 	clear_banner_delay = 0.55 if had_breakthrough else CONFIG.CLEAR_BANNER_DELAY
 	clear_banner_shown = false
 	world.room_cleared = true
 	world.queue_redraw()
+	if is_boss:
+		feedback.play_title_start()
+		if DisplayServer.get_name() != "headless":
+			_end_hitstop()
+			victory_slowmo_left = 1.0
+			Engine.time_scale = 0.25
 	if is_instance_valid(player) and not player.dead and not kill_point.is_zero_approx():
 		feedback.spawn_clear_spirit_orbs(kill_point, player, 8 if is_boss else 6)
 	_update_status()
@@ -484,8 +579,11 @@ func _begin_clear_celebration(is_boss: bool, had_breakthrough: bool = false, kil
 func _finish_clear_celebration() -> void:
 	if phase != "clear_celebration":
 		return
+	if victory_slowmo_left > 0.0 or not is_equal_approx(Engine.time_scale, 1.0):
+		victory_slowmo_left = 0.0
+		Engine.time_scale = 1.0
 	if clear_is_boss:
-		phase = "cleared"
+		phase = "victory"
 		_update_status()
 		_show_result(true)
 
@@ -499,6 +597,7 @@ func _on_enemy_killed(point: Vector2, _xp: int) -> void:
 	if not player.dead:
 		if reward_counts[2] > 0:
 			player.health = minf(player.max_health, player.health + CONFIG.KILL_HEAL * reward_counts[2])
+			player.stamina = minf(player.max_stamina, player.stamina + 14.0 * reward_counts[2])
 			feedback.spawn_lifesteal_orbs(point, player, 5)
 		var rank := _cultivation_rank()
 		if int(player.cultivation) != rank:
@@ -525,6 +624,20 @@ func _on_enemy_killed(point: Vector2, _xp: int) -> void:
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	if phase == "defeat_transition":
+		var left := defeat_left - delta / Engine.time_scale
+		if left <= 0.0001:
+			_end_defeat_slowmo()
+			phase = "dead"
+			_update_status()
+			_show_result(false)
+		else:
+			defeat_left = left
+			hud.set_defeat_ink(smoothstep(0.0, 1.0, 1.0 - left / DEFEAT_SLOWMO))
+		return
+	cast_zoom_left = maxf(0.0, cast_zoom_left - delta / Engine.time_scale)
+	if phase in ["combat", "exit_ready", "wave_transition"]:
+		run_elapsed += delta
 	if phase == "combat" and is_instance_valid(scheduler):
 		scheduler.tick(delta)
 	elif phase == "wave_transition":
@@ -539,11 +652,17 @@ func _physics_process(delta: float) -> void:
 			pending_wave_points.clear()
 			_spawn_wave(pts, true)
 	elif phase == "clear_celebration":
-		clear_celebration_elapsed += delta
+		var real_step := delta / maxf(0.10, Engine.time_scale)
+		if victory_slowmo_left > 0.0:
+			victory_slowmo_left = maxf(0.0, victory_slowmo_left - real_step)
+			if victory_slowmo_left <= 0.0:
+				Engine.time_scale = 1.0
+		clear_celebration_elapsed += real_step
 		if not clear_banner_shown and clear_celebration_elapsed >= clear_banner_delay:
 			clear_banner_shown = true
 			feedback.play_clear_sound(clear_is_boss)
-			hud.play_clear_banner(clear_is_boss)
+			if not clear_is_boss:
+				hud.play_clear_banner(false)
 		if clear_celebration_elapsed >= clear_celebration_duration:
 			_finish_clear_celebration()
 	elif phase == "exit_ready":
@@ -578,6 +697,30 @@ func _input(event: InputEvent) -> void:
 			if code_t in [KEY_ESCAPE, KEY_TAB, KEY_QUOTELEFT]:
 				get_viewport().set_input_as_handled()
 				return
+		return
+	if phase == "victory":
+		if event is InputEventKey and event.pressed and not event.echo:
+			var code_v: int = event.keycode if event.keycode != 0 else event.physical_keycode
+			if code_v in [KEY_ENTER, KEY_KP_ENTER, KEY_R]:
+				start_room(false)
+				get_viewport().set_input_as_handled()
+				return
+			if code_v in [KEY_ESCAPE, KEY_TAB, KEY_SPACE]:
+				get_viewport().set_input_as_handled()
+				return
+		return
+	if phase == "defeat_transition":
+		get_viewport().set_input_as_handled()
+		return
+	if phase == "dead":
+		if event is InputEventKey and event.pressed and not event.echo:
+			var code_d: int = event.keycode if event.keycode != 0 else event.physical_keycode
+			if code_d == KEY_R:
+				start_room()
+				get_viewport().set_input_as_handled()
+			elif code_d in [KEY_ENTER, KEY_KP_ENTER] and get_viewport().gui_get_focus_owner() == hud.defeat_retry:
+				retry_current_room()
+				get_viewport().set_input_as_handled()
 		return
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
 		_debug_menu()
@@ -617,10 +760,16 @@ func _quick_set_cultivation(rank: int) -> void:
 			hud.show_notice("切换境界 · " + CONFIG.CULTIVATION_NAMES[cultivation_override])
 
 func _draw_rewards() -> void:
-	reward_options = CARD_POOL.draw(reward_counts, reward_rng)
+	reward_options = CARD_POOL.draw(reward_counts, reward_rng, reward_rank())
+
+func reward_rank() -> int:
+	return mini(player.cultivation, _room_grade_ceiling())
+
+func _room_grade_ceiling() -> int:
+	return mini(2, floori(room_index / 2.0))
 
 func can_select_reward(index: int) -> bool:
-	return index in reward_options and CARD_POOL.eligible(index, reward_counts)
+	return index in reward_options and CARD_POOL.eligible(index, reward_counts, reward_rank())
 
 func select_reward(index: int) -> void:
 	if phase != "reward_select" or not can_select_reward(index):
@@ -728,7 +877,7 @@ func debug_clear_enemies() -> void:
 		enemy.take_damage(enemy.health * 4.0 + 1.0, Vector2.ZERO, true)
 
 func debug_grant(index: int) -> void:
-	if not OS.is_debug_build() or not CARD_POOL.eligible(index, reward_counts):
+	if not OS.is_debug_build() or not CARD_POOL.eligible(index, reward_counts, 2):
 		return
 	reward_counts[index] += 1
 	_apply_rewards()
@@ -760,6 +909,8 @@ func debug_close() -> void:
 		get_tree().paused = false
 
 func _update_status() -> void:
+	if is_instance_valid(player):
+		player.aim_marker.visible = phase in ["combat", "wave_transition", "exit_ready"]
 	match phase:
 		"title": status.text = "问剑"
 		"combat":
@@ -767,8 +918,8 @@ func _update_status() -> void:
 		"clear_celebration": status.text = "%s已破 · 灵气散尽" % CONFIG.BOSS_NAME if clear_is_boss else "清场 · 破阵成功"
 		"reward_select": status.text = "阵眼领悟 · 选择一项功法奖励后进入下一关"
 		"exit_ready": status.text = "已清场 · 步入%s阵眼领悟功法" % CONFIG.ROOM_EXIT_LABELS[room_index]
-		"cleared": status.text = "%s已击败 · 本局通关" % CONFIG.BOSS_NAME
-		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
+		"cleared", "victory": status.text = "%s已斩 · 问剑大成" % CONFIG.BOSS_NAME
+		"dead": status.text = "败北 · 重战本关或重入仙途"
 
 func toggle_pause() -> void:
 	if menu_open:
@@ -791,6 +942,11 @@ func toggle_stats() -> void:
 func _show_result(completed: bool) -> void:
 	menu_open = false
 	stats_open = false
+	cast_zoom_left = 0.0
+	_update_camera()
+	hud.cast_focus.clear()
+	if not completed:
+		feedback.hide()
 	get_tree().paused = true
 	hud.update_room(remaining, total, triggered_count)
 	hud.show_run_result(completed)
@@ -803,7 +959,8 @@ func _update_camera() -> void:
 	if not is_instance_valid(player):
 		return
 	var viewport := get_viewport_rect().size
-	var fit: float = minf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y)
+	var cast_zoom := 1.0 + 0.030 * sin(PI * cast_zoom_left / 0.34)
+	var fit: float = minf(viewport.x / world.ART_SIZE.x, viewport.y / world.ART_SIZE.y) * cast_zoom
 	if room_index <= 1 or not close_view:
 		$Camera2D.zoom = Vector2.ONE * fit
 		$Camera2D.position = world.ART_SIZE * 0.5

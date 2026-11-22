@@ -53,7 +53,7 @@ func trial(count: int, reward: bool, tactic: int):
 	es.resize(count)
 	game.scheduler.configure(es, 2, 1.65)
 	if reward:
-		game.reward_counts[3] = 1
+		game.reward_counts[8] = 1
 		game._apply_rewards()
 	p.position = Vector2(620, 420)
 	for i in range(count):

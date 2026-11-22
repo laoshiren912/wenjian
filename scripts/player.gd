@@ -319,6 +319,17 @@ func _physics_process(delta: float) -> void:
 		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
 	if not rolling_this_frame and not movement.is_zero_approx():
 		_movement_facing = Vector2(signf(movement.x), 0) if absf(movement.x) > absf(movement.y) else Vector2(0, signf(movement.y))
+	var body_look := _body_look(movement, rolling_this_frame)
+	if _uses_charge():
+		visual.charge_aim = aim_direction if combo.charging else Vector2.ZERO
+	visual.update_pose(get_real_velocity(), body_look, color, body_look)
+	if rolling_this_frame:
+		_roll_remaining = maxf(0.0, _roll_remaining - delta)
+		if not is_rolling():
+			_finish_roll()
+	queue_redraw()
+
+func _body_look(movement: Vector2, rolling_this_frame: bool) -> Vector2:
 	var body_look: Vector2 = visual.facing
 	if weapon.swing_time > 0.0:
 		body_look = weapon.swing_direction
@@ -330,14 +341,7 @@ func _physics_process(delta: float) -> void:
 		body_look = movement
 	if rolling_this_frame:
 		body_look = _roll_direction
-	if _uses_charge():
-		visual.charge_aim = aim_direction if combo.charging else Vector2.ZERO
-	visual.update_pose(get_real_velocity(), body_look, color, body_look)
-	if rolling_this_frame:
-		_roll_remaining = maxf(0.0, _roll_remaining - delta)
-		if not is_rolling():
-			_finish_roll()
-	queue_redraw()
+	return body_look
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:

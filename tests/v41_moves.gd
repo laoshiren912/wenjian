@@ -3,6 +3,7 @@ extends SceneTree
 const CONFIG = preload("res://scripts/v41_config.gd")
 const Trace = preload("res://scripts/v41_dash_trace.gd")
 const ORIGIN := Vector2(460, 397)
+const CAPTURES := "res://artifacts/runtime/v41-aim-and-cooldown/"
 var game
 var player
 var checks := 0
@@ -34,10 +35,13 @@ func tap(index: MouseButton, point: Vector2) -> void:
 	button(index, true, point)
 	button(index, false, point)
 
-func space(point: Vector2, held = null) -> void:
+func mouse_motion(point: Vector2) -> void:
 	var motion := InputEventMouseMotion.new()
 	motion.position = root.get_canvas_transform() * point
 	root.push_input(motion, true)
+
+func space(point: Vector2, held = null) -> void:
+	mouse_motion(point)
 	var event := InputEventKey.new()
 	event.keycode = KEY_SPACE
 	event.physical_keycode = KEY_SPACE
@@ -80,6 +84,7 @@ func run() -> void:
 	await check_interrupts()
 	await check_action_links()
 	await check_combo()
+	await check_split_controls()
 	print("V41 MOVES: %d / %d passed" % [checks - failures, checks])
 	game.free()
 	await process_frame
@@ -87,17 +92,19 @@ func run() -> void:
 
 func check_growth() -> void:
 	var enemies := fresh()
-	# 第一关 3 击杀仍处于凡剑期（[0, 8, 18]）
+	# 第一关 3 击杀仍处于凡剑期。
 	for i in range(3):
 		enemies[i].take_damage(2000.0, Vector2.ZERO)
 		check(player.cultivation == 0 and game.run_kills == i + 1, "natural cultivation kill %d stays rank 0" % (i + 1))
-	# 验证达到 8 击杀突破御气期、18 击杀突破仙术期
+	# 验证达到对应击杀阈值后突破。
+	game.room_index = 2
 	game.run_kills = int(CONFIG.CULTIVATION_KILLS[1]) - 1
 	player.cultivation = game._cultivation_rank()
 	check(player.cultivation == 0, "just below rank 1 threshold stays rank 0")
 	game.run_kills = int(CONFIG.CULTIVATION_KILLS[1])
 	player.cultivation = game._cultivation_rank()
 	check(player.cultivation == 1, "reaches rank 1 at threshold %d" % CONFIG.CULTIVATION_KILLS[1])
+	game.room_index = 4
 	game.run_kills = int(CONFIG.CULTIVATION_KILLS[2])
 	player.cultivation = game._cultivation_rank()
 	check(player.cultivation == 2, "reaches rank 2 at threshold %d" % CONFIG.CULTIVATION_KILLS[2])
@@ -106,6 +113,8 @@ func check_growth() -> void:
 	check(player.cultivation == 0 and game.run_kills == int(CONFIG.CULTIVATION_KILLS[2]), "GM changes rank without changing kills")
 	game.debug_cultivation(-1)
 	check(player.cultivation == 2, "GM restores earned rank")
+	game.room_index = 0
+	player.cultivation = game._cultivation_rank()
 	game.debug_close()
 	enemies[3].take_damage(2000.0, Vector2.ZERO)
 	check(game.phase == "exit_ready" and not paused and game.world.portal_open, "room clear opens exit portal without forced modal")
@@ -116,9 +125,9 @@ func check_growth() -> void:
 	game.select_reward(0)
 	await frames(2)
 	player = game.player
-	check(game.room_index == 1 and is_equal_approx(player.combo.stages[0].damage, 41.6) and player.cultivation == 2, "selecting reward transitions directly to next room and applies cards independently of rank")
+	check(game.room_index == 1 and player.card_level(0) == 1 and player.cultivation == 0, "room two remains at basic rank and carries the chosen card")
 	game._apply_rewards()
-	check(is_equal_approx(player.combo.stages[0].damage, 41.6), "reapplying rewards does not compound")
+	check(player.card_level(0) == 1 and is_equal_approx(player.combo.stages[0].damage, 32.0), "reapplying cards leaves levels and base damage unchanged")
 	await frames(2)
 
 func check_group_dashes() -> void:
@@ -199,7 +208,8 @@ func check_interrupts() -> void:
 	await frames(21)
 	check(traces().size() == 1 and traces()[0].marks.size() == 3, "lethal cleanup fixture has pending marks")
 	player.take_damage(1000.0, Vector2.ZERO)
-	check(paused and game.phase == "dead" and traces().is_empty(), "death clears pending sword marks")
+	check(not paused and game.phase == "defeat_transition" and traces().is_empty(), "death clears pending sword marks before the result")
+	await frames(35)
 	var key := InputEventKey.new()
 	key.keycode = KEY_R
 	key.pressed = true
@@ -300,3 +310,89 @@ func check_action_links() -> void:
 	tap(MOUSE_BUTTON_LEFT, aim)
 	await frames(4)
 	check(player.combo.stage == 0, "dash chain expires back to first swing after window")
+
+func check_split_controls() -> void:
+	var capture := "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless"
+	if capture:
+		root.size = Vector2i(1280, 720)
+		DirAccess.make_dir_recursive_absolute(CAPTURES)
+	game.enter_title_screen()
+	check(not game.player.aim_marker.visible, "aim marker hidden at the title")
+	for rank in range(3):
+		var enemies := fresh(rank)
+		await frames(2)
+		check(player.aim_marker.visible and player.aim_marker.can_process(), "aim marker in combat")
+		var origin: Vector2 = player.global_position
+		var click_point := origin + Vector2.RIGHT * 140.0
+		enemies[0].position = origin + Vector2(88, 17)
+		Input.action_press("move_left")
+		tap(MOUSE_BUTTON_LEFT, click_point)
+		check(player.visual.look_direction.is_equal_approx(Vector2.RIGHT), "left click immediately faces the cursor")
+		await frames(9)
+		check(player.combo.swing_direction.is_equal_approx(Vector2.RIGHT) and player.position.x < origin.x
+			and is_equal_approx(player.position.y, origin.y), "retreat left while slashing right at rank %d" % rank)
+		if capture and rank == 1:
+			await RenderingServer.frame_post_draw
+			var image := root.get_texture().get_image()
+			check(image.save_png(CAPTURES + "01-retreating-slash.png") == OK, "native retreating slash capture")
+		var second_point: Vector2 = player.global_position + Vector2.DOWN * 100.0
+		tap(MOUSE_BUTTON_LEFT, second_point)
+		mouse_motion(origin + Vector2.UP * 200.0)
+		await frames(18)
+		check(player.combo.stage == 1 and player.combo.swing_direction.is_equal_approx(Vector2.DOWN),
+			"buffered second slash preserves the click direction at rank %d" % rank)
+		Input.action_release("move_left")
+
+		fresh(rank)
+		await frames(2)
+		origin = player.global_position
+		Input.action_press("move_up")
+		tap(MOUSE_BUTTON_RIGHT, origin + Vector2.RIGHT * 125.0)
+		check(player.visual.look_direction.is_equal_approx(Vector2.RIGHT), "right click immediately faces the cursor")
+		await frames(11)
+		check(is_instance_valid(player.thrown_sword) and player.thrown_sword.aim.is_equal_approx(Vector2.RIGHT)
+			and player.visual.look_direction.is_equal_approx(Vector2.RIGHT) and player.position.y < origin.y,
+			"moving north leaves throw and pose locked east at rank %d" % rank)
+		if capture and rank == 1:
+			await RenderingServer.frame_post_draw
+			check(root.get_texture().get_image().save_png(CAPTURES + "02-moving-throw.png") == OK, "native moving throw capture")
+		tap(MOUSE_BUTTON_LEFT, player.global_position + Vector2.LEFT * 100.0)
+		mouse_motion(origin + Vector2.DOWN * 180.0)
+		await frames(60)
+		check(player.combo.attack_count == 1 and player.combo.swing_direction.is_equal_approx(Vector2.LEFT),
+			"post-catch slash preserves the click direction at rank %d" % rank)
+		Input.action_release("move_up")
+
+		fresh(rank)
+		await frames(2)
+		origin = player.global_position
+		Input.action_press("move_up")
+		Input.action_press("move_right")
+		space(origin + Vector2.LEFT * 150.0)
+		Input.action_release("move_up")
+		Input.action_release("move_right")
+		await frames(8)
+		check(player.dash_direction.is_equal_approx(Vector2(1, -1).normalized())
+			and player.position.x > origin.x and player.position.y < origin.y,
+			"dash records the pressed WASD diagonal at rank %d" % rank)
+
+		fresh(rank)
+		await frames(2)
+		origin = player.global_position
+		Input.action_press("move_up")
+		Input.action_press("move_down")
+		space(origin + Vector2.LEFT * 150.0)
+		check(player.dash_request.is_zero_approx(), "opposing held keys do not fall back to mouse dash")
+		Input.action_release("move_up")
+		Input.action_release("move_down")
+		space(origin + Vector2.LEFT * 150.0)
+		await frames(8)
+		check(player.dash_direction.is_equal_approx(Vector2.LEFT) and player.position.x < origin.x,
+			"stationary dash aims at the cursor at rank %d" % rank)
+	game.phase = "exit_ready"
+	game._trigger_portal_reward()
+	check(not player.aim_marker.visible, "aim marker hidden on reward selection")
+	game.phase = "victory"
+	game._update_status()
+	check(not player.aim_marker.visible, "aim marker hidden on results")
+	paused = false

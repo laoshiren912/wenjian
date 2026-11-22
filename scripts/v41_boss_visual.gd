@@ -5,6 +5,7 @@ const S_WALK = preload("res://assets/characters/Swordsman/Swordsman_Walk_Sheet_1
 const S_ATTACK = preload("res://assets/characters/Swordsman/Swordsman_Attack_Sheet_1404x1440.png")
 const S_DEATH = preload("res://assets/characters/Swordsman/Swordsman_Death_Sheet_1404x540.png")
 const TINT_SHADER = preload("res://assets/shaders/v41_boss_tint.gdshader")
+const CONFIG = preload("res://scripts/v41_config.gd")
 
 const CELL := Vector2(156, 180)
 const BOSS_SCALE := 0.80
@@ -20,8 +21,7 @@ func _ready() -> void:
 	ensure_material()
 
 func play_hurt() -> void:
-	hurt_time = 0.07
-	queue_redraw()
+	start_limited_hurt_flash(CONFIG.ENEMY_FLASH_INTERVAL, CONFIG.ENEMY_FLASH_DURATION)
 
 func ensure_material() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -118,10 +118,9 @@ func _draw() -> void:
 					frame = 8
 
 	if is_instance_valid(boss_material):
-		boss_material.set_shader_parameter("hurt_flash", 1.0 if hurt_time > 0.0 else 0.0)
-		boss_material.set_shader_parameter("aura_glow", aura)
+		boss_material.set_shader_parameter("hurt_flash", CONFIG.BOSS_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
 	if hurt_time > 0.0:
-		body_scale *= Vector2(1.05, 0.95)
+		body_scale *= Vector2(1.022, 0.978)
 
 	# 冲锋赤金像素残像
 	if boss != null:

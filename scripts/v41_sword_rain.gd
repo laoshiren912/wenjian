@@ -6,7 +6,10 @@ enum Phase { CAST, ORBIT, ASCEND, FALL }
 
 var actor: SurvivorPlayer
 var rank := 0
-var card_level := 0
+var empowered := false
+var refunded_targets := {}
+var refunded_time := 0.0
+var opening_bonus := 1.0
 var power := 1.0
 var terrain_mask := 1
 var aim := Vector2.RIGHT
@@ -22,7 +25,7 @@ var _fall_cue_sent := false
 func _ready() -> void:
 	z_index = 6
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	total_swords = int(CONFIG.SWORD_RAIN_COUNT[clampi(rank, 0, 2)]) + (CONFIG.SWORD_RAIN_CARD_EXTRA if card_level > 0 else 0)
+	total_swords = int(CONFIG.SWORD_RAIN_COUNT[clampi(rank, 0, 2)]) * (2 if empowered else 1)
 	if is_instance_valid(actor):
 		global_position = actor.global_position
 		aim = _current_aim()
@@ -73,8 +76,8 @@ func _build_sword_slots() -> void:
 			"target_enemy": locked_enemy,
 			"drop_point": drop_pt,
 			"ascend_start": Vector2.ZERO,
-			"fall_delay": float(i) * CONFIG.SWORD_RAIN_FALL_STEP,
-			"skew_x": (float(i % 5) - 2.0) * 7.0,
+			"fall_delay": float(i) * CONFIG.SWORD_RAIN_FALL_STEP * (0.40 if empowered else 0.86),
+			"skew_x": (float(i % 5) - 2.0) * (16.0 if empowered else 7.0),
 			"landed": false,
 			"land_age": 0.0,
 		})
@@ -137,7 +140,7 @@ func _physics_process(delta: float) -> void:
 			if phase_age >= CONFIG.SWORD_RAIN_ORBIT_TIME:
 				for s in swords:
 					var end_a: float = float(s.base_angle) + TAU
-					s.ascend_start = global_position + Vector2(cos(end_a) * 34.0, sin(end_a) * 24.0 - 12.0)
+					s.ascend_start = global_position + Vector2(cos(end_a) * 54.0, sin(end_a) * 37.0 - 12.0)
 				_assign_live_targets()
 				phase = Phase.ASCEND
 				phase_age = 0.0
@@ -176,7 +179,7 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _resolve_sword_impact(point: Vector2) -> void:
-	var radius: float = CONFIG.SWORD_RAIN_IMPACT_RADIUS + (8.0 if card_level > 0 else 0.0)
+	var radius: float = CONFIG.SWORD_RAIN_IMPACT_RADIUS
 	var dmg: float = float(CONFIG.SWORD_RAIN_DAMAGE[clampi(rank, 0, 2)]) * power
 	var hit_any := false
 	for node in get_tree().get_nodes_in_group("enemies"):
@@ -185,8 +188,29 @@ func _resolve_sword_impact(point: Vector2) -> void:
 			continue
 		if enemy.global_position.distance_squared_to(point) <= radius * radius:
 			var push_dir := (enemy.global_position - point).normalized() if enemy.global_position.distance_squared_to(point) > 1.0 else aim
-			enemy.take_damage(dmg, push_dir * 65.0, false, false)
+			var broke_guard := false
+			if enemy.has_method("is_guarding_stance") and enemy.is_guarding_stance():
+				if enemy.v41_guard_elite:
+					broke_guard = enemy.damage_posture(55.0)
+				else:
+					broke_guard = enemy.break_guard_stance(CONFIG.HEAVY_BASE_BREAK, CONFIG.BREAK_STUN)
+			var is_crit := broke_guard or opening_bonus > 1.0 or enemy.posture_broken_time > 0.0
+			enemy.take_damage(dmg * opening_bonus, push_dir * 65.0, broke_guard, false, false, is_crit)
+			if opening_bonus > 1.0:
+				opening_bonus = 1.0
+				actor.trigger_card_slash(enemy, aim)
+			if broke_guard:
+				actor.report_guard_break(enemy, 2)
 			hit_any = true
+			if empowered and not actor.dead:
+				var target_id := enemy.get_instance_id()
+				if not refunded_targets.has(target_id):
+					refunded_targets[target_id] = true
+					var budget: float = CONFIG.SWORD_RAIN_COOLDOWNS[rank] - CONFIG.SWORD_RAIN_MIN_COOLDOWN
+					var refund := minf(CONFIG.SWORD_RAIN_REFUND, budget - refunded_time)
+					refunded_time += refund
+					actor.sword_rain_cooldown = maxf(0.0, actor.sword_rain_cooldown - refund)
+				actor.health = minf(actor.max_health, actor.health + 2.0)
 	impacts.append({
 		"point": point,
 		"age": 0.0,
@@ -197,20 +221,42 @@ func _resolve_sword_impact(point: Vector2) -> void:
 		actor.sword_cue.emit("sword_rain_hit", point)
 
 func _draw_pixel_sword(pos: Vector2, heading: Vector2, length: float, col_main: Color, col_core: Color, col_accent: Color, alpha: float) -> void:
+	length *= 1.34
 	var dir := heading.normalized()
 	var side := dir.orthogonal()
 	var tip := (pos + dir * (length * 0.56)).round()
 	var tail := (pos - dir * (length * 0.44)).round()
-	var guard_l := (pos - dir * (length * 0.12) + side * 4.5).round()
-	var guard_r := (pos - dir * (length * 0.12) - side * 4.5).round()
+	var guard_l := (pos - dir * (length * 0.12) + side * 6.3).round()
+	var guard_r := (pos - dir * (length * 0.12) - side * 6.3).round()
+	draw_line(tail, tip, Color(col_main, 0.34 * alpha), 13.0, false)
 	draw_colored_polygon(PackedVector2Array([tip, guard_l, tail, guard_r]), Color(col_main, 0.90 * alpha))
 	draw_line(tail, tip, Color(col_core, 0.96 * alpha), 2.2, false)
 	draw_line(guard_l, guard_r, Color(col_accent, 0.92 * alpha), 2.0, false)
 
+func _draw_cast_shockwave() -> void:
+	var progress := clampf(clock / 0.26, 0.0, 1.0)
+	if progress >= 1.0:
+		return
+	var radius := lerpf(25.0, 120.0, 1.0 - pow(1.0 - progress, 2.3))
+	var strength := 1.0 - smoothstep(0.02, 1.0, progress)
+	draw_set_transform(Vector2(0, 12), 0.0, Vector2(1.0, 0.48))
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 56, Color(0.22, 0.86, 0.69, 0.43 * strength), 14.0 * strength + 1.0, true)
+	draw_arc(Vector2.ZERO, radius - 3.0, 0.0, TAU, 56, Color(0.88, 1.0, 0.91, 0.92 * strength), 3.4, true)
+	draw_arc(Vector2.ZERO, radius * 0.74, 0.5, TAU, 46, Color(0.99, 0.80, 0.36, 0.77 * strength), 2.8, true)
+	draw_set_transform(Vector2.ZERO)
+	for i in range(24):
+		var direction := Vector2.from_angle(TAU * float(i) / 24.0 + 0.09 * i)
+		var point := direction * radius * (0.90 + 0.11 * (i % 3))
+		point.y *= 0.48
+		point.y -= progress * (14.0 + i % 5 * 6.0)
+		var ink := Color("f5d982") if i % 3 == 0 else Color("a4f8dc")
+		draw_line(point * 0.78, point, Color(ink, strength * 0.86), 2.0 + i % 2, true)
+
 func _draw() -> void:
+	_draw_cast_shockwave()
 	var col_main := Color("8be6ff") if rank == 0 else (Color("52f0ea") if rank == 1 else Color("42d2ff"))
 	var col_core := Color("f8ffff")
-	var col_accent := Color("ffe17d") if (card_level > 0 or rank >= 1) else col_main
+	var col_accent := Color("ffe17d") if (empowered or rank >= 1) else col_main
 
 	if phase == Phase.CAST:
 		var t := clampf(phase_age / maxf(0.01, CONFIG.SWORD_RAIN_CAST_TIME), 0.0, 1.0)
@@ -218,7 +264,7 @@ func _draw() -> void:
 		if blade_t > 0.01:
 			for s in swords:
 				var a: float = s.base_angle
-				var p := Vector2(cos(a) * lerpf(28.0, 42.0, blade_t), sin(a) * lerpf(18.0, 30.0, blade_t) - 10.0)
+				var p := Vector2(cos(a) * lerpf(30.0, 65.0, blade_t), sin(a) * lerpf(20.0, 45.0, blade_t) - 10.0)
 				var tangent := Vector2(-sin(a), cos(a)).normalized()
 				_draw_pixel_sword(p, tangent, lerpf(12.0, 26.0, blade_t), col_main, col_core, col_accent, blade_t * 0.92)
 
@@ -226,8 +272,8 @@ func _draw() -> void:
 		var t := clampf(phase_age / maxf(0.01, CONFIG.SWORD_RAIN_ORBIT_TIME), 0.0, 1.0)
 		var eased := smoothstep(0.0, 1.0, t)
 		var spin := eased * TAU
-		var rx := lerpf(42.0, 34.0, t)
-		var ry := lerpf(30.0, 24.0, t)
+		var rx := lerpf(65.0, 54.0, t)
+		var ry := lerpf(45.0, 37.0, t)
 		draw_set_transform(Vector2(0, -10), 0.0, Vector2(1.0, ry / rx))
 		draw_arc(Vector2.ZERO, rx, 0.0, TAU, 28, Color(col_main, 0.38 + 0.30 * t), 2.0, false)
 		draw_set_transform(Vector2.ZERO)
@@ -236,7 +282,8 @@ func _draw() -> void:
 			var pos := Vector2(cos(cur_a) * rx, sin(cur_a) * ry - 12.0)
 			var prev_a := cur_a - 0.38
 			var prev_pos := Vector2(cos(prev_a) * rx, sin(prev_a) * ry - 12.0)
-			draw_line(prev_pos.round(), pos.round(), Color(col_main, 0.65), 3.0, false)
+			draw_line(prev_pos.round(), pos.round(), Color(col_main, 0.45), 9.0, false)
+			draw_line(prev_pos.round(), pos.round(), Color(col_core, 0.84), 2.4, false)
 			var tangent := Vector2(-sin(cur_a), cos(cur_a)).normalized()
 			var heading := tangent.lerp(Vector2.UP, smoothstep(0.75, 1.0, t))
 			_draw_pixel_sword(pos, heading, 28.0, col_main, col_core, col_accent, 0.95)
@@ -273,10 +320,11 @@ func _draw() -> void:
 				var eased_f := f * f
 				var start_p := dst + Vector2(float(s.skew_x), -250.0)
 				var pos := start_p.lerp(dst, eased_f)
-				var prev_p := start_p.lerp(dst, maxf(0.0, eased_f - 0.22))
+				var prev_p := start_p.lerp(dst, maxf(0.0, eased_f - 0.34))
 				var heading := (dst - start_p).normalized()
-				draw_line(prev_p.round(), pos.round(), Color(col_main, 0.78), 4.0, false)
-				draw_line(prev_p.lerp(pos, 0.35).round(), pos.round(), Color(col_core, 0.92), 2.0, false)
+				draw_line(prev_p.round(), pos.round(), Color(col_main, 0.56), 11.0, false)
+				draw_line(prev_p.round(), pos.round(), Color(col_main, 0.92), 5.0, false)
+				draw_line(prev_p.lerp(pos, 0.28).round(), pos.round(), Color(col_core, 0.95), 2.8, false)
 				_draw_pixel_sword(pos, heading, 30.0, col_main, col_core, col_accent, 0.98)
 			else:
 				var st := clampf(float(s.land_age) / 0.14, 0.0, 1.0)

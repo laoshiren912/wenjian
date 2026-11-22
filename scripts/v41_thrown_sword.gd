@@ -1,6 +1,7 @@
 extends Node2D
 
 const CONFIG = preload("res://scripts/v41_config.gd")
+const CARDS = preload("res://scripts/v41_card_pool.gd").Card
 const STRIKE = preload("res://assets/characters/Swordsman/v41-strike-pose.png")
 const WHEEL_SHADER = preload("res://assets/shaders/v41_spin_wheel.gdshader")
 const SEAL_SHADER = preload("res://assets/shaders/v41_bagua_seal.gdshader")
@@ -12,6 +13,8 @@ const BLADE_CENTER_FROM_HILT := 11.0
 const CATCH_TIME := 0.075
 const COLORS := [Color("e9f3ff"), Color("67def3"), Color("b59bff")]
 enum Flight { OUTBOUND, SPIN, RETURN, CATCH }
+var on_hit_cards_fired := false
+var critical_slash_fired := false
 
 var actor: SurvivorPlayer
 var rank := 0
@@ -26,12 +29,10 @@ var angle := 0.0
 var traveled := 0.0
 var left := 0.0
 var age := 0.0
-var spin_tick_timer := 0.0
-var spin_ticks_left := 0
-var spin_tick_interval := 0.10
 var outbound_hits := {}
 var spin_hits := {}
 var return_hits := {}
+var target_hit_times := {}
 var launch_point := Vector2.ZERO
 var launch_grip := Vector2.ZERO
 var catch_start := Vector2.ZERO
@@ -107,12 +108,7 @@ func _physics_process(delta: float) -> void:
 			_outbound(delta)
 		Flight.SPIN:
 			spin_seal_age += delta
-			spin_tick_timer -= delta
-			if spin_ticks_left > 0 and spin_tick_timer <= 0.0:
-				spin_ticks_left -= 1
-				spin_tick_timer += spin_tick_interval
-				spin_hits.clear()
-				_contact(global_position, global_position, CONFIG.THROW_RADIUS[rank], CONFIG.THROW_SPIN_DAMAGE[rank], spin_hits, aim, true)
+			_contact(global_position, global_position, CONFIG.THROW_RADIUS[rank], CONFIG.THROW_SPIN_DAMAGE[rank], spin_hits, aim, true)
 			left -= delta
 			if left <= 0.0:
 				_return_now()
@@ -132,7 +128,7 @@ func _physics_process(delta: float) -> void:
 func _update_wheel_vfx() -> void:
 	if not is_instance_valid(wheel_sprite) or not is_instance_valid(actor):
 		return
-	var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
+	var twin: bool = actor.card_level(CARDS.SPLIT) > 0
 	var strength := smoothstep(0.0, 0.06, age)
 	var center := Vector2.ZERO
 	if flight == Flight.CATCH:
@@ -141,8 +137,6 @@ func _update_wheel_vfx() -> void:
 	elif flight == Flight.OUTBOUND:
 		center = (launch_grip + aim * BLADE_CENTER_FROM_HILT) * (1.0 - strength)
 	var base_radius: float = (CONFIG.THROW_RADIUS[rank] + 10.0) if flight == Flight.SPIN else (30.0 + rank * 4.5)
-	if twin:
-		base_radius *= 1.26
 	var diameter := base_radius * 2.0
 	wheel_sprite.visible = strength > 0.02
 	wheel_sprite.position = center
@@ -184,15 +178,12 @@ func _outbound(delta: float) -> void:
 	global_position += aim * distance
 	traveled += distance
 	if distance > 0.001:
-		_contact(from, global_position, 18.0, CONFIG.THROW_OUT_DAMAGE[rank] * opening_bonus, outbound_hits, aim)
+		_contact(from, global_position, 18.0, CONFIG.THROW_OUT_DAMAGE[rank], outbound_hits, aim)
 	if fraction < 1.0:
 		_return_now()
 	elif traveled >= max_travel - 0.01:
 		flight = Flight.SPIN
 		left = float(CONFIG.THROW_SPIN_TIME[rank])
-		spin_ticks_left = int(CONFIG.THROW_SPIN_TICKS[rank])
-		spin_tick_interval = left / float(maxi(1, spin_ticks_left))
-		spin_tick_timer = 0.0
 		actor.sword_cue.emit("throw_spin", global_position)
 
 func _return_now() -> void:
@@ -237,7 +228,13 @@ func _contact(from: Vector2, to: Vector2, radius: float, amount: float, hits: Di
 	var contact := Vector2.INF
 	for candidate in get_tree().get_nodes_in_group("enemies"):
 		var enemy := candidate as SurvivorEnemy
-		if enemy == null or enemy.dead or enemy.emerging or enemy.is_queued_for_deletion() or hits.has(enemy.get_instance_id()):
+		if enemy == null or enemy.dead or enemy.emerging or enemy.is_queued_for_deletion():
+			continue
+		var target_id := enemy.get_instance_id()
+		var hit_count := int(hits.get(target_id, 0))
+		if hit_count >= (CONFIG.THROW_SPIN_TICKS[rank] if pull_inward else 1):
+			continue
+		if age + 0.00001 < float(target_hit_times.get(target_id, -1.0)) + CONFIG.THROW_TARGET_HIT_INTERVAL:
 			continue
 		var point := enemy.global_position
 		var nearest := from if from.is_equal_approx(to) else Geometry2D.get_closest_point_to_segment(point, from, to)
@@ -247,24 +244,52 @@ func _contact(from: Vector2, to: Vector2, radius: float, amount: float, hits: Di
 			var ray := PhysicsRayQueryParameters2D.create(nearest, point, terrain_mask)
 			if not get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 				continue
-		hits[enemy.get_instance_id()] = true
+		hits[target_id] = hit_count + 1
+		target_hit_times[target_id] = age
+		var rear: bool = actor.is_rear_hit(enemy, push)
+		var broke_guard := false
+		if enemy.has_method("is_guarding_stance") and enemy.is_guarding_stance():
+			if enemy.v41_guard_elite and not rear:
+				# 右键飞剑大幅削减精英怪黄色架势条（2 段命中即震碎护体剑罡进入 1.5s 破防硬直）
+				broke_guard = enemy.damage_posture(55.0)
+			else:
+				broke_guard = enemy.break_guard_stance(CONFIG.HEAVY_BASE_BREAK, CONFIG.BREAK_STUN)
 		var impulse := push * 56.0
 		if pull_inward:
-			# 旋停期轻度向心牵引 + 短暂减速，方便聚怪衔接 E 或空格
+			# 旋停期向心牵引与短暂减速。
 			var to_center := global_position - point
 			var pull_dist := to_center.length()
 			impulse = to_center.normalized() * minf(CONFIG.THROW_PULL_STRENGTH, pull_dist * 3.2) if pull_dist > 6.0 else Vector2.ZERO
 			enemy.slow_time = maxf(enemy.slow_time, CONFIG.THROW_SLOW_DURATION)
-		enemy.take_damage(amount * power, impulse, false, false)
+		var swing_amount := amount
+		var is_crit := broke_guard or (rear and enemy.v41_guard_elite) or enemy.posture_broken_time > 0.0
+		if rear and enemy.v41_guard_elite:
+			swing_amount *= 1.5
+		# Consume the critical on the first actual contact, regardless of flight phase.
+		if opening_bonus > 1.0 and not critical_slash_fired:
+			critical_slash_fired = true
+			swing_amount *= opening_bonus
+			is_crit = true
+			actor.trigger_card_slash(enemy, push)
+		enemy.take_damage(swing_amount * power, impulse, broke_guard or rear, false, false, is_crit)
+		if broke_guard:
+			actor.report_guard_break(enemy, 2)
+		if rear and enemy.dead:
+			actor.refresh_dash_from_card()
+		if not on_hit_cards_fired:
+			on_hit_cards_fired = true
+			if actor.card_level(CARDS.SPLIT) > 0:
+				actor.split_thrown_sword(point, push, enemy)
+			actor.trigger_card_lightning(point, enemy)
 		contact = point
 	if first and contact.is_finite():
-		var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
+		var twin: bool = actor.card_level(CARDS.SPLIT) > 0
 		actor.sword_cue.emit("throw_hit_twin" if twin else "throw_hit", contact)
 
 func _draw() -> void:
 	if not is_instance_valid(actor):
 		return
-	var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
+	var twin: bool = actor.card_level(CARDS.SPLIT) > 0
 	var center := Vector2.ZERO
 	var blade_angle := angle
 	var strength := smoothstep(0.0, 0.06, age)

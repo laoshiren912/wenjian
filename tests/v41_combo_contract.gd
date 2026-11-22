@@ -34,11 +34,11 @@ func run():
    for i in range(8):
     var dir = Vector2.from_angle(i * TAU / 8)
     enemy.position = player.position + dir.rotated(deg_to_rad(10.0)) * (reach + 5.0)
-    var assisted: Vector2 = sword._sword_assist(dir)
-    check(absf(assisted.angle_to(enemy.position - player.position)) < 0.001, "assist slot/rank/direction %d/%d/%d" % [slot,rank,i])
-    sword.swing_direction = assisted
+    var aim: Vector2 = sword._sword_assist(dir)
+    check(aim.is_equal_approx(dir), "nearby enemy cannot bend slot/rank/direction %d/%d/%d" % [slot,rank,i])
+    sword.swing_direction = aim
     var edge: Vector2 = sword.blade_segment(1.0)[1]
-    check(edge.dot(assisted) > 0, "edge forward")
+    check(edge.dot(aim) > 0, "edge forward")
    enemy.position = player.position + Vector2.RIGHT.rotated(deg_to_rad(16.0)) * 65.0
    check(sword._sword_assist(Vector2.RIGHT).is_equal_approx(Vector2.RIGHT), "outside cone")
  enemy.position = Vector2(1100,600)

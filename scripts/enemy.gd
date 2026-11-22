@@ -35,6 +35,7 @@ var dodge_enabled: bool = true
 var emerging: bool = false
 var legacy_ai: bool = false
 var guard_time: float = 0.0
+var v41_guard_elite := false
 var guard_cooldown: float = 1.2
 var guard_direction: Vector2 = Vector2.RIGHT
 var encounter_id: int = -1
@@ -290,6 +291,7 @@ func _encounter_attackers() -> int:
 
 func _encounter_process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
+	guard_anim_clock += delta
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	guard_cooldown = maxf(0.0, guard_cooldown - delta)
 	guard_time = maxf(0.0, guard_time - delta)
@@ -298,12 +300,20 @@ func _encounter_process(delta: float) -> void:
 	var offset: Vector2 = player.global_position - global_position
 	if v41_heavy_stun > 0.0:
 		v41_heavy_stun = maxf(0.0, v41_heavy_stun - delta)
+		if posture_broken_time > 0.0:
+			posture_broken_time = maxf(0.0, posture_broken_time - delta)
+			if posture_broken_time <= 0.0:
+				posture = posture_max
 		velocity = knockback
 		knockback = knockback.lerp(Vector2.ZERO, minf(1.0, 11.0 * delta))
 		move_and_slide()
-		visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
+		visual.update_pose(Vector2.ZERO, guard_direction, Color.WHITE)
 		queue_redraw()
 		return
+	if posture_broken_time > 0.0:
+		posture_broken_time = maxf(0.0, posture_broken_time - delta)
+		if posture_broken_time <= 0.0:
+			posture = posture_max
 	if hit_stun > 0.0:
 		hit_stun = maxf(0.0, hit_stun - delta)
 	if slow_time > 0.0:
@@ -346,6 +356,15 @@ func _encounter_process(delta: float) -> void:
 	elif encounter_state == EncounterState.CHASE and visible:
 		if distance > 0.01 and not _holding_encounter_melee_facing():
 			guard_direction = offset.normalized()
+		# 精英怪在追击靠近玩家且架势完好时主动展开真格挡架势（身前护体剑罡 + 黄色架势条）
+		if v41_guard_elite and guard_cooldown <= 0.0 and posture_broken_time <= 0.0 and posture > 0.0 and distance < 175.0 and distance > 52.0:
+			guard_time = 0.85
+			guard_visual_time = 0.85
+			guard_cooldown = 1.65
+			velocity = Vector2.ZERO
+			visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
+			queue_redraw()
+			return
 		var reach := 400.0 if kind == Kind.RANGED else (75.0 if thrust_type else 60.0)
 		if kind == Kind.RANGED and v41_pressure:
 			reach = V41.RANGED_REACH
@@ -401,7 +420,8 @@ func _encounter_process(delta: float) -> void:
 		knockback = Vector2.ZERO
 	move_and_slide()
 	var look: Vector2 = attack_direction if windup > 0.0 or lunge_time > 0.0 or _holding_encounter_melee_facing() else (guard_direction if guard_time > 0.0 or encounter_state == EncounterState.CHASE else get_real_velocity())
-	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
+	var body_color := Color.WHITE if v41_pressure else (Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
+	visual.update_pose(get_real_velocity(), look, body_color)
 	queue_redraw()
 
 func _uses_melee_telegraph() -> bool:
@@ -597,44 +617,93 @@ func _v41_follow_path(target: Vector2) -> Vector2:
 		return (path[path_index] - global_position).normalized()
 	return Vector2.ZERO
 
+const ELITE_POSTURE_MAX := 100.0
+const ELITE_BREAK_STUN := 1.5
+
 var damage_shakes_camera := true
 var last_hit_blocked := false
+var last_hit_crit := false
 var v41_heavy_stun := 0.0
 var hit_stun := 0.0
 var slow_time := 0.0
 var guard_visual_time := 0.0
+var guard_anim_clock := 0.0
+var posture_max: float = ELITE_POSTURE_MAX
+var posture: float = ELITE_POSTURE_MAX
+var posture_broken_time: float = 0.0
+
+func is_guarding_stance() -> bool:
+	return guard_time > 0.0 or (v41_pressure and guard_visual_time > 0.0)
+
+func damage_posture(amount: float) -> bool:
+	if not v41_guard_elite or posture_broken_time > 0.0 or amount <= 0.0:
+		return false
+	posture = maxf(0.0, posture - amount)
+	if posture <= 0.0:
+		break_guard_stance(ELITE_BREAK_STUN, ELITE_BREAK_STUN)
+		posture_broken_time = ELITE_BREAK_STUN
+		return true
+	queue_redraw()
+	return false
+
+func break_guard_stance(opening_window: float = V41.HEAVY_BASE_BREAK, stun_duration: float = V41.BREAK_STUN) -> bool:
+	var was_guarding := is_guarding_stance()
+	guard_time = 0.0
+	guard_visual_time = 0.0
+	var actual_open := ELITE_BREAK_STUN if v41_guard_elite else opening_window
+	var actual_stun := ELITE_BREAK_STUN if v41_guard_elite else stun_duration
+	guard_cooldown = maxf(guard_cooldown, actual_open)
+	if v41_guard_elite:
+		posture = 0.0
+		posture_broken_time = maxf(posture_broken_time, ELITE_BREAK_STUN)
+	if v41_pressure and kind == Kind.HOSTILE and not thrust_type:
+		v41_heavy_stun = maxf(v41_heavy_stun, actual_stun)
+		windup = 0.0
+		lunge_time = 0.0
+		velocity = Vector2.ZERO
+	elif kind == Kind.BOSS and was_guarding:
+		boss_timer = maxf(boss_timer, 0.55)
+		velocity = Vector2.ZERO
+	queue_redraw()
+	return was_guarding
 
 func suppress_by_third_hit() -> void:
 	if not v41_pressure or kind != Kind.HOSTILE or thrust_type:
 		return
-	v41_heavy_stun = V41.BREAK_STUN
+	v41_heavy_stun = maxf(v41_heavy_stun, V41.BREAK_STUN)
 	windup = 0.0
 	lunge_time = 0.0
 	velocity = Vector2.ZERO
 
-func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true, v41_player_arrow: bool = false) -> void:
+func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camera_shake: bool = true, v41_player_arrow: bool = false, force_crit: bool = false) -> void:
 	damage_shakes_camera = camera_shake
 	if dead or emerging:
 		return
-	var can_block := guard_time > 0.0
-	if encounter_id >= 0 and kind == Kind.HOSTILE and not thrust_type and encounter_state == EncounterState.CHASE and windup <= 0.0 and lunge_time <= 0.0 and guard_cooldown <= 0.0:
+	var can_block := guard_time > 0.0 and posture_broken_time <= 0.0
+	# 限定仅重装/精英怪自动进入格挡；普通小怪保持纯粹割草手感（手动设 guard_time 的单测仍兼容）
+	if encounter_id >= 0 and kind == Kind.HOSTILE and v41_guard_elite and posture_broken_time <= 0.0 and encounter_state == EncounterState.CHASE and windup <= 0.0 and lunge_time <= 0.0 and guard_cooldown <= 0.0:
 		can_block = true
 	aggro = true
 	var guard_arc := V41.GUARD_ARC_DOT if v41_pressure else 0.5
 	var arrow_bypasses := v41_player_arrow and v41_pressure and kind == Kind.HOSTILE and not thrust_type
 	var blocked_hit := not ignore_guard and not arrow_bypasses and kind == Kind.HOSTILE and can_block and not push.is_zero_approx() and guard_direction.dot(-push.normalized()) >= guard_arc
 	last_hit_blocked = blocked_hit
+	var vulnerable_crit := posture_broken_time > 0.0 and not blocked_hit
+	last_hit_crit = (force_crit or vulnerable_crit) and not blocked_hit
+	if vulnerable_crit and not force_crit:
+		amount *= 1.5
 	if blocked_hit:
 		if v41_pressure:
-			guard_visual_time = V41.GUARD_DISPLAY
+			guard_visual_time = maxf(guard_visual_time, V41.GUARD_DISPLAY)
 		amount *= V41.GUARD_DAMAGE_FACTOR if v41_pressure else 0.35
 		push *= 0.25
 		if encounter_id >= 0 and (not v41_pressure or guard_time <= 0.0):
-			guard_time = V41.GUARD_HOLD if v41_pressure else 0.2
-			guard_cooldown = V41.GUARD_COOLDOWN if v41_pressure else 1.5
+			guard_time = (0.45 if v41_guard_elite else V41.GUARD_HOLD) if v41_pressure else 0.2
+			guard_cooldown = (0.50 if v41_guard_elite else V41.GUARD_COOLDOWN) if v41_pressure else 1.5
 	if encounter_id >= 0 and not ignore_guard:
 		alert_encounter(player.global_position)
-	flash = 0.14
+	if not v41_pressure or visual.hurt_flash_lock <= 0.00001:
+		flash = V41.ENEMY_FLASH_DURATION if v41_pressure else 0.14
 	visual.play_hurt()
 	var actual_damage: float = minf(health, amount)
 	health -= amount
@@ -669,6 +738,8 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 	queue_redraw()
 
 func _draw() -> void:
+	if v41_guard_elite:
+		draw_arc(Vector2(0, 13), 17.0, 0.20, PI - 0.20, 16, Color("80cfcb"), 2.0, true)
 	if intro_room and kind == Kind.HOSTILE and is_instance_valid(pair_scheduler):
 		if pair_scheduler.can_start(self) or windup > 0.0 or lunge_time > 0.0:
 			draw_circle(Vector2(0, 23), 4.0, Color("ffad59"))
@@ -680,9 +751,30 @@ func _draw() -> void:
 	if aggro:
 		draw_line(Vector2(0, -30), Vector2(0, -24), Color("ffab89"), 2.0)
 		draw_circle(Vector2(0, -21), 1.5, Color("ffab89"))
-	if health < max_health:
-		draw_rect(Rect2(-19, -38, 38, 4), Color("182329"))
-		draw_rect(Rect2(-19, -38, 38 * maxf(0.0, health / max_health), 4), color)
+	if health < max_health or v41_guard_elite:
+		var bar_w := 48.0 if v41_guard_elite else 38.0
+		var bar_x := -bar_w * 0.5
+		var bar_y := -52.0 if v41_guard_elite else -38.0
+		draw_rect(Rect2(bar_x - 1.0, bar_y - 1.0, bar_w + 2.0, 6.0), Color("0a1014"))
+		draw_rect(Rect2(bar_x, bar_y, bar_w, 4.0), Color("1b252c"))
+		draw_rect(Rect2(bar_x, bar_y, bar_w * maxf(0.0, health / maxf(1.0, max_health)), 4.0), color)
+		if v41_guard_elite:
+			# 精英怪专属：生命条正下方醒目的明黄色「架势条（韧性条）」
+			var py := bar_y + 6.0
+			draw_rect(Rect2(bar_x - 1.0, py - 1.0, bar_w + 2.0, 6.5), Color("0a1014"))
+			draw_rect(Rect2(bar_x, py, bar_w, 4.5), Color("242018"))
+			if posture_broken_time > 0.0:
+				var blink := 0.55 + 0.45 * sin(guard_anim_clock * 22.0)
+				draw_rect(Rect2(bar_x, py, bar_w, 4.5), Color(0.95, 0.32, 0.18, 0.60 * blink))
+				# 头顶破防眩晕标识（赤金碎盾菱标 + 旋转晕眩光弧）
+				var warn_y := bar_y - 14.0
+				draw_arc(Vector2(0, warn_y), 7.5, guard_anim_clock * 6.0, guard_anim_clock * 6.0 + PI * 1.35, 14, Color(1.0, 0.72, 0.25, 0.95), 2.0, true)
+				draw_string_outline(ThemeDB.fallback_font, Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color("200a06"))
+				draw_string(ThemeDB.fallback_font, Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("ffbe45"))
+			else:
+				var ratio := clampf(posture / maxf(1.0, posture_max), 0.0, 1.0)
+				draw_rect(Rect2(bar_x, py, bar_w * ratio, 4.5), Color("f8d848"))
+				draw_line(Vector2(bar_x, py + 0.5), Vector2(bar_x + bar_w * ratio, py + 0.5), Color("fff7cc"), 1.2)
 	if kind == Kind.BOSS:
 		if boss_state == BossState.STAGGER:
 			draw_arc(Vector2.ZERO, 32.0, 0.0, TAU, 32, Color("fff09a"), 5.0, true)
@@ -729,10 +821,43 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 24.0, 0.0, TAU, 32, Color("ffcc57"), 4.0, true)
 	if fast_chaser:
 		draw_arc(Vector2.ZERO, 21.0, 0.0, TAU, 24, Color("ffbd55"), 3.0, true)
-	if guard_time > 0.0 or v41_pressure and guard_visual_time > 0.0:
+	if (guard_time > 0.0 or v41_pressure and guard_visual_time > 0.0) and posture_broken_time <= 0.0:
 		var angle := guard_direction.angle()
 		var half_arc := acos(V41.GUARD_ARC_DOT) if v41_pressure else 0.8
-		draw_arc(Vector2.ZERO, 25.0, angle - half_arc, angle + half_arc, 20, Color("8fe5ff"), 5.0, true)
+		var pulse := 0.74 + 0.26 * sin(guard_anim_clock * 14.0)
+		var shield_r := 34.0 if kind == Kind.BOSS else (31.0 if v41_guard_elite else 27.0)
+		# 半透明青金色扇形护体剑罡光弧（带流光纹理）
+		var fan_poly := PackedVector2Array([Vector2.ZERO])
+		var ring_poly := PackedVector2Array()
+		var inner_r := shield_r - 11.0
+		for i in range(21):
+			var a := lerpf(angle - half_arc, angle + half_arc, float(i) / 20.0)
+			var pt := Vector2.from_angle(a) * shield_r
+			fan_poly.append(pt)
+			ring_poly.append(pt)
+		for i in range(20, -1, -1):
+			var a := lerpf(angle - half_arc, angle + half_arc, float(i) / 20.0)
+			ring_poly.append(Vector2.from_angle(a) * inner_r)
+		draw_colored_polygon(fan_poly, Color(0.28, 0.84, 0.80, 0.14 + 0.06 * pulse))
+		draw_colored_polygon(ring_poly, Color(0.45, 0.92, 0.88, 0.28 + 0.14 * pulse))
+		# 扇形流光纹理波纹（沿弧面匀速扫过）
+		var sweep_frac := fmod(guard_anim_clock * 1.25, 1.0)
+		var sweep_a := lerpf(angle - half_arc * 0.85, angle + half_arc * 0.85, sweep_frac)
+		draw_arc(Vector2.ZERO, shield_r - 4.5, maxf(angle - half_arc, sweep_a - 0.32), minf(angle + half_arc, sweep_a + 0.32), 12, Color(1.0, 0.96, 0.76, 0.85), 3.0, true)
+		# 扇形侧边微光线
+		draw_line(Vector2.from_angle(angle - half_arc) * 10.0, Vector2.from_angle(angle - half_arc) * shield_r, Color(0.86, 0.82, 0.50, 0.45), 1.4, true)
+		draw_line(Vector2.from_angle(angle + half_arc) * 10.0, Vector2.from_angle(angle + half_arc) * shield_r, Color(0.86, 0.82, 0.50, 0.45), 1.4, true)
+		# 外层鎏金剑罡边锋 + 内层霜青流光弧
+		draw_arc(Vector2.ZERO, shield_r + 1.5, angle - half_arc, angle + half_arc, 26, Color(0.96, 0.84, 0.48, 0.92 * pulse), 3.0, true)
+		draw_arc(Vector2.ZERO, shield_r - 2.0, angle - half_arc * 0.95, angle + half_arc * 0.95, 24, Color(0.56, 0.98, 0.94, 0.95), 3.6, true)
+		draw_arc(Vector2.ZERO, inner_r + 1.5, angle - half_arc * 0.80, angle + half_arc * 0.80, 18, Color(1.0, 0.96, 0.80, 0.58 * pulse), 1.4, true)
+		# 身前横举长剑光刃投影，凸显持剑横挡架势
+		var fwd := Vector2.from_angle(angle)
+		var side := fwd.orthogonal()
+		var blade_mid := fwd * (shield_r - 8.0) + Vector2(0, -6.0)
+		draw_line(blade_mid - side * 16.0, blade_mid + side * 16.0, Color(0.14, 0.20, 0.24, 0.85), 5.0, true)
+		draw_line(blade_mid - side * 15.0, blade_mid + side * 15.0, Color(0.94, 0.98, 1.0, 0.95), 2.4, true)
+		draw_circle(blade_mid - side * 11.0, 2.8, Color("f0cf7a"))
 
 func _draw_encounter_melee_cue(impact_cue: float) -> void:
 	var aiming := windup > 0.0

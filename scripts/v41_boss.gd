@@ -2,6 +2,7 @@ extends SurvivorEnemy
 
 const BOSS_VISUAL = preload("res://scripts/v41_boss_visual.gd")
 const BOSS_VFX_SHADER = preload("res://assets/shaders/v41_boss_vfx.gdshader")
+const BOSS_DOMAIN = preload("res://scripts/v41_boss_domain.gd")
 const HEALTH := 4400.0
 const APPROACH_SPEED := 228.0
 const SWEEP_REACH := 102.0
@@ -15,10 +16,22 @@ const CHARGE_SPEED := 495.0
 const CHARGE_DAMAGE := 25.0
 const RECOVERY := 0.86
 const IMPACT_TIME := 0.22
+const DOMAIN_CENTER := Vector2(640, 350)
+const DOMAIN_COOLDOWN := 8.4
+const DOMAIN_THRESHOLDS := [0.75, 0.53, 0.35]
+
+signal domain_alert_changed(pattern: int)
+signal domain_burst_cue(point: Vector2)
 
 var vfx_sprite: Sprite2D
 var vfx_material: ShaderMaterial
 var _unit_tex: ImageTexture
+var domain_node: Node2D
+var domain_active := false
+var domain_clock := 0.0
+var domain_cooldown := 0.0
+var domain_casts := 0
+var next_pattern := BOSS_DOMAIN.Pattern.RAIN
 
 func _ready() -> void:
 	name = "心魔"
@@ -49,10 +62,67 @@ func _setup_vfx() -> void:
 	vfx_sprite.visible = false
 	add_child(vfx_sprite)
 
+func _exit_tree() -> void:
+	cancel_demon_domain()
+
+func cancel_demon_domain() -> void:
+	if is_instance_valid(domain_node):
+		domain_node.hide()
+		domain_node.set_physics_process(false)
+		domain_node.queue_free()
+	if domain_active:
+		_on_domain_finished()
+
+func trigger_demon_domain(selected: int = -1) -> void:
+	if dead or domain_active or not is_instance_valid(player) or player.dead:
+		return
+	var pattern: int = next_pattern if selected < 0 else selected
+	domain_active = true
+	domain_casts += 1
+	next_pattern = (pattern + 1) % BOSS_DOMAIN.NAMES.size()
+	domain_clock = 0.0
+	velocity = Vector2.ZERO
+	knockback = Vector2.ZERO
+	global_position = DOMAIN_CENTER
+	boss_state = BossState.CIRCLE_WINDUP
+	boss_timer = BOSS_DOMAIN.TELEGRAPH[pattern] + BOSS_DOMAIN.ACTIVE[pattern]
+	if is_instance_valid(vfx_sprite):
+		vfx_sprite.visible = false
+	var field := BOSS_DOMAIN.new()
+	field.setup(self, player, DOMAIN_CENTER, pattern)
+	field.domain_burst_started.connect(func(): domain_burst_cue.emit(global_position))
+	field.domain_finished.connect(_on_domain_finished)
+	get_parent().add_child(field)
+	domain_node = field
+	domain_alert_changed.emit(pattern)
+
+func _on_domain_finished() -> void:
+	domain_active = false
+	domain_node = null
+	domain_cooldown = DOMAIN_COOLDOWN if health > max_health * 0.35 else 6.4
+	if is_instance_valid(visual):
+		visual.position = Vector2.ZERO
+	domain_alert_changed.emit(-1)
+	if not dead:
+		boss_state = BossState.RECOVERY
+		boss_timer = 0.90
+
 func _boss_process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
+	guard_anim_clock += delta
 	boss_timer -= delta
 	repath -= delta
+	domain_cooldown = maxf(0.0, domain_cooldown - delta)
+	if domain_active:
+		domain_clock += delta
+		var offset_d := player.global_position - global_position
+		if not offset_d.is_zero_approx():
+			boss_charge_aim = offset_d.normalized()
+		if is_instance_valid(visual):
+			visual.position = Vector2(0.0, -22.0 + sin(domain_clock * 7.5) * 4.5)
+			visual.update_pose(Vector2.ZERO, boss_charge_aim, Color.WHITE)
+		queue_redraw()
+		return
 	var offset := player.global_position - global_position
 	var visible := _boss_has_sight(player.global_position)
 	if visible:
@@ -61,6 +131,10 @@ func _boss_process(delta: float) -> void:
 		boss_searching = false
 	match boss_state:
 		BossState.APPROACH:
+			var threshold: float = DOMAIN_THRESHOLDS[mini(domain_casts, DOMAIN_THRESHOLDS.size() - 1)]
+			if not world.has_exit and health <= max_health * threshold and health > 120.0 and domain_cooldown <= 0.0:
+				trigger_demon_domain()
+				return
 			var reach := SWEEP_REACH - 14.0 if boss_next_attack == 0 else CHARGE_REACH
 			if visible:
 				if not offset.is_zero_approx():
@@ -206,5 +280,23 @@ func _finish_attack(next_attack: int) -> void:
 	boss_timer = RECOVERY
 
 func _draw() -> void:
-	# Boss body, ground aura, telegraphs and slashes are rendered by pixel visual & shader nodes.
-	pass
+	if domain_active:
+		var pulse := 0.72 + 0.28 * sin(domain_clock * 12.0)
+		# 地面浮空投影 + 旋转黑红魔气聚灵法环
+		draw_set_transform(Vector2(0, 14), 0.0, Vector2(1.0, 0.42))
+		draw_circle(Vector2.ZERO, 24.0, Color(0.05, 0.01, 0.02, 0.55))
+		draw_arc(Vector2.ZERO, 44.0 + pulse * 6.0, 0.0, TAU, 32, Color(0.95, 0.18, 0.22, 0.85 * pulse), 3.0, false)
+		draw_arc(Vector2.ZERO, 30.0, domain_clock * 3.0, domain_clock * 3.0 + TAU * 0.75, 24, Color(1.0, 0.78, 0.48, 0.82), 2.0, false)
+		draw_set_transform(Vector2.ZERO)
+		# 浮空魔剑环绕光点
+		for i in range(6):
+			var a := domain_clock * 3.2 + i * TAU / 6.0
+			var p := Vector2(cos(a) * 34.0, sin(a) * 14.0 - 24.0)
+			draw_line(p + Vector2(0, -10), p + Vector2(0, 8), Color(0.98, 0.22, 0.25, 0.92), 2.4, false)
+			draw_circle(p, 2.5, Color("ffd89a"))
+	elif is_guarding_stance():
+		var angle := guard_direction.angle()
+		var half_arc := acos(V41.GUARD_ARC_DOT)
+		var pulse := 0.72 + 0.28 * sin(guard_anim_clock * 14.0)
+		draw_arc(Vector2.ZERO, 34.0, angle - half_arc, angle + half_arc, 24, Color(0.95, 0.84, 0.50, 0.85 * pulse), 3.0, true)
+		draw_arc(Vector2.ZERO, 30.0, angle - half_arc * 0.92, angle + half_arc * 0.92, 22, Color(0.60, 0.96, 0.95, 0.92), 3.8, true)

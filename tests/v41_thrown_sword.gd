@@ -77,6 +77,12 @@ func check_flight() -> void:
 		enemies[1].position = ORIGIN + Vector2(distance - 6.0, 3.0)
 		enemies[2].position = ORIGIN + Vector2(distance, spin_radius - 2.0)
 		enemies[3].position = ORIGIN + Vector2(distance, spin_radius + 8.0)
+		var contacts := [[], [], [], []]
+		for i in range(enemies.size()):
+			enemies[i].damaged.connect(func(_point: Vector2, amount: float):
+				var flight: Flight = player.thrown_sword
+				if is_instance_valid(flight):
+					contacts[i].append({"age": flight.age, "phase": flight.flight, "amount": amount}))
 		await frames(2)
 		mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 350)
 		await frames(3)
@@ -101,13 +107,21 @@ func check_flight() -> void:
 			saw_return = saw_return or sword.flight == Flight.Flight.RETURN
 			saw_catch = saw_catch or sword.flight == Flight.Flight.CATCH
 			await frames(1)
-		var expected_spin_total: float = float(CONFIG.THROW_SPIN_DAMAGE[rank]) * float(CONFIG.THROW_SPIN_TICKS[rank])
 		check(spin_point.distance_to(ORIGIN + Vector2.RIGHT * distance) < 1.0, "spin starts at configured range %d" % rank)
 		check(absf(spin_tick_count / 60.0 - CONFIG.THROW_SPIN_TIME[rank]) < 0.04, "spin lasts the configured time %d" % rank)
 		check(saw_return and saw_catch and not is_instance_valid(player.thrown_sword), "continuous return and catch phases")
 		check(is_equal_approx(1000.0 - enemies[0].health, CONFIG.THROW_OUT_DAMAGE[rank] + CONFIG.THROW_RETURN_DAMAGE[rank]), "out and return each damage once")
-		check(is_equal_approx(1000.0 - enemies[1].health, CONFIG.THROW_OUT_DAMAGE[rank] + expected_spin_total + CONFIG.THROW_RETURN_DAMAGE[rank]), "multi-tick shred in spin plus out and return")
-		check(is_equal_approx(1000.0 - enemies[2].health, expected_spin_total) and enemies[2].slow_time > 0.0, "spin-only target takes multi-tick shred and brief slow")
+		var mixed: Array = contacts[1]
+		check(mixed.size() >= 3 and mixed[0].phase == Flight.Flight.OUTBOUND and mixed[1].phase == Flight.Flight.SPIN,
+			"overlapping phases still allow the first hit and spaced spin damage")
+		var spin_only: Array = contacts[2]
+		check(spin_only.size() >= 3 and spin_only.size() <= CONFIG.THROW_SPIN_TICKS[rank]
+			and spin_only.all(func(hit): return hit.phase == Flight.Flight.SPIN and is_equal_approx(hit.amount, CONFIG.THROW_SPIN_DAMAGE[rank]))
+			and enemies[2].slow_time > 0.0, "spin-only target still takes spaced multi-hit damage and brief slow")
+		for series in contacts:
+			for i in range(1, series.size()):
+				check(series[i].age - series[i - 1].age + 0.00001 >= CONFIG.THROW_TARGET_HIT_INTERVAL,
+					"same throw and target leave at least 0.12s between accepted hits")
 		check(enemies[3].health == 1000.0 and is_equal_approx(player.stamina, 92.0), "outside target and repeat-press cost")
 		mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 350, false)
 	# Verify short-range cursor-targeted spin stops right at clicked position
@@ -189,7 +203,7 @@ func check_inputs() -> void:
 	check(not is_instance_valid(player.thrown_sword) and player.throw_request.is_zero_approx() and player.stamina >= stamina,
 		"throw cooldown rejects second shot even after catch")
 	fresh(0)
-	game.reward_counts[1] = 1
+	game.reward_counts[5] = 1
 	game._apply_rewards()
 	await frames(2)
 	mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 300)
@@ -209,6 +223,7 @@ func check_cleanup() -> void:
 	var sword: Flight = player.thrown_sword
 	player.take_damage(1000.0, Vector2.ZERO)
 	check(not is_instance_valid(player.thrown_sword) and sword.is_queued_for_deletion(), "death removes sword and pending phases")
+	await frames(35)
 	key(KEY_R)
 	await frames(2)
 	check(game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword), "fresh run clears throw cooldown")

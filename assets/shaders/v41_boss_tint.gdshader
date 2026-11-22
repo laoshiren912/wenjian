@@ -3,8 +3,6 @@ render_mode unshaded, blend_mix;
 
 // 0..1 受击纯白闪白
 uniform float hurt_flash : hint_range(0.0, 1.0) = 0.0;
-// 0..1 蓄力/冲锋赤金仙煞脉冲
-uniform float aura_glow : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
 	vec4 tex = texture(TEXTURE, UV);
@@ -38,12 +36,8 @@ void fragment() {
 		remapped = mix(rgb, clamp(rgb * vec3(0.92, 0.86, 0.82) + vec3(0.03, 0.025, 0.025), 0.0, 1.0), outline_keep);
 	}
 
-	// 蓄力与冲锋时，仅在边缘与亮部泛起克制赤金煞光
-	float rim_factor = smoothstep(0.35, 0.85, luma) * aura_glow;
-	remapped = mix(remapped, vec3(1.0, 0.48, 0.18), rim_factor * 0.55);
-
 	// 受击纯白高对比度闪白
-	remapped = mix(remapped, vec3(1.0, 0.99, 0.96), hurt_flash * 0.96);
+	remapped = mix(remapped, vec3(1.0), clamp(hurt_flash, 0.0, 0.26));
 
 	COLOR = vec4(remapped, tex.a * COLOR.a);
 }

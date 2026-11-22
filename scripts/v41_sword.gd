@@ -3,6 +3,7 @@ extends "res://scripts/sword_orbit.gd"
 const CONFIG = preload("res://scripts/v41_config.gd")
 const SlashVfx = preload("res://scripts/v41_slash_vfx.gd")
 const SwordWave = preload("res://scripts/v41_sword_wave.gd")
+const CARDS = preload("res://scripts/v41_card_pool.gd").Card
 # Legacy mid-slash atlas disabled; procedural pixel shader vfx drives all three combo slots.
 const USE_MID_SLASH_V2 := false
 const MID_SLASH_ATLAS = preload("res://assets/vfx/mid-horizontal-slash-v2/mid_horizontal_slash_v2_atlas_4x4.png")
@@ -23,17 +24,15 @@ signal guard_broken(point: Vector2)
 # One contact can emit a hit/blocked event plus break and kill events.
 # Miss is emitted once after the active window, only if nothing was contacted.
 signal combo_event(kind: String, slot: int, point: Vector2, target: Node2D)
-var sword_rain_reward := false
-var dash_reward := false
-var heavy_reward := false
 var dash_armed := false
 var swing_bonus := 1.0
-var card_multiplier := 1.0
+var critical_slash_fired := false
 var swing_rank := 0
 var impact_sent := false
 var miss_checked := false
 var wave_fired := false
 var slash_vfx: Node2D
+var queued_direction := Vector2.ZERO
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -44,6 +43,7 @@ func _ready() -> void:
 		stages[i].windup = CONFIG.SWORD_TIMINGS[i].x
 		stages[i].active = CONFIG.SWORD_TIMINGS[i].y
 		stages[i].recovery = CONFIG.SWORD_TIMINGS[i].z
+		stages[i].lunge = 0.0
 	slash_vfx = SlashVfx.new()
 	slash_vfx.name = "SlashVfx"
 	add_child(slash_vfx)
@@ -187,6 +187,7 @@ func attack(direction: Vector2) -> bool:
 	if not super.attack(direction):
 		return false
 	swing_bonus = consume_dash_bonus()
+	critical_slash_fired = false
 	impact_sent = false
 	miss_checked = false
 	wave_fired = false
@@ -194,29 +195,7 @@ func attack(direction: Vector2) -> bool:
 	return true
 
 func _sword_assist(direction: Vector2) -> Vector2:
-	var player = get_parent()
-	var best_angle := deg_to_rad(CONFIG.COMBO_ASSIST_DEGREES)
-	var best_distance := INF
-	var input_direction := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
-	var result := input_direction
-	var reach: float = float(current_data().reach) + player.reach_bonus + CONFIG.SWORD_EXTENSION[swing_rank]
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if enemy.dead or enemy.emerging or enemy.is_queued_for_deletion():
-			continue
-		var offset: Vector2 = enemy.global_position - global_position
-		var distance := offset.length()
-		if distance < 1.0 or distance > reach + CONFIG.COMBO_TARGET_RADIUS:
-			continue
-		var angle := absf(input_direction.angle_to(offset))
-		if angle > best_angle or (is_equal_approx(angle, best_angle) and distance >= best_distance):
-			continue
-		var ray := PhysicsRayQueryParameters2D.create(global_position, enemy.global_position, player.terrain_mask)
-		if not get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
-			continue
-		best_angle = angle
-		best_distance = distance
-		result = offset.normalized()
-	return result
+	return direction if not direction.is_zero_approx() else Vector2.RIGHT
 
 func _physics_process(delta: float) -> void:
 	var player = get_parent()
@@ -234,7 +213,7 @@ func _physics_process(delta: float) -> void:
 			combo_event.emit("miss", stage, global_position, null)
 
 func consume_dash_bonus() -> float:
-	var bonus := CONFIG.DASH_SWORD_FACTOR if dash_reward and dash_armed else 1.0
+	var bonus := CONFIG.DASH_SWORD_FACTOR if dash_armed else 1.0
 	dash_armed = false
 	return bonus
 
@@ -250,6 +229,9 @@ func _sweep(previous: float, current: float) -> void:
 		return
 	var first := active_progress(previous)
 	var last := active_progress(current)
+	if stage == 2 and not charged_swing and not wave_fired and last >= CONFIG.THIRD_IMPACT_PROGRESS:
+		wave_fired = true
+		_fire_card_waves()
 	var reach: float = float(data.reach) + player.reach_bonus + CONFIG.SWORD_EXTENSION[swing_rank]
 	var candidates: Array[Node2D] = []
 	for target in get_tree().get_nodes_in_group("enemies"):
@@ -283,47 +265,100 @@ func _sweep(previous: float, current: float) -> void:
 		if sword_hit_targets.size() >= limit:
 			break
 
+func _fire_card_waves() -> void:
+	var player = get_parent()
+	var lotus: int = player.card_level(CARDS.LOTUS)
+	var wide: bool = player.card_level(CARDS.WIDE) > 0
+	var fan: bool = player.card_level(CARDS.FAN) > 0
+	if lotus == 0 and not wide and not fan:
+		return
+	var angles := [-0.28, 0.0, 0.28] if fan else [0.0]
+	for angle in angles:
+		var wave := SwordWave.new()
+		wave.owner_actor = player
+		wave.direction = swing_direction.rotated(angle)
+		wave.position = player.get_parent().to_local(global_position)
+		wave.damage = (36.0 + 12.0 * maxi(0, lotus - 1) if fan else 32.0 + 12.0 * maxi(0, lotus - 1)) * player.damage_multiplier
+		wave.rank = swing_rank
+		wave.terrain_mask = player.terrain_mask
+		wave.empowered = fan
+		wave.breaks_guard = fan
+		wave.jade_trail = wide
+		wave.hit_radius = 42.0 if wide else (30.0 if fan else 20.0)
+		wave.max_distance = 490.0 if wide else (370.0 if fan else 290.0)
+		player.get_parent().add_child(wave)
+
 func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	var heavy_hit := stage == 2 and not charged_swing
 	if target.dead or target.emerging:
 		return
 	var ordinary: bool = target is SurvivorEnemy and target.v41_pressure and target.kind == SurvivorEnemy.Kind.HOSTILE and not target.thrust_type
+	var is_elite: bool = target is SurvivorEnemy and target.v41_guard_elite
 	var suppress: bool = heavy_hit and ordinary
-	var break_guard: bool = heavy_hit and (heavy_reward or target is SurvivorEnemy and target.v41_pressure)
-	if break_guard:
-		target.guard_time = 0.0
-		target.guard_visual_time = 0.0
-		var opening := CONFIG.GUARD_BREAK_TIME if heavy_hit and heavy_reward else CONFIG.HEAVY_BASE_BREAK
-		target.guard_cooldown = maxf(target.guard_cooldown, opening)
-		if heavy_hit and heavy_reward:
-			push = swing_direction * CONFIG.HEAVY_PUSH
+	var was_guarding: bool = target is SurvivorEnemy and target.has_method("is_guarding_stance") and target.is_guarding_stance()
+	var backstab := false
+	if target is SurvivorEnemy:
+		backstab = get_parent().is_rear_hit(target, swing_direction)
+	# 解法一（身法绕背）：绕至精英怪/格挡怪背后攻击，直接无视护盾触发 100% 赤金大暴击
+	var backstab_break: bool = (was_guarding or is_elite) and (backstab or target.guard_direction.dot(swing_direction) > 0.25)
+	var posture_shattered := false
+	var break_guard := false
+	if is_elite and was_guarding and not backstab_break:
+		# 精英怪正面架势条博弈：前两段削减极少并弹刀，第三段重击大幅削减架势（打满 1-2-3 或配合飞剑震碎）
+		var posture_dmg := 68.0 if heavy_hit else 18.0
+		posture_shattered = target.damage_posture(posture_dmg)
+		break_guard = posture_shattered
+	elif backstab_break and was_guarding:
+		target.break_guard_stance(CONFIG.HEAVY_BASE_BREAK, CONFIG.BREAK_STUN)
+		break_guard = true
+	elif heavy_hit and target is SurvivorEnemy and target.v41_pressure and not is_elite:
+		target.break_guard_stance(CONFIG.HEAVY_BASE_BREAK, CONFIG.BREAK_STUN)
+		break_guard = true
 	if heavy_hit and target is SurvivorEnemy and target.v41_pressure and target.kind != SurvivorEnemy.Kind.BOSS:
 		push = swing_direction * CONFIG.THIRD_MOB_PUSH
-	target.take_damage(damage * swing_bonus, push, false, false)
+	var is_crit: bool = backstab_break or posture_shattered or swing_bonus > 1.0 or (heavy_hit and break_guard) or (target is SurvivorEnemy and target.posture_broken_time > 0.0)
+	var crit_mult := 1.5 if (backstab_break or posture_shattered) else 1.0
+	var dealt := damage * swing_bonus * crit_mult
+	var ignore_guard := break_guard or backstab_break or (heavy_hit and not is_elite)
+	target.take_damage(dealt, push, ignore_guard, false, false, is_crit)
+	if swing_bonus > 1.0 and not critical_slash_fired and target is SurvivorEnemy:
+		critical_slash_fired = true
+		get_parent().trigger_card_slash(target, swing_direction)
 	combo_event.emit("blocked" if target.last_hit_blocked else "hit", stage, target.global_position, target)
-	if suppress and not target.dead:
+	if target.last_hit_blocked and not heavy_hit:
+		# 正面轻击触发金属弹刀与轻微震退（不阻塞玩家立刻按空格穿阵绕背破防）
+		var owner_p := get_parent()
+		if owner_p is SurvivorPlayer and not owner_p.dead:
+			owner_p.move_and_collide(-swing_direction * 7.5)
+	if (suppress or backstab_break or posture_shattered) and not target.dead and not target.last_hit_blocked:
 		target.suppress_by_third_hit()
-	if break_guard and ordinary:
-		guard_broken.emit(target.global_position)
-		combo_event.emit("guard_break", stage, target.global_position, target)
+	if break_guard and (ordinary or backstab_break or posture_shattered):
+		if was_guarding or posture_shattered:
+			get_parent().report_guard_break(target, stage)
+		else:
+			guard_broken.emit(target.global_position)
+			combo_event.emit("guard_break", stage, target.global_position, target)
 	if target.dead:
+		if backstab:
+			get_parent().refresh_dash_from_card()
 		combo_event.emit("kill", stage, target.global_position, target)
 	if not impact_sent:
 		impact_sent = true
-		if heavy_hit or not target.last_hit_blocked:
-			get_parent().sword_cue.emit("heavy_hit" if heavy_hit else "light_hit", target.global_position)
+		if heavy_hit or backstab_break or posture_shattered or not target.last_hit_blocked:
+			get_parent().sword_cue.emit("heavy_hit" if (heavy_hit or backstab_break or posture_shattered) else "light_hit", target.global_position)
 		if heavy_hit:
 			finisher_contact.emit(target.global_position)
 			self.heavy_hit.emit()
 
-func queue_click() -> void:
+func queue_click(direction := Vector2.ZERO) -> void:
 	if not get_parent().dead:
 		click_time = click_buffer
+		queued_direction = direction
 
 func tick_inputs(delta: float) -> void:
 	var player = get_parent()
-	if player.dash_state != 0 or is_instance_valid(player.thrown_sword) or (
-			swing_time <= 0.0 and (not player.dash_request.is_zero_approx() or not player.throw_request.is_zero_approx())):
-		click_time = maxf(0.0, click_time - delta)
-		return
-	super.tick_inputs(delta)
+	if click_time > 0.0 and swing_time <= 0.0 and player.dash_state == 0 \
+			and not is_instance_valid(player.thrown_sword) and player.dash_request.is_zero_approx() \
+			and player.throw_request.is_zero_approx():
+		attack(queued_direction if not queued_direction.is_zero_approx() else player.aim_direction)
+	click_time = maxf(0.0, click_time - delta)

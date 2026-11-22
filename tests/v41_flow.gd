@@ -3,6 +3,8 @@ extends SceneTree
 # Real F5 scene, spawned enemies and GUI events. AI stays live.
 # Invulnerability and direct damage in flow fixtures isolate individual rules.
 const CONFIG = preload("res://scripts/v41_config.gd")
+const POOL = preload("res://scripts/v41_card_pool.gd")
+const CARDS = POOL.Card
 const OUT := "res://artifacts/v41_review_2026-11-05/"
 var game
 var checks := 0
@@ -82,7 +84,9 @@ func reward(index: int) -> void:
 	check(game.phase == "reward_select" and paused, "stepping into exit portal opens reward selection")
 	# Seed-independent deterministic choice fixture after verifying actual draw.
 	check(game.reward_options.size() == 3 and game.reward_options[0] != game.reward_options[1] and game.reward_options[1] != game.reward_options[2] and game.reward_options[0] != game.reward_options[2], "three random options are distinct")
-	game.reward_options.assign([index, (index + 1) % 4, (index + 2) % 4])
+	check(game.reward_options.all(func(card): return POOL.eligible(card, game.reward_counts, game.reward_rank())), "all offered cards are unlocked by rank")
+	if index not in game.reward_options:
+		game.reward_options[0] = index
 	game.hud.show_rewards()
 	game.select_reward(index)
 	await frames()
@@ -167,7 +171,7 @@ func wait_boss_state(enemy: SurvivorEnemy, state: int, limit: int = 180) -> bool
 func check_final_boss() -> void:
 	var boss: SurvivorEnemy = game.boss
 	check(CONFIG.WAVES.size() == 6 and game.room_index == 6 and enemies() == [boss] and game.remaining == 1 and game.run_kills == CONFIG.run_total() - 1, "six rooms lead to one live boss with no adds")
-	check(not game.world.portal_open and not game.world.reward_visible and game.reward_counts == [4, 1, 1, 0, 0, 0, 0, 0, 0, 0], "six rewards carry into a closed boss arena")
+	check(not game.world.portal_open and not game.world.reward_visible and game.reward_counts == [1, 1, 0, 1, 0, 1, 0, 1, 1, 0], "six mastered cards carry into a closed boss arena")
 	if not is_instance_valid(boss):
 		return
 	var player: SurvivorPlayer = game.player
@@ -186,7 +190,7 @@ func check_final_boss() -> void:
 	check(await wait_boss_state(boss, boss.BossState.CHARGING), "charge begins after its warning")
 	check(await wait_boss_state(boss, boss.BossState.RECOVERY) and is_equal_approx(player.health, after_sweep_hp) and boss.boss_charge_aim.is_equal_approx(facing), "sidestep avoids the real locked charge")
 	player.position = boss.position - facing * 55.0
-	boss.health = 40.0
+	boss.health = 30.0
 	await frames(2)
 	var aim := root.get_canvas_transform() * boss.global_position
 	click_mouse(true, aim)
@@ -194,7 +198,10 @@ func check_final_boss() -> void:
 	await frames(22)
 	check(game.phase == "clear_celebration" and not paused, "boss defeat enters clear celebration before victory modal")
 	await wait_clear_celebration(170)
-	check(game.phase == "cleared" and paused and game.hud.overlay.visible and game.run_kills == CONFIG.run_total() and not game.world.reward_visible, "real sword finishes boss and opens existing victory result")
+	check(game.phase == "victory" and paused and game.hud.overlay.visible and game.run_kills == CONFIG.run_total() and not game.world.reward_visible, "real sword finishes boss and opens victory settlement")
+	check(game.hud.modal_panel.find_children("*", "Label", true, false).any(func(label):
+		return label.text.begins_with("已习得功法") and "万剑归宗·极" in label.text and "青莲剑气" in label.text),
+		"victory shows the learned cards alongside the kill total")
 	key(KEY_ENTER)
 	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "Enter after boss win restarts a fresh run")
 	game.room_index = CONFIG.BOSS_ROOM
@@ -205,7 +212,7 @@ func check_final_boss() -> void:
 	player.health = 18.0
 	player.position = boss.position + Vector2.LEFT * 70.0
 	check(await wait_boss_state(boss, boss.BossState.COMBO_WINDUP), "boss starts its attack on a fresh entry")
-	await frames(58)
+	await frames(82)
 	check(game.phase == "dead" and paused and game.hud.overlay.visible, "lethal boss attack opens death result")
 	key(KEY_R)
 	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "R after boss death clears rewards and returns to room one")
@@ -290,13 +297,14 @@ func run() -> void:
 		for index in game.reward_options: offered[index] = true
 	check(draws.size() > 1 and draws.keys().all(func(draw):
 		var cards: Array = JSON.parse_string(draw).map(func(value): return int(value))
-		return cards.size() == 3 and cards.all(func(card): return card < 4)) and offered.size() == 4, "attribute-only draws expose all four cards")
+		return cards.size() == 3 and cards.all(func(card): return POOL.tier(card) == 0)) and offered.size() == 3, "first-room draws offer exactly the three basic cards")
 	for point in CONFIG.SPAWN_POINTS + [CONFIG.ROOM1_SPAWN, CONFIG.REWARD_POINT, game.world.exit_point]:
 		check(Geometry2D.is_point_in_polygon(point, game.world.walkable) and not game.world.path_between(CONFIG.ROOM1_SPAWN, point).is_empty(), "configured point reachable: " + str(point))
 	for e in enemies():
 		check(e.encounter_id == 0 and e.max_simultaneous_attackers == 3 and e.health == CONFIG.ENEMY_STATS[CONFIG.MELEE].health and e.damage == CONFIG.ENEMY_STATS[CONFIG.MELEE].damage, "spawn enables encounter mechanics and configured stats")
 	# Actual spawned defender: let real physics update its direction, then inspect hit.
 	var defender: SurvivorEnemy = enemies()[0]
+	defender.v41_guard_elite = true
 	game.player.set_physics_process(false)
 	game.player.position = Vector2(570, 400)
 	defender.position = Vector2(660, 400)
@@ -411,24 +419,24 @@ func run() -> void:
 	await advance()
 	await reward(1)
 	game.player.set_physics_process(false)
-	var room3_total := CONFIG.WAVES[2][0].size() + CONFIG.WAVES[2][1].size()
+	var room3_total := CONFIG.room_total(2)
 	check(game.total == room3_total and enemies().size() == CONFIG.WAVES[2][0].size() and game.remaining == room3_total, "room3 starts first wave of room total")
 	await clear_wave()
 	var thrusts := 0
 	for e in enemies():
 		if e.thrust_type and e.fast_chaser: thrusts += 1
 		check(is_equal_approx(e.health, float(CONFIG.ENEMY_STATS[CONFIG.RANGED if e.kind == e.Kind.RANGED else (CONFIG.THRUST if e.thrust_type else CONFIG.MELEE)].health) * 1.4), "room3 health scale")
-	check(thrusts == 1 and game.scheduler.groups.size() == 2 and game.scheduler.groups[0].size() == 2, "third room second wave includes one fast thrust and two scheduled groups")
-	await clear_wave()
+	check(thrusts == 1 and game.scheduler.groups.size() == 2 and game.scheduler.groups[0].size() == 2 and enemies().any(func(e): return e.v41_guard_elite), "third room second wave includes thrust, guard elite and two scheduled groups")
+	await clear_room()
 	await advance()
-	await reward(2)
+	await reward(CARDS.SPLIT)
 	for room in range(3, 6):
 		check(game.room_index == room and game.total == CONFIG.room_total(room) and game.phase == "combat", "enters ordinary room %d in sequence" % (room + 1))
 		await clear_room()
 		check(game.phase == "exit_ready" and not paused and game.world.portal_open, "room %d clear opens exit portal" % (room + 1))
 		await advance()
 		check(game.phase == "reward_select" and paused, "room %d portal triggers reward modal" % (room + 1))
-		await reward(0)
+		await reward([CARDS.CRITICAL, CARDS.RAIN, CARDS.FAN][room - 3])
 	await check_final_boss()
 	# Mixed real AI cannot exceed the configurable overall attack budget.
 	game.room_index = 2
@@ -471,7 +479,7 @@ func run() -> void:
 	await frames(28)
 	check(sword.attack_count == 3 and sword.stage == 2, "tap buffers third stage")
 	reset()
-	game.reward_counts[1] = 1
+	game.reward_counts[CARDS.CRITICAL] = 1
 	game._apply_rewards()
 	sword = game.player.combo
 	key(KEY_SPACE)
@@ -491,11 +499,11 @@ func run() -> void:
 	game.player.set_physics_process(false)
 	game.player.combo.set_physics_process(false)
 	game.player.position = Vector2(580, 420)
-	game.reward_counts.assign([1, 1, 0, 1, 0, 0, 0, 0, 0, 0])
+	game.reward_counts[CARDS.CRITICAL] = 1
 	game._apply_rewards()
 	sword = game.player.combo
 	var target := target_at(game.player.position + Vector2(65, 0))
-	check(is_equal_approx(sword.stages[0].damage, 41.6) and is_equal_approx(sword.card_multiplier, 1.3), "+30 percent applies to sword and dash base")
+	check(is_equal_approx(sword.stages[0].damage, 32.0), "cards preserve base sword damage")
 	game.player.request_dash(Vector2.UP)
 	game.player._start_dash()
 	game.player.clear_dash_effects()
@@ -503,31 +511,34 @@ func run() -> void:
 	sword.attack(Vector2.RIGHT)
 	check(not sword.dash_armed and sword.swing_bonus == 2.0, "attack consumes roll bonus once")
 	tick_sword(40)
-	check(is_equal_approx(1000.0 - target.health, 83.2), "actual light hit combines 32 x 1.3 x 2")
-	# Base third hit opens guard; the reward extends that opening and push.
+	check(is_equal_approx(1000.0 - target.health, 64.0), "critical light hit is twice base sword damage")
+	# Base third hit opens guard; 血/踏雪 reward the actual guard break.
 	for mode in ["base", "reward"]:
 		reset()
 		game.player.set_physics_process(false)
 		game.player.combo.set_physics_process(false)
 		game.player.position = Vector2(580, 420)
-		game.reward_counts[3] = int(mode != "base")
+		game.reward_counts[CARDS.BLOOD] = int(mode != "base")
+		game.reward_counts[CARDS.REFRESH] = int(mode != "base")
 		game._apply_rewards()
+		game.player.dash_cooldown = 1.2
+		game.player.stamina = 70.0
 		sword = game.player.combo
 		target = target_at(game.player.position + Vector2(65, 0))
 		target.guard_cooldown = 0.0
 		target.guard_direction = Vector2.LEFT
+		target.guard_time = CONFIG.GUARD_HOLD
 		target.encounter_state = target.EncounterState.CHASE
 		sword.next_stage = 2
 		sword.chain_time = 0.2
 		sword.attack(Vector2.RIGHT)
 		tick_sword(40)
 		check(is_equal_approx(1000.0 - target.health, 60.0), "guard interaction on front contact: " + mode)
-		var guard_window := CONFIG.HEAVY_BASE_BREAK if mode == "base" else CONFIG.GUARD_BREAK_TIME
-		check(is_equal_approx(target.guard_cooldown, guard_window), "guard window: " + mode)
+		check(is_equal_approx(target.guard_cooldown, CONFIG.HEAVY_BASE_BREAK), "guard window: " + mode)
 		check(is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "third stun: " + mode)
 		check(target.guard_time == 0.0 and target.guard_visual_time == 0.0, "third break clears guard and blue arc: " + mode)
 		if mode != "base":
-			check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MOB_PUSH), "correct suppressed third knockback")
+			check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MOB_PUSH) and game.player.dash_cooldown == 0.0 and game.player.stamina == 80.0, "real guard break restores dash and 10 stamina")
 	reset()
 	game.reward_counts[2] = 2
 	game.player.health = 91.0
@@ -537,7 +548,9 @@ func run() -> void:
 	game.player.gm_invulnerable = false
 	game.player.invulnerability = 0.0
 	game.player.take_damage(10000.0, Vector2.ZERO)
-	check(game.phase == "dead" and paused, "real damage enters death result")
+	check(game.phase == "defeat_transition" and not paused, "real damage begins the defeat fade")
+	await frames(35)
+	check(game.phase == "dead" and paused, "defeat fade opens death result")
 	key(KEY_R)
 	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "death R resets run and rewards")
 	await clear_room()
@@ -547,16 +560,16 @@ func run() -> void:
 	# Step into exit portal while thrown sword is airborne, then pick reward to transition directly.
 	await advance()
 	click_mouse(false, Vector2(670, 390), true)
-	game.reward_options.assign([0, 1, 3])
-	game.reward_counts[1] = 1
+	game.reward_options.assign([0, 1, 2])
+	game.reward_counts[1] = 2
 	game.hud.show_rewards()
 	await frames()
 	var chosen: Button
 	var disabled: Button
 	for item in game.hud.modal_panel.find_children("*", "Button", true, false):
-		if item.text.begins_with("剑伤害"): chosen = item
-		if item.text.begins_with("冲刺后"): disabled = item
-	check(disabled != null and disabled.disabled, "already unlocked unique reward is visibly disabled")
+		if item.accessibility_name.begins_with("青莲剑气"): chosen = item
+		if item.accessibility_name.begins_with("雷霆残影"): disabled = item
+	check(disabled != null and disabled.disabled, "maxed-out reward is visibly disabled in injected offer")
 	game.select_reward(1)
 	check(game.phase == "reward_select", "disabled unique reward cannot be selected through code")
 	var point := chosen.get_global_rect().get_center()
@@ -564,7 +577,7 @@ func run() -> void:
 	await frames(1)
 	click_mouse(false, point)
 	await frames(3)
-	check(game.room_index == 1 and game.phase == "combat" and game.reward_counts[0] == 1 and game.reward_counts[1] == 1 and not game.player.combo.dash_armed and game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword) and game.player.combo.attack_count == 0, "real reward button applies once and directly enters next room cleanly")
+	check(game.room_index == 1 and game.phase == "combat" and game.reward_counts[0] == 1 and game.reward_counts[1] == 2 and not game.player.combo.dash_armed and game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword) and game.player.combo.attack_count == 0, "real reward button applies once and directly enters next room cleanly")
 	# All original imported samples must load with their existing player.
 	for path in ["courtyard_trial", "sword_motion_trial", "sword_motion_combat"]:
 		var sample = load("res://scenes/" + path + ".tscn").instantiate()

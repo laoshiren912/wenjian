@@ -11,8 +11,13 @@ var death_dissolves: Array[Dictionary] = []
 var breakthrough_effects: Array[Dictionary] = []
 var exit_beacons: Array[Dictionary] = []
 var wave_summons: Array[Dictionary] = []
-var kick_offset := Vector2.ZERO
-var kick_vel := Vector2.ZERO
+var card_arcs: Array[Dictionary] = []
+var card_slashes: Array[Dictionary] = []
+const SHAKE_MERGE_WINDOW := 0.18
+const SHAKE_MAX_STRENGTH := 6.5
+var shake_gate_left := 0.0
+var shake_duration := 0.0
+var shake_direction := Vector2.RIGHT
 var guard_sound: AudioStreamWAV
 var break_sound: AudioStreamWAV
 var sword_sounds := {}
@@ -40,11 +45,12 @@ func _ready() -> void:
 		"throw_spin": _layered_sound(1120.0, 260.0, 0.16, 0.74, 0.58, 0.22),
 		"throw_hit": _layered_sound(430.0, 110.0, 0.105, 0.66, 0.38, 0.70),
 		"throw_catch": _layered_sound(1480.0, 340.0, 0.075, 0.80, 0.28, 0.18),
-		"sword_rain_cast": _layered_sound(440.0, 110.0, 0.28, 1.24, 0.14, 0.42),
+		"sword_rain_cast": _layered_sound(1480.0, 136.0, 0.25, 1.62, 0.26, 0.42),
 		"sword_rain_gather": _layered_sound(1040.0, 240.0, 0.22, 1.36, 0.22, 0.28),
 		"sword_rain_ascend": _layered_sound(760.0, 165.0, 0.20, 1.72, 0.36, 0.34),
 		"sword_rain_fire": _layered_sound(360.0, 66.0, 0.25, 0.50, 0.44, 0.88),
-		"sword_rain_hit": _layered_sound(340.0, 82.0, 0.125, 0.64, 0.30, 0.80),
+		"sword_rain_hit": _layered_sound(335.0, 51.0, 0.20, 0.49, 0.39, 0.99),
+		"defeat": _layered_sound(187.0, 49.0, 0.48, 0.45, 0.18, 0.78),
 		"breakthrough": _chime_sound([587.3, 880.0, 1174.7], 0.68, 0.36),
 		"room_clear": _chime_sound([659.25, 987.77], 0.48, 0.18),
 		"portal_activate": _chime_sound([783.99, 1174.66, 1567.98], 0.56, 0.32),
@@ -65,13 +71,51 @@ func reset_sword_cues() -> void:
 	breakthrough_effects.clear()
 	exit_beacons.clear()
 	wave_summons.clear()
-	kick_offset = Vector2.ZERO
-	kick_vel = Vector2.ZERO
+	card_arcs.clear()
+	card_slashes.clear()
+	shake_gate_left = 0.0
+	shake_time = 0.0
+	shake_strength = 0.0
+
+func spawn_card_lightning(points: PackedVector2Array) -> void:
+	card_arcs.append({"points": points, "left": 0.27})
+	play_sword_cue("thunder_burst", points[0])
+
+func spawn_card_slash(point: Vector2, direction: Vector2) -> void:
+	card_slashes.append({"point": point, "direction": direction, "left": 0.24})
 
 func trigger_camera_kick(direction: Vector2, strength: float) -> void:
-	var dir := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
-	kick_offset = (kick_offset + dir * strength).limit_length(8.0)
-	kick_vel = -dir * strength * 4.5
+	_submit_camera_shake(strength, 0.14, direction)
+
+func request_camera_shake(strength: float, duration: float) -> void:
+	_submit_camera_shake(strength, duration, Vector2(0.79, 0.61))
+
+func _submit_camera_shake(strength: float, duration: float, direction: Vector2) -> void:
+	if shake_gate_left > 0.00001:
+		if shake_time > 0.0:
+			shake_strength = minf(SHAKE_MAX_STRENGTH, maxf(shake_strength, strength))
+		return
+	shake_gate_left = SHAKE_MERGE_WINDOW
+	shake_strength = minf(SHAKE_MAX_STRENGTH, strength)
+	shake_duration = minf(duration, SHAKE_MERGE_WINDOW)
+	shake_time = shake_duration
+	shake_direction = Vector2.RIGHT if direction.is_zero_approx() else direction.normalized()
+
+func _update_camera_shake(delta: float) -> void:
+	var elapsed := delta / Engine.time_scale
+	shake_gate_left = maxf(0.0, shake_gate_left - elapsed)
+	shake_time = maxf(0.0, shake_time - elapsed)
+	if shake_time == 0.0:
+		shake_strength = 0.0
+	if not is_instance_valid(camera):
+		return
+	camera.offset = Vector2.ZERO
+	if shake_time > 0.0:
+		var phase := (shake_duration - shake_time) * 65.0
+		var envelope := pow(shake_time / shake_duration, 2.1)
+		var motion := shake_direction * sin(phase) + shake_direction.orthogonal() * (sin(phase * 1.17) * 0.18)
+		camera.offset = motion.limit_length() * shake_strength * envelope
+	camera.force_update_scroll()
 
 func _voice(channel: String) -> AudioStreamPlayer:
 	if not is_instance_valid(sword_voices.get(channel)):
@@ -95,7 +139,9 @@ func _cue_ready(channel: String, gap_ms: int) -> bool:
 func play_sword_cue(kind: String, point: Vector2) -> void:
 	var sound_key := "throw_hit" if kind == "throw_hit_twin" else kind
 	var channel := "motion"
-	if sound_key.begins_with("mark"):
+	if sound_key == "defeat":
+		channel = "defeat"
+	elif sound_key.begins_with("mark"):
 		channel = "mark"
 	elif sound_key == "sword_rain_hit":
 		channel = "rain_hit"
@@ -112,9 +158,9 @@ func play_sword_cue(kind: String, point: Vector2) -> void:
 		var voice := _voice(channel)
 		voice.stream = sword_sounds[sound_key]
 		var db := -12.5
-		if sound_key in ["heavy_hit", "thunder_burst", "sword_rain_fire"]:
+		if sound_key in ["heavy_hit", "thunder_burst", "sword_rain_fire", "sword_rain_hit", "sword_rain_cast"]:
 			db = -8.0
-		elif sound_key in ["sword_rain_cast", "sword_rain_gather", "sword_rain_ascend", "sword_rain_hit"]:
+		elif sound_key in ["sword_rain_gather", "sword_rain_ascend"]:
 			db = -10.5
 		elif sound_key == "light_swing":
 			db = -17.0
@@ -123,7 +169,7 @@ func play_sword_cue(kind: String, point: Vector2) -> void:
 		voice.play()
 	if kind in ["throw_hit", "throw_hit_twin"]:
 		_spawn_slash_impact("spin_twin" if kind == "throw_hit_twin" else "spin_hit", point, Vector2.RIGHT, 0, 2 if kind == "throw_hit_twin" else 1)
-		trigger_camera_kick(Vector2.RIGHT.rotated(randf() * TAU), 4.6 if kind == "throw_hit_twin" else 3.8)
+		trigger_camera_kick(Vector2.RIGHT, 2.6 if kind == "throw_hit_twin" else 2.1)
 	elif kind == "sword_rain_hit":
 		_spawn_slash_impact("rain_hit", point, Vector2.DOWN, 2, 2)
 		trigger_camera_kick(Vector2.DOWN, 6.2)
@@ -138,7 +184,7 @@ func spawn_thunder_afterimage(point: Vector2, direction: Vector2, landing: bool)
 		"dir": direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT,
 		"landing": landing,
 		"age": 0.0,
-		"duration": 0.34,
+		"duration": CONFIG.THUNDER_GHOST_DELAY,
 	})
 	if _cue_ready("thunder", 85):
 		var voice := _voice("thunder")
@@ -214,8 +260,7 @@ func spawn_breakthrough(target_player: Node2D, rank: int) -> void:
 		voice.stream = sword_sounds["breakthrough"]
 		voice.volume_db = -7.5
 		voice.play()
-	shake_strength = maxf(shake_strength, 2.8 if rank == 2 else 2.0)
-	shake_time = maxf(shake_time, 0.14)
+	request_camera_shake(2.8 if rank == 2 else 2.0, 0.14)
 
 func spawn_exit_beacon(point: Vector2) -> void:
 	exit_beacons.append({
@@ -311,13 +356,14 @@ func _spawn_slash_impact(kind: String, point: Vector2, direction: Vector2, slot:
 		"duration": duration,
 	})
 
-func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true, blocked: bool = false) -> void:
-	super.show_damage(point, amount, is_player, camera_shake, blocked)
+func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true, blocked: bool = false, crit: bool = false) -> void:
+	super.show_damage(point, amount, is_player, camera_shake, blocked, crit)
 	if blocked and amount > 0.0:
 		_guard_effect(point, false)
 
 func show_guard_break(point: Vector2) -> void:
-	_popup(point, "破防", Color("ffce77"), "guard_break", 0.0)
+	_popup(point, "破防!", Color("ffb84d"), "guard_break", 0.0, "crit")
+	_spawn_crit_sparks(point)
 	_guard_effect(point, true)
 
 func _guard_effect(point: Vector2, broken: bool) -> void:
@@ -460,17 +506,11 @@ func _unsheathe_sound() -> AudioStreamWAV:
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	# 定向镜头冲击回弹（高阻尼弹簧快速归零，叠加在微震之上）
-	if kick_offset.length_squared() > 0.01 or kick_vel.length_squared() > 0.04:
-		var accel := -kick_offset * 380.0 - kick_vel * 24.0
-		kick_vel += accel * delta
-		kick_offset += kick_vel * delta
-		if kick_offset.length_squared() < 0.02 and kick_vel.length_squared() < 0.2:
-			kick_offset = Vector2.ZERO
-			kick_vel = Vector2.ZERO
-	if is_instance_valid(camera) and kick_offset.length_squared() > 0.0:
-		camera.offset += kick_offset
-		camera.force_update_scroll()
+	for effects in [card_arcs, card_slashes]:
+		for i in range(effects.size() - 1, -1, -1):
+			effects[i].left -= delta
+			if effects[i].left <= 0.0:
+				effects.remove_at(i)
 	for i in range(guard_effects.size() - 1, -1, -1):
 		guard_effects[i].age += delta
 		var duration := CONFIG.BREAK_SPARK_TIME if guard_effects[i].broken else CONFIG.GUARD_SPARK_TIME
@@ -527,6 +567,27 @@ func _rank_accent(rank: int) -> Color:
 
 func _draw() -> void:
 	super._draw()
+	for arc in card_arcs:
+		var points: PackedVector2Array = arc.points
+		var alpha := smoothstep(0.0, 0.27, float(arc.left))
+		for i in range(1, points.size()):
+			var start := to_local(points[i - 1])
+			var end := to_local(points[i])
+			var side := start.direction_to(end).orthogonal()
+			var bolt := PackedVector2Array([start])
+			for j in range(1, 6):
+				bolt.append(start.lerp(end, j / 6.0) + side * (8.0 if j % 2 == 0 else -8.0))
+			bolt.append(end)
+			draw_polyline(bolt, Color(0.22, 0.92, 0.86, alpha * 0.65), 7.0, true)
+			draw_polyline(bolt, Color(1.0, 0.87, 0.47, alpha), 2.3, true)
+	for slash in card_slashes:
+		var alpha := float(slash.left) / 0.24
+		var point := to_local(slash.point)
+		draw_set_transform(point, slash.direction.angle(), Vector2(1.0, 0.55))
+		var radius := lerpf(96.0, 44.0, alpha)
+		draw_arc(Vector2.ZERO, radius, -1.52, 1.52, 26, Color(0.31, 0.86, 0.80, alpha * 0.80), 10.0, true)
+		draw_arc(Vector2.ZERO, radius, -1.48, 1.48, 26, Color(1.0, 0.90, 0.56, alpha), 3.0, true)
+		draw_set_transform(Vector2.ZERO)
 	for effect in guard_effects:
 		var broken: bool = effect.broken
 		var duration := CONFIG.BREAK_SPARK_TIME if broken else CONFIG.GUARD_SPARK_TIME

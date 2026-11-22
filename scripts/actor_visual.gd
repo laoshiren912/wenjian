@@ -9,6 +9,7 @@ var motion: Vector2 = Vector2.ZERO
 var tint := Color("79e2d0")
 var walk_phase: float = 0.0
 var hurt_time: float = 0.0
+var hurt_flash_lock := 0.0
 var attack_time: float = 0.0
 var attack_duration: float = 0.18
 var attack_weapon: int = 0
@@ -78,6 +79,13 @@ func play_hurt() -> void:
 	hurt_time = 0.14
 	queue_redraw()
 
+func start_limited_hurt_flash(interval: float, duration: float) -> void:
+	if hurt_flash_lock > 0.00001:
+		return
+	hurt_flash_lock = interval
+	hurt_time = duration
+	queue_redraw()
+
 func detach_and_die(world_parent: Node) -> void:
 	# The enemy is still freed immediately; only this non-physical child survives briefly.
 	reparent(world_parent, true)
@@ -90,6 +98,7 @@ func detach_and_die(world_parent: Node) -> void:
 	queue_redraw()
 
 func _physics_process(delta: float) -> void:
+	hurt_flash_lock = maxf(0.0, hurt_flash_lock - delta)
 	if dying:
 		death_age += delta
 		var progress: float = clampf(death_age / DEATH_DURATION, 0.0, 1.0)

@@ -100,6 +100,7 @@ func combo_timing():
 func front_block():
 	var es = await fresh(1, Vector2.RIGHT, 100.0)
 	var target = es[0]
+	target.v41_guard_elite = true
 	var p = game.player
 	click(true, target.position)
 	await tick()
