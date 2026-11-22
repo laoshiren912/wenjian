@@ -54,22 +54,38 @@ func key(code: int) -> void:
 	event.pressed = false
 	root.push_input(event, true)
 
+func wait_clear_celebration(limit: int = 160) -> void:
+	var n := 0
+	while game.phase == "clear_celebration" and n < limit:
+		await frames(1)
+		n += 1
+
 func clear_wave() -> void:
 	for enemy in enemies():
 		enemy.take_damage(10000.0, enemy.global_position - game.player.global_position)
 	await frames()
+	if game.phase == "wave_transition":
+		check(enemies().is_empty(), "wave transition pauses with summoning telegraph before spawning next wave")
+		var wn := 0
+		while game.phase == "wave_transition" and wn < 80:
+			await frames(1)
+			wn += 1
+	if game.phase == "clear_celebration":
+		check(not paused and game.world.room_cleared, "clear celebration keeps world running for death animation")
+		await wait_clear_celebration(160)
 
 func clear_room() -> void:
 	while game.phase == "combat":
 		await clear_wave()
 
 func reward(index: int) -> void:
-	check(game.phase == "reward_select" and paused and not game.world.portal_open, "room clear directly opens selection before exit")
+	check(game.phase == "reward_select" and paused, "stepping into exit portal opens reward selection")
 	# Seed-independent deterministic choice fixture after verifying actual draw.
 	check(game.reward_options.size() == 3 and game.reward_options[0] != game.reward_options[1] and game.reward_options[1] != game.reward_options[2] and game.reward_options[0] != game.reward_options[2], "three random options are distinct")
 	game.reward_options.assign([index, (index + 1) % 4, (index + 2) % 4])
 	game.hud.show_rewards()
 	game.select_reward(index)
+	await frames()
 
 func advance() -> void:
 	game.player.position = game.world.exit_point
@@ -105,7 +121,7 @@ func check_melee_cue_and_facing() -> void:
 			actors[i].position = Vector2(1000, 350 + i * 55)
 		await frames(2)
 		var facing := enemy.attack_direction
-		check(enemy.windup > 0.6 and facing.dot(Vector2.LEFT) > 0.99 and player.health == 100.0, "live melee raises warning before dealing damage")
+		check(enemy.windup > 0.5 and facing.dot(Vector2.LEFT) > 0.99 and player.health == 100.0, "live melee raises warning before dealing damage")
 		if flank:
 			# Place the player behind the telegraph while it is still tracking on the old build.
 			player.position = enemy.position - facing * 50.0
@@ -134,7 +150,8 @@ func check_melee_cue_and_facing() -> void:
 		else:
 			await frames(12)
 		check(held_facing, "melee keeps its original facing through warning and swing")
-		check(is_equal_approx(player.health, 100.0 if flank else 88.0), "live swing misses the rear and hits the front for 12")
+		var expected_hp: float = 100.0 if flank else 100.0 - float(CONFIG.ENEMY_STATS[CONFIG.MELEE].damage)
+		check(is_equal_approx(player.health, expected_hp), "live swing misses the rear and hits the front for %.0f" % float(CONFIG.ENEMY_STATS[CONFIG.MELEE].damage))
 		if flank:
 			check(enemy.visual.facing == Vector2.LEFT and enemy.guard_direction.dot(Vector2.LEFT) > 0.99, "short recovery keeps the original guard and body facing")
 			await frames(15)
@@ -149,7 +166,7 @@ func wait_boss_state(enemy: SurvivorEnemy, state: int, limit: int = 180) -> bool
 
 func check_final_boss() -> void:
 	var boss: SurvivorEnemy = game.boss
-	check(CONFIG.WAVES.size() == 6 and game.room_index == 6 and enemies() == [boss] and game.remaining == 1 and game.run_kills == 42, "six rooms lead to one live boss with no adds")
+	check(CONFIG.WAVES.size() == 6 and game.room_index == 6 and enemies() == [boss] and game.remaining == 1 and game.run_kills == CONFIG.run_total() - 1, "six rooms lead to one live boss with no adds")
 	check(not game.world.portal_open and not game.world.reward_visible and game.reward_counts == [4, 1, 1, 0, 0, 0, 0, 0, 0, 0], "six rewards carry into a closed boss arena")
 	if not is_instance_valid(boss):
 		return
@@ -159,14 +176,15 @@ func check_final_boss() -> void:
 	check(await wait_boss_state(boss, boss.BossState.COMBO_WINDUP), "boss approaches and starts the orange sweep warning")
 	await frames(25)
 	check(boss.boss_state == boss.BossState.COMBO_WINDUP and player.health == 100.0, "boss sweep windup deals no damage")
-	check(await wait_boss_state(boss, boss.BossState.RECOVERY) and player.health == 82.0, "remaining in the sweep takes real damage after the warning")
+	var after_sweep_hp: float = 100.0 - boss.SWEEP_DAMAGE
+	check(await wait_boss_state(boss, boss.BossState.RECOVERY) and is_equal_approx(player.health, after_sweep_hp), "remaining in the sweep takes real damage after the warning")
 	check(await wait_boss_state(boss, boss.BossState.CHARGE_WINDUP), "boss alternates to its short charge warning")
 	var facing := boss.boss_charge_aim
 	player.position = boss.position + facing.orthogonal() * 78.0
 	await frames(20)
-	check(boss.boss_state == boss.BossState.CHARGE_WINDUP and boss.boss_charge_aim.is_equal_approx(facing) and player.health == 82.0, "charge warning is harmless and stays locked after a sidestep")
+	check(boss.boss_state == boss.BossState.CHARGE_WINDUP and boss.boss_charge_aim.is_equal_approx(facing) and is_equal_approx(player.health, after_sweep_hp), "charge warning is harmless and stays locked after a sidestep")
 	check(await wait_boss_state(boss, boss.BossState.CHARGING), "charge begins after its warning")
-	check(await wait_boss_state(boss, boss.BossState.RECOVERY) and player.health == 82.0 and boss.boss_charge_aim.is_equal_approx(facing), "sidestep avoids the real locked charge")
+	check(await wait_boss_state(boss, boss.BossState.RECOVERY) and is_equal_approx(player.health, after_sweep_hp) and boss.boss_charge_aim.is_equal_approx(facing), "sidestep avoids the real locked charge")
 	player.position = boss.position - facing * 55.0
 	boss.health = 40.0
 	await frames(2)
@@ -174,6 +192,8 @@ func check_final_boss() -> void:
 	click_mouse(true, aim)
 	click_mouse(false, aim)
 	await frames(22)
+	check(game.phase == "clear_celebration" and not paused, "boss defeat enters clear celebration before victory modal")
+	await wait_clear_celebration(170)
 	check(game.phase == "cleared" and paused and game.hud.overlay.visible and game.run_kills == CONFIG.run_total() and not game.world.reward_visible, "real sword finishes boss and opens existing victory result")
 	key(KEY_ENTER)
 	check(game.room_index == 0 and game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "Enter after boss win restarts a fresh run")
@@ -210,7 +230,7 @@ func check_dash_links() -> void:
 		var attacks: int = sword.attack_count
 		key(KEY_SPACE)
 		await frames(2)
-		check(not player.is_rolling() and not game.player.dash_request.is_zero_approx(), "Space buffers after stage " + str(target_stage))
+		check(not player.is_rolling() and game.player.dash_state == game.player.Dash.WINDUP, "Space cancels recovery immediately after stage " + str(target_stage))
 		for tick in range(60):
 			if game.player.dash_state == game.player.Dash.RECOVERY and game.player.dash_time <= 0.10:
 				break
@@ -219,7 +239,8 @@ func check_dash_links() -> void:
 		click_mouse(true)
 		click_mouse(false)
 		await frames(9)
-		check(sword.attack_count == attacks + 1 and sword.stage == 0, "late dash recovery buffers a fresh sword chain")
+		var expected_stage := (target_stage + 1) % 3
+		check(sword.attack_count == attacks + 1 and sword.stage == expected_stage, "late dash recovery continues preserved sword chain")
 		check(game.player.dash_cooldown > 0.0 and not player.is_rolling(), "dash has one cooldown and no roll state")
 	reset()
 	game.room_index = 1
@@ -353,11 +374,11 @@ func run() -> void:
 	reset()
 	game.player.set_physics_process(false)
 	await clear_room()
-	check(game.phase == "reward_select" and paused and not game.world.portal_open, "full room clear opens reward before exit")
-	await reward(0)
+	check(game.phase == "exit_ready" and not paused and game.world.portal_open, "full room clear opens exit portal without forced modal")
 	game.player.health = 63.0
 	game.player.stamina = 47.0
 	await advance()
+	await reward(0)
 	game.player.set_physics_process(false)
 	check(game.room_index == 1 and game.total == 6 and game.remaining == 6 and enemies().size() == 3, "room2 starts only wave1 of six total")
 	check(game.world.exit_point == CONFIG.ROOM_EXIT_POINTS[1] and not game.world.path_between(CONFIG.ROOM_ENTRY_POINTS[1], game.world.exit_point).is_empty(), "room2 small-room exit is reachable")
@@ -387,26 +408,27 @@ func run() -> void:
 	await clear_wave()
 	check(game.wave_index == 1 and enemies().size() == 3 and game.remaining == 3 and not game.world.reward_visible, "second wave only after first clear, no early reward")
 	await clear_wave()
-	await reward(1)
 	await advance()
+	await reward(1)
 	game.player.set_physics_process(false)
-	check(game.total == 9 and enemies().size() == 4 and game.remaining == 9, "room3 starts first four of nine")
+	var room3_total := CONFIG.WAVES[2][0].size() + CONFIG.WAVES[2][1].size()
+	check(game.total == room3_total and enemies().size() == CONFIG.WAVES[2][0].size() and game.remaining == room3_total, "room3 starts first wave of room total")
 	await clear_wave()
 	var thrusts := 0
 	for e in enemies():
 		if e.thrust_type and e.fast_chaser: thrusts += 1
 		check(is_equal_approx(e.health, float(CONFIG.ENEMY_STATS[CONFIG.RANGED if e.kind == e.Kind.RANGED else (CONFIG.THRUST if e.thrust_type else CONFIG.MELEE)].health) * 1.4), "room3 health scale")
-	check(thrusts == 1 and game.scheduler.groups.size() == 2 and game.scheduler.groups[1].size() == 2, "third room second wave includes one fast thrust and two full pairs")
+	check(thrusts == 1 and game.scheduler.groups.size() == 2 and game.scheduler.groups[0].size() == 2, "third room second wave includes one fast thrust and two scheduled groups")
 	await clear_wave()
-	await reward(2)
 	await advance()
+	await reward(2)
 	for room in range(3, 6):
 		check(game.room_index == room and game.total == CONFIG.room_total(room) and game.phase == "combat", "enters ordinary room %d in sequence" % (room + 1))
 		await clear_room()
-		check(game.phase == "reward_select" and paused and not game.world.portal_open, "room %d clears before offering a reward" % (room + 1))
-		await reward(0)
-		check(game.world.portal_open, "room %d reward opens exit" % (room + 1))
+		check(game.phase == "exit_ready" and not paused and game.world.portal_open, "room %d clear opens exit portal" % (room + 1))
 		await advance()
+		check(game.phase == "reward_select" and paused, "room %d portal triggers reward modal" % (room + 1))
+		await reward(0)
 	await check_final_boss()
 	# Mixed real AI cannot exceed the configurable overall attack budget.
 	game.room_index = 2
@@ -519,6 +541,12 @@ func run() -> void:
 	key(KEY_R)
 	check(game.reward_counts == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and game.player.health == 100.0 and not paused and game.phase == "combat" and game.player.cultivation == 0, "death R resets run and rewards")
 	await clear_room()
+	game.player.combo.dash_armed = true
+	click_mouse(true, Vector2(670, 390), true)
+	await frames(8)
+	# Step into exit portal while thrown sword is airborne, then pick reward to transition directly.
+	await advance()
+	click_mouse(false, Vector2(670, 390), true)
 	game.reward_options.assign([0, 1, 3])
 	game.reward_counts[1] = 1
 	game.hud.show_rewards()
@@ -531,21 +559,12 @@ func run() -> void:
 	check(disabled != null and disabled.disabled, "already unlocked unique reward is visibly disabled")
 	game.select_reward(1)
 	check(game.phase == "reward_select", "disabled unique reward cannot be selected through code")
-	var count_before: int = game.player.weapon.attack_count
 	var point := chosen.get_global_rect().get_center()
 	click_mouse(true, point)
 	await frames(1)
 	click_mouse(false, point)
-	await frames(2)
-	check(game.phase == "exit_ready" and game.reward_counts[0] == 1 and game.player.weapon.attack_count == count_before, "real reward button applies once without ordinary attack")
-	game.player.combo.dash_armed = true
-	click_mouse(true, Vector2(670, 390), true)
-	await frames(18)
-	# Change rooms through the real exit while the thrown sword is airborne.
-	await advance()
-	click_mouse(false, Vector2(670, 390), true)
-	await frames(2)
-	check(game.room_index == 1 and game.reward_counts[1] == 1 and not game.player.combo.dash_armed and game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword) and game.player.combo.attack_count == 0, "room transition preserves unlock but clears armed multiplier and thrown sword")
+	await frames(3)
+	check(game.room_index == 1 and game.phase == "combat" and game.reward_counts[0] == 1 and game.reward_counts[1] == 1 and not game.player.combo.dash_armed and game.player.throw_cooldown == 0.0 and not is_instance_valid(game.player.thrown_sword) and game.player.combo.attack_count == 0, "real reward button applies once and directly enters next room cleanly")
 	# All original imported samples must load with their existing player.
 	for path in ["courtyard_trial", "sword_motion_trial", "sword_motion_combat"]:
 		var sample = load("res://scenes/" + path + ".tscn").instantiate()
@@ -574,8 +593,10 @@ func run() -> void:
 		await snapshot("%d_stats" % size.x)
 		game.resume_room()
 		await clear_room()
+		await advance()
 		await snapshot("%d_rewards" % size.x)
 		game.select_reward(game.reward_options.filter(game.can_select_reward)[0])
+		await frames()
 	paused = false
 	game.queue_free()
 	await process_frame

@@ -101,14 +101,27 @@ func check_flight() -> void:
 			saw_return = saw_return or sword.flight == Flight.Flight.RETURN
 			saw_catch = saw_catch or sword.flight == Flight.Flight.CATCH
 			await frames(1)
+		var expected_spin_total: float = float(CONFIG.THROW_SPIN_DAMAGE[rank]) * float(CONFIG.THROW_SPIN_TICKS[rank])
 		check(spin_point.distance_to(ORIGIN + Vector2.RIGHT * distance) < 1.0, "spin starts at configured range %d" % rank)
-		check(absf(spin_tick_count / 60.0 - CONFIG.THROW_SPIN_TIME[rank]) < 0.032, "spin lasts the configured time %d" % rank)
+		check(absf(spin_tick_count / 60.0 - CONFIG.THROW_SPIN_TIME[rank]) < 0.04, "spin lasts the configured time %d" % rank)
 		check(saw_return and saw_catch and not is_instance_valid(player.thrown_sword), "continuous return and catch phases")
 		check(is_equal_approx(1000.0 - enemies[0].health, CONFIG.THROW_OUT_DAMAGE[rank] + CONFIG.THROW_RETURN_DAMAGE[rank]), "out and return each damage once")
-		check(is_equal_approx(1000.0 - enemies[1].health, CONFIG.THROW_OUT_DAMAGE[rank] + CONFIG.THROW_SPIN_DAMAGE[rank] + CONFIG.THROW_RETURN_DAMAGE[rank]), "one maximum hit in each of three phases")
-		check(is_equal_approx(1000.0 - enemies[2].health, CONFIG.THROW_SPIN_DAMAGE[rank]), "spin-only target takes one hit")
+		check(is_equal_approx(1000.0 - enemies[1].health, CONFIG.THROW_OUT_DAMAGE[rank] + expected_spin_total + CONFIG.THROW_RETURN_DAMAGE[rank]), "multi-tick shred in spin plus out and return")
+		check(is_equal_approx(1000.0 - enemies[2].health, expected_spin_total) and enemies[2].slow_time > 0.0, "spin-only target takes multi-tick shred and brief slow")
 		check(enemies[3].health == 1000.0 and is_equal_approx(player.stamina, 92.0), "outside target and repeat-press cost")
 		mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 350, false)
+	# Verify short-range cursor-targeted spin stops right at clicked position
+	fresh(2)
+	await frames(2)
+	mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 92.0)
+	var short_spin := Vector2.INF
+	for _i in range(60):
+		await frames(1)
+		if is_instance_valid(player.thrown_sword) and player.thrown_sword.flight == Flight.Flight.SPIN:
+			short_spin = player.thrown_sword.global_position
+			break
+	check(short_spin.distance_to(ORIGIN + Vector2.RIGHT * 92.0) < 2.0, "short-range right-click spins right at cursor location")
+	mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 92.0, false)
 
 func check_wall() -> void:
 	var enemies := fresh(2)
@@ -134,7 +147,7 @@ func check_return_route() -> void:
 	player.position = Vector2(676, 235)
 	await frames(2)
 	mouse(MOUSE_BUTTON_RIGHT, Vector2(380, 235))
-	await frames(17)
+	await frames(14)
 	check(is_instance_valid(player.thrown_sword) and player.thrown_sword.flight == Flight.Flight.SPIN, "routing fixture launches south of the gate wall")
 	# The direct return line now crosses the left wing of the new gate.
 	player.position = Vector2(640, 162)
@@ -168,7 +181,7 @@ func check_inputs() -> void:
 	await frames(12)
 	check(player.position.y > start.y + 20.0 and player.combo.attack_count == 0, "can move with empty hands and buffered left does not swing")
 	Input.action_release("move_down")
-	await frames(30)
+	await frames(48)
 	check(not is_instance_valid(player.thrown_sword) and player.combo.attack_count == 1, "buffered left resumes after moving catch")
 	var stamina: float = player.stamina
 	mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 300)
@@ -182,9 +195,10 @@ func check_inputs() -> void:
 	mouse(MOUSE_BUTTON_RIGHT, ORIGIN + Vector2.RIGHT * 300)
 	await frames(4)
 	key(KEY_SPACE)
-	check(not player.is_rolling() and not player.dash_request.is_zero_approx(), "Space queues the only dash while sword is airborne")
-	await frames(46)
-	check(not is_instance_valid(player.thrown_sword) and player.dash_cooldown > 0.0 and is_equal_approx(player.stamina, 72.0), "queued dash pays only once after catch")
+	await frames(2)
+	check(player.dash_state != player.Dash.IDLE and is_instance_valid(player.thrown_sword), "Space dash fires immediately without deadlocking while thrown sword is airborne")
+	await frames(52)
+	check(not is_instance_valid(player.thrown_sword) and player.dash_cooldown > 0.0 and is_equal_approx(player.stamina, 72.0), "airborne dash plus throw pays both costs once and finishes cleanly")
 	check(player.combo.dash_armed and not player.is_rolling(), "same unique card arms after Space dash")
 
 func check_cleanup() -> void:

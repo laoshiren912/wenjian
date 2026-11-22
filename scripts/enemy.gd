@@ -197,8 +197,11 @@ func _physics_process(delta: float) -> void:
 		var offset: Vector2 = global_position - other.global_position
 		if offset.length_squared() > 0.01 and offset.length_squared() < 34.0 * 34.0:
 			separation += offset.normalized() * 24.0
-	velocity = movement * speed + knockback + separation.limit_length(45.0)
-	knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
+	var move_scale := 0.15 if (hit_stun > 0.0 and windup <= 0.0 and lunge_time <= 0.0) else (0.62 if slow_time > 0.0 else 1.0)
+	velocity = movement * speed * move_scale + knockback + separation.limit_length(45.0)
+	knockback = knockback.lerp(Vector2.ZERO, minf(1.0, 14.0 * delta))
+	if knockback.length_squared() < 4.0:
+		knockback = Vector2.ZERO
 	move_and_slide()
 	var look: Vector2 = attack_direction if windup > 0.0 or melee_action in ["windup", "attack"] else get_real_velocity()
 	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
@@ -296,11 +299,15 @@ func _encounter_process(delta: float) -> void:
 	if v41_heavy_stun > 0.0:
 		v41_heavy_stun = maxf(0.0, v41_heavy_stun - delta)
 		velocity = knockback
-		knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
+		knockback = knockback.lerp(Vector2.ZERO, minf(1.0, 11.0 * delta))
 		move_and_slide()
 		visual.update_pose(Vector2.ZERO, guard_direction, Color("e47c77"))
 		queue_redraw()
 		return
+	if hit_stun > 0.0:
+		hit_stun = maxf(0.0, hit_stun - delta)
+	if slow_time > 0.0:
+		slow_time = maxf(0.0, slow_time - delta)
 	var distance := offset.length()
 	var visible := distance < (V41.SIGHT_RANGE if v41_pressure else 340.0) and _boss_has_sight(player.global_position)
 	if visible:
@@ -362,7 +369,7 @@ func _encounter_process(delta: float) -> void:
 				attack_direction = offset.normalized()
 				attack_duration = 0.85 if kind == Kind.RANGED else (0.65 if thrust_type else 0.8)
 				if v41_pressure:
-					attack_duration -= 0.14
+					attack_duration -= 0.20
 				windup = attack_duration
 				if kind == Kind.HOSTILE and is_instance_valid(pair_scheduler):
 					pair_scheduler.attack_started(self)
@@ -387,8 +394,11 @@ func _encounter_process(delta: float) -> void:
 	for other in get_tree().get_nodes_in_group("enemies"):
 		if other != self and not other.dead and global_position.distance_squared_to(other.global_position) < 34.0 * 34.0:
 			separation += (global_position - other.global_position).normalized() * 24.0
-	velocity = movement * speed + knockback + separation.limit_length(45.0)
-	knockback = knockback.move_toward(Vector2.ZERO, 520.0 * delta)
+	var move_scale := 0.15 if (hit_stun > 0.0 and windup <= 0.0 and lunge_time <= 0.0) else (0.62 if slow_time > 0.0 else 1.0)
+	velocity = movement * speed * move_scale + knockback + separation.limit_length(45.0)
+	knockback = knockback.lerp(Vector2.ZERO, minf(1.0, 14.0 * delta))
+	if knockback.length_squared() < 4.0:
+		knockback = Vector2.ZERO
 	move_and_slide()
 	var look: Vector2 = attack_direction if windup > 0.0 or lunge_time > 0.0 or _holding_encounter_melee_facing() else (guard_direction if guard_time > 0.0 or encounter_state == EncounterState.CHASE else get_real_velocity())
 	visual.update_pose(get_real_velocity(), look, Color("e47c77") if kind == Kind.HOSTILE else Color("d4bb76"))
@@ -590,6 +600,8 @@ func _v41_follow_path(target: Vector2) -> Vector2:
 var damage_shakes_camera := true
 var last_hit_blocked := false
 var v41_heavy_stun := 0.0
+var hit_stun := 0.0
+var slow_time := 0.0
 var guard_visual_time := 0.0
 
 func suppress_by_third_hit() -> void:
@@ -635,7 +647,13 @@ func take_damage(amount: float, push: Vector2, ignore_guard: bool = false, camer
 			boss_timer = 1.2
 			velocity = Vector2.ZERO
 	damaged.emit(global_position, actual_damage)
-	knockback = push if kind != Kind.BOSS else Vector2.ZERO
+	if kind == Kind.BOSS:
+		if boss_state != BossState.CHARGING and not push.is_zero_approx():
+			knockback = push.limit_length(85.0) * 0.42
+	else:
+		knockback = push
+		if v41_pressure and not blocked_hit and windup <= 0.0 and lunge_time <= 0.0:
+			hit_stun = maxf(hit_stun, 0.065)
 	if encounter_id < 0:
 		windup = 0.0
 		if melee_action == "windup":

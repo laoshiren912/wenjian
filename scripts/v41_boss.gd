@@ -1,27 +1,53 @@
 extends SurvivorEnemy
 
-const HEALTH := 3200.0
-const APPROACH_SPEED := 205.0
+const BOSS_VISUAL = preload("res://scripts/v41_boss_visual.gd")
+const BOSS_VFX_SHADER = preload("res://assets/shaders/v41_boss_vfx.gdshader")
+const HEALTH := 4400.0
+const APPROACH_SPEED := 228.0
 const SWEEP_REACH := 102.0
 const SWEEP_HALF_ANGLE := 1.32
-const SWEEP_WINDUP := 0.78
-const SWEEP_DAMAGE := 18.0
+const SWEEP_WINDUP := 0.68
+const SWEEP_DAMAGE := 22.0
 const CHARGE_REACH := 165.0
 const CHARGE_WIDTH := 34.0
-const CHARGE_WINDUP := 0.85
-const CHARGE_SPEED := 450.0
-const CHARGE_DAMAGE := 20.0
-const RECOVERY := 1.05
-const IMPACT_TIME := 0.16
+const CHARGE_WINDUP := 0.74
+const CHARGE_SPEED := 495.0
+const CHARGE_DAMAGE := 25.0
+const RECOVERY := 0.86
+const IMPACT_TIME := 0.22
+
+var vfx_sprite: Sprite2D
+var vfx_material: ShaderMaterial
+var _unit_tex: ImageTexture
 
 func _ready() -> void:
+	name = "心魔"
 	kind = Kind.BOSS
 	v41_pressure = true
+	var vr := get_node_or_null("VisualRoot")
+	if vr != null and vr.get_script() != BOSS_VISUAL:
+		vr.set_script(BOSS_VISUAL)
 	super._ready()
 	max_health = HEALTH
 	health = max_health
 	speed = APPROACH_SPEED
-	visual.scale = Vector2.ONE * 1.5
+	visual.scale = Vector2.ONE
+	visual.z_index = 1
+	_setup_vfx()
+
+func _setup_vfx() -> void:
+	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	img.set_pixel(0, 0, Color.WHITE)
+	_unit_tex = ImageTexture.create_from_image(img)
+	vfx_material = ShaderMaterial.new()
+	vfx_material.shader = BOSS_VFX_SHADER
+	vfx_sprite = Sprite2D.new()
+	vfx_sprite.name = "BossAttackVfx"
+	vfx_sprite.texture = _unit_tex
+	vfx_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	vfx_sprite.material = vfx_material
+	vfx_sprite.visible = false
+	add_child(vfx_sprite)
 
 func _boss_process(delta: float) -> void:
 	flash = maxf(0.0, flash - delta)
@@ -72,8 +98,77 @@ func _boss_process(delta: float) -> void:
 		BossState.RECOVERY:
 			if boss_timer <= 0.0:
 				boss_state = BossState.APPROACH
+	if boss_state == BossState.CHARGING:
+		knockback = Vector2.ZERO
+	elif knockback.length_squared() > 1.0:
+		move_and_collide(knockback * delta)
+		knockback = knockback.lerp(Vector2.ZERO, minf(1.0, 18.0 * delta))
+		if knockback.length_squared() < 2.0:
+			knockback = Vector2.ZERO
 	visual.update_pose(get_real_velocity() if boss_state == BossState.APPROACH else Vector2.ZERO, boss_charge_aim, Color("e6a451"))
+	_update_vfx()
 	queue_redraw()
+
+func _update_vfx() -> void:
+	if not is_instance_valid(vfx_sprite) or dead:
+		return
+	var aim := boss_charge_aim.normalized() if not boss_charge_aim.is_zero_approx() else Vector2.RIGHT
+	match boss_state:
+		BossState.COMBO_WINDUP:
+			var t := clampf(1.0 - boss_timer / SWEEP_WINDUP, 0.0, 1.0)
+			vfx_sprite.visible = true
+			vfx_sprite.z_index = 0
+			vfx_sprite.centered = true
+			vfx_sprite.position = Vector2.ZERO
+			vfx_sprite.rotation = aim.angle()
+			var d := SWEEP_REACH * 2.04
+			vfx_sprite.scale = Vector2(d, d)
+			vfx_material.set_shader_parameter("mode", 0)
+			vfx_material.set_shader_parameter("progress", t)
+			vfx_material.set_shader_parameter("half_arc", SWEEP_HALF_ANGLE)
+			vfx_material.set_shader_parameter("pixel_grid", 104.0)
+		BossState.CHARGE_WINDUP:
+			var t := clampf(1.0 - boss_timer / CHARGE_WINDUP, 0.0, 1.0)
+			var length := boss_charge_distance + CHARGE_WIDTH
+			vfx_sprite.visible = true
+			vfx_sprite.z_index = 0
+			vfx_sprite.centered = true
+			vfx_sprite.position = aim * (length * 0.5)
+			vfx_sprite.rotation = aim.angle()
+			vfx_sprite.scale = Vector2(length, CHARGE_WIDTH * 2.0)
+			vfx_material.set_shader_parameter("mode", 2)
+			vfx_material.set_shader_parameter("progress", t)
+			vfx_material.set_shader_parameter("pixel_grid", 88.0)
+		BossState.CHARGING:
+			var prog := clampf(1.0 - boss_charge_remaining / maxf(1.0, boss_charge_distance), 0.0, 1.0)
+			vfx_sprite.visible = true
+			vfx_sprite.z_index = 2
+			vfx_sprite.centered = true
+			vfx_sprite.position = -aim * 22.0
+			vfx_sprite.rotation = aim.angle()
+			vfx_sprite.scale = Vector2(96.0, CHARGE_WIDTH * 2.1)
+			vfx_material.set_shader_parameter("mode", 3)
+			vfx_material.set_shader_parameter("progress", prog)
+			vfx_material.set_shader_parameter("pixel_grid", 72.0)
+		BossState.RECOVERY:
+			var elapsed := RECOVERY - boss_timer
+			if elapsed < IMPACT_TIME and boss_next_attack == 1:
+				var t := clampf(elapsed / IMPACT_TIME, 0.0, 1.0)
+				vfx_sprite.visible = true
+				vfx_sprite.z_index = 2
+				vfx_sprite.centered = true
+				vfx_sprite.position = Vector2.ZERO
+				vfx_sprite.rotation = aim.angle()
+				var d := SWEEP_REACH * 2.16
+				vfx_sprite.scale = Vector2(d, d)
+				vfx_material.set_shader_parameter("mode", 1)
+				vfx_material.set_shader_parameter("progress", t)
+				vfx_material.set_shader_parameter("half_arc", SWEEP_HALF_ANGLE)
+				vfx_material.set_shader_parameter("pixel_grid", 112.0)
+			else:
+				vfx_sprite.visible = false
+		_:
+			vfx_sprite.visible = false
 
 func _follow_path(target: Vector2) -> Vector2:
 	# A centre ray can clear a pillar while the body's radius still hits it.
@@ -111,21 +206,5 @@ func _finish_attack(next_attack: int) -> void:
 	boss_timer = RECOVERY
 
 func _draw() -> void:
-	draw_arc(Vector2.ZERO, 22.0, 0.0, TAU, 36, Color("e6a451"), 3.0, true)
-	match boss_state:
-		BossState.COMBO_WINDUP:
-			_draw_attack_fan(boss_charge_aim.angle(), SWEEP_HALF_ANGLE, SWEEP_REACH, 1.0 - boss_timer / SWEEP_WINDUP)
-		BossState.CHARGE_WINDUP:
-			var end := boss_charge_aim * (boss_charge_distance + CHARGE_WIDTH)
-			var side := boss_charge_aim.orthogonal() * CHARGE_WIDTH
-			var lane := PackedVector2Array([side, end + side, end - side, -side])
-			draw_colored_polygon(lane, Color(1.0, 0.31, 0.12, lerpf(0.24, 0.49, 1.0 - boss_timer / CHARGE_WINDUP)))
-			draw_polyline(lane + PackedVector2Array([side]), Color("ffad59"), 2.5, true)
-		BossState.CHARGING:
-			draw_line(Vector2.ZERO, -boss_charge_aim * 48.0, Color("ffe2a0"), 7.0, true)
-		BossState.RECOVERY:
-			var glow := clampf(1.0 - (RECOVERY - boss_timer) / IMPACT_TIME, 0.0, 1.0)
-			if glow > 0.0 and boss_next_attack == 1:
-				var angle := boss_charge_aim.angle()
-				draw_arc(Vector2.ZERO, SWEEP_REACH, angle - SWEEP_HALF_ANGLE, angle + SWEEP_HALF_ANGLE, 24,
-					Color(1.0, 0.89, 0.63, glow), 5.0, true)
+	# Boss body, ground aura, telegraphs and slashes are rendered by pixel visual & shader nodes.
+	pass

@@ -1,6 +1,8 @@
 extends "res://scripts/courtyard_world.gd"
 
 const CONFIG = preload("res://scripts/v41_config.gd")
+const AmbientFx = preload("res://scripts/v41_ambient_fx.gd")
+const PortalFx = preload("res://scripts/v41_portal_fx.gd")
 const ROOM_BACKGROUNDS := [
 	preload("res://assets/courtyard/rooms2-7/room02_mountain_path.png"),
 	preload("res://assets/courtyard/rooms2-7/room03_cliff_walkway.png"),
@@ -61,6 +63,8 @@ var has_exit := false
 var exit_point := Vector2.ZERO
 var room2_obstacles: Array[StaticBody2D] = []
 var room1_obstacles: Array[StaticBody2D] = []
+var ambient_fx: Node2D
+var portal_fx: Node2D
 var terrain_movement_mask := 1
 
 func build_battle() -> void:
@@ -73,6 +77,12 @@ func build_battle() -> void:
 	backdrop.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bamboo_room = preload("res://scenes/v41_room1_visual.tscn").instantiate()
 	add_child(bamboo_room)
+	ambient_fx = AmbientFx.new()
+	ambient_fx.name = "AmbientFx"
+	add_child(ambient_fx)
+	portal_fx = PortalFx.new()
+	portal_fx.name = "PortalFx"
+	add_child(portal_fx)
 	actors.y_sort_enabled = true
 	grid.region = Rect2i(0, 0, 40, 23)
 	grid.cell_size = Vector2.ONE * NAV_CELL
@@ -325,6 +335,20 @@ func set_room_style(room_index: int) -> void:
 	backdrop.visible = not first_room
 	bamboo_room.visible = first_room
 	bamboo_room.set_cloud_shadows_active(first_room)
+	if is_instance_valid(ambient_fx):
+		ambient_fx.set_room(room_index)
+	if is_instance_valid(portal_fx):
+		portal_fx.configure(exit_point, has_exit, 26.0 if first_room else ROOM_EXIT_RADIUS)
+
+func set_portal_active(is_open: bool, play_wave: bool = false) -> void:
+	portal_open = is_open
+	if is_instance_valid(portal_fx):
+		portal_fx.set_portal_active(is_open, play_wave)
+	queue_redraw()
+
+func trigger_portal_burst() -> void:
+	if is_instance_valid(portal_fx):
+		portal_fx.trigger_step_in_burst()
 
 func _process(delta: float) -> void:
 	super._process(delta)
@@ -369,9 +393,3 @@ func path_between(start: Vector2, target: Vector2) -> PackedVector2Array:
 
 func _draw() -> void:
 	super._draw()
-	if not has_exit:
-		return
-	var color := Color("86f5d3") if portal_open else (Color("e1cc9c") if room_cleared else Color("566b70"))
-	var radius := 22.0 if bamboo_room.visible else ROOM_EXIT_RADIUS
-	draw_circle(exit_point, radius, Color(color, 0.15))
-	draw_arc(exit_point, radius, 0.0, TAU, 40, color, 4.0, true)

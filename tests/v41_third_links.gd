@@ -61,7 +61,8 @@ func run():
 			root.push_input(ev,true)
 			await wait_frames(42)
 		await tap()
-		check(game.player.combo.stage == 0, action + " next first")
+		var expected := 1 if action == "dash" else 0
+		check(game.player.combo.stage == expected, action + (" preserves next" if action == "dash" else " next first"))
 	print("LINK_RESULT failures=",failures)
 	quit(1 if failures else 0)
 

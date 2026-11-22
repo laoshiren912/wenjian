@@ -4,7 +4,9 @@ const CONFIG = preload("res://scripts/v41_config.gd")
 const MINI_BOSS = preload("res://scripts/v41_boss.gd")
 const COMBO_PLAYER = preload("res://scenes/player_v41.tscn")
 const CARD_POOL = preload("res://scripts/v41_card_pool.gd")
+const AudioManager = preload("res://scripts/v41_audio.gd")
 const MELEE_DEATH_SMOKE = preload("res://assets/vfx/pvfx-small-explosion-tail/smoke-frames.tres")
+var audio_mgr: Node
 var room_index := 0
 var reward_counts: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var run_kills := 0
@@ -23,6 +25,20 @@ var gm_spawned: Array[Node] = []
 var hitstop_generation := 0
 var saved_time_scale := 1.0
 var hitstop_active := false
+var hitstop_current_duration := 0.0
+var last_combo_impact_ms := -10000
+var last_combo_shake_ms := -10000
+var clear_celebration_elapsed := 0.0
+var clear_celebration_duration := 0.0
+var clear_banner_delay := 0.15
+var clear_banner_shown := false
+var clear_banner_pending := false
+var clear_banner_elapsed := 0.0
+var portal_trigger_grace := 0.0
+var clear_is_boss := false
+var wave_wait_elapsed := 0.0
+var wave_summon_started := false
+var pending_wave_points: Array[Vector2] = []
 
 func _end_hitstop() -> void:
 	hitstop_generation += 1
@@ -33,22 +49,96 @@ func _end_hitstop() -> void:
 func _exit_tree() -> void:
 	_end_hitstop()
 
-func _third_impact(_point: Vector2) -> void:
-	feedback.shake_strength = maxf(feedback.shake_strength, CONFIG.THIRD_SHAKE)
-	feedback.shake_time = maxf(feedback.shake_time, CONFIG.THIRD_SHAKE_TIME)
-	if hitstop_active:
+func _trigger_combo_shake(strength: float, duration: float) -> void:
+	var now := Time.get_ticks_msec()
+	if now - last_combo_shake_ms < CONFIG.COMBO_SHAKE_GAP_MS:
 		return
-	saved_time_scale = Engine.time_scale
+	last_combo_shake_ms = now
+	feedback.shake_strength = maxf(feedback.shake_strength, strength)
+	feedback.shake_time = maxf(feedback.shake_time, duration)
+
+func _trigger_combo_hitstop(duration: float, scale: float, allow_upgrade: bool = false, min_gap_ms: int = CONFIG.COMBO_HITSTOP_GAP_MS) -> void:
+	var now := Time.get_ticks_msec()
+	var within_gap := (now - last_combo_impact_ms) < min_gap_ms
+	var can_upgrade := allow_upgrade and duration > hitstop_current_duration + 0.005
+	if not can_upgrade and (hitstop_active or within_gap):
+		return
+	last_combo_impact_ms = now
+	if not hitstop_active:
+		saved_time_scale = Engine.time_scale
 	hitstop_active = true
+	hitstop_current_duration = duration
 	hitstop_generation += 1
 	var generation := hitstop_generation
-	Engine.time_scale = CONFIG.THIRD_HITSTOP_SCALE
-	await get_tree().create_timer(CONFIG.THIRD_HITSTOP, true, false, true).timeout
+	Engine.time_scale = scale
+	await get_tree().create_timer(duration, true, false, true).timeout
 	if generation == hitstop_generation:
 		_end_hitstop()
 
+func _third_impact(_point: Vector2) -> void:
+	_trigger_combo_shake(CONFIG.THIRD_SHAKE, CONFIG.THIRD_SHAKE_TIME)
+	_trigger_combo_hitstop(CONFIG.THIRD_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
+
+func _on_sword_cue(kind: String, point: Vector2) -> void:
+	feedback.play_sword_cue(kind, point)
+	if kind == "sword_rain_hit":
+		_trigger_combo_hitstop(CONFIG.RAIN_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, false, 160)
+
+func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) -> void:
+	if not is_instance_valid(player) or not is_instance_valid(player.combo):
+		return
+	var sword = player.combo
+	var dir: Vector2 = sword.swing_direction
+	var rank: int = clampi(sword.swing_rank, 0, 2)
+	feedback.handle_combo_event(kind, slot, point, dir, rank)
+	match kind:
+		"miss":
+			pass
+		"hit":
+			if is_instance_valid(target) and is_instance_valid(target.visual):
+				target.visual.hurt_time = maxf(target.visual.hurt_time, 0.07)
+			if sword.swing_bonus > 1.01:
+				feedback.spawn_thunder_burst(point, dir)
+				if is_instance_valid(sword.slash_vfx):
+					sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.18)
+				feedback.trigger_camera_kick(dir, 7.8)
+				_trigger_combo_shake(3.4, 0.12)
+				_trigger_combo_hitstop(CONFIG.THIRD_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
+			if slot == 2:
+				if is_instance_valid(sword.slash_vfx):
+					sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.0)
+					sword.slash_vfx.notify_third_impact(point, rank, false)
+				feedback.trigger_camera_kick(dir, 7.2)
+			else:
+				feedback.trigger_camera_kick(dir, 4.6)
+				_trigger_combo_hitstop(CONFIG.LIGHT_HITSTOP, CONFIG.LIGHT_HITSTOP_SCALE, false, 65)
+		"blocked":
+			if is_instance_valid(sword.slash_vfx):
+				sword.slash_vfx.trigger_block_recoil()
+			feedback.trigger_camera_kick(-dir, 3.6)
+			_trigger_combo_shake(1.8, 0.08)
+		"guard_break":
+			if is_instance_valid(target):
+				var break_dur := CONFIG.GUARD_BREAK_TIME if sword.heavy_reward else CONFIG.HEAVY_BASE_BREAK
+				feedback.register_guard_break_target(target, break_dur)
+			if is_instance_valid(sword.slash_vfx):
+				sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.24)
+				sword.slash_vfx.notify_third_impact(point, rank, true)
+			feedback.trigger_camera_kick(dir, 8.2)
+			_trigger_combo_shake(CONFIG.THIRD_SHAKE * 1.15, CONFIG.THIRD_SHAKE_TIME)
+			_trigger_combo_hitstop(CONFIG.GUARD_BREAK_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
+		"kill":
+			if slot == 2 and is_instance_valid(sword.slash_vfx):
+				sword.slash_vfx.notify_third_impact(point, rank, true)
+			feedback.trigger_camera_kick(dir, 6.2)
+			_trigger_combo_shake(4.4 if slot == 2 else 3.0, 0.16 if slot == 2 else 0.12)
+			_trigger_combo_hitstop(0.046 if slot == 2 else 0.030, 0.15 if slot == 2 else 0.22)
+
 func _ready() -> void:
 	_setup_inputs()
+	audio_mgr = AudioManager.new()
+	audio_mgr.name = "V41Audio"
+	add_child(audio_mgr)
 	world.build_battle()
 	_build_ui()
 	get_viewport().size_changed.connect(_update_camera)
@@ -77,6 +167,8 @@ func start_room() -> void:
 
 func _enter_room(returning_to_room_one := false) -> void:
 	_end_hitstop()
+	last_combo_impact_ms = -10000
+	last_combo_shake_ms = -10000
 	var carried_health := -1.0
 	var carried_stamina := -1.0
 	if room_index > 0 and is_instance_valid(player):
@@ -98,8 +190,10 @@ func _enter_room(returning_to_room_one := false) -> void:
 	feedback.shake_time = 0.0
 	feedback.shake_strength = 0.0
 	$Camera2D.offset = Vector2.ZERO
-	world.portal_open = false
+	world.set_portal_active(false, false)
 	world.set_room_style(room_index)
+	if is_instance_valid(audio_mgr):
+		audio_mgr.play_room_bgm(room_index == CONFIG.BOSS_ROOM)
 	phase = "combat"
 	player = _create_player()
 	gm_spawned.clear()
@@ -126,7 +220,18 @@ func _enter_room(returning_to_room_one := false) -> void:
 	hud.hurt_flash.color.a = 0.0
 	hud.notice_time = 0.0
 	hud.notice.text = ""
+	hud.clear_screen_banner()
 	hud.hide_screen()
+	clear_celebration_elapsed = 0.0
+	clear_celebration_duration = 0.0
+	clear_banner_shown = false
+	clear_banner_pending = false
+	clear_banner_elapsed = 0.0
+	portal_trigger_grace = 0.0
+	clear_is_boss = false
+	wave_wait_elapsed = 0.0
+	wave_summon_started = false
+	pending_wave_points.clear()
 	world.reward_visible = false
 	world.room_cleared = false
 	base_stages = player.combo.stages.duplicate(true)
@@ -136,8 +241,10 @@ func _enter_room(returning_to_room_one := false) -> void:
 		player.health = carried_health
 		player.stamina = carried_stamina
 	player.combo.finisher_contact.connect(_third_impact)
+	player.combo.combo_event.connect(_on_combo_event)
 	player.combo.guard_broken.connect(feedback.show_guard_break)
-	player.sword_cue.connect(feedback.play_sword_cue)
+	player.sword_cue.connect(_on_sword_cue)
+	player.thunder_afterimage.connect(feedback.spawn_thunder_afterimage)
 	wave_index = 0
 	total = 1 if room_index == CONFIG.BOSS_ROOM else CONFIG.room_total(room_index)
 	remaining = total
@@ -154,6 +261,8 @@ func _enter_room(returning_to_room_one := false) -> void:
 
 func _apply_rewards() -> void:
 	player.combo.stages = base_stages.duplicate(true)
+	player.combo.sword_rain_reward = reward_counts[0] > 0
+	player.sword_rain_card_level = reward_counts[0]
 	player.combo.card_multiplier = 1.0 + CONFIG.SWORD_BONUS * reward_counts[0]
 	for data in player.combo.stages:
 		data.damage = float(data.damage) * player.combo.card_multiplier
@@ -168,16 +277,23 @@ func _cultivation_rank() -> int:
 			return rank
 	return 0
 
-func _spawn_wave() -> void:
+func _pick_wave_spawn_points() -> Array[Vector2]:
+	var kinds: Array = CONFIG.WAVES[room_index][wave_index]
+	var pool: Array[Vector2] = (CONFIG.ROOM2_SPAWN_POINTS if room_index == 1 else CONFIG.SPAWN_POINTS).duplicate()
+	pool = pool.filter(func(point): return point.distance_to(player.position) >= CONFIG.SPAWN_CLEARANCE)
+	var chosen: Array[Vector2] = []
+	for i in range(kinds.size()):
+		chosen.append(pool[i % pool.size()])
+	return chosen
+
+func _spawn_wave(fixed_points: Array[Vector2] = [], from_summon: bool = false) -> void:
 	if phase == "dead":
 		return
 	phase = "combat"
 	var kinds: Array = CONFIG.WAVES[room_index][wave_index]
 	wave_remaining = kinds.size()
-	var points: Array[Vector2] = (CONFIG.ROOM2_SPAWN_POINTS if room_index == 1 else CONFIG.SPAWN_POINTS).duplicate()
+	var points: Array[Vector2] = fixed_points if fixed_points.size() >= kinds.size() else _pick_wave_spawn_points()
 	var melee: Array = []
-	# Six spaced courtyard points for at most five enemies; avoid the player.
-	points = points.filter(func(point): return point.distance_to(player.position) >= CONFIG.SPAWN_CLEARANCE)
 	for i in range(kinds.size()):
 		var type: int = kinds[i]
 		var enemy: SurvivorEnemy = ENEMY.instantiate()
@@ -197,22 +313,26 @@ func _spawn_wave() -> void:
 		enemy.home_position = enemy.position
 		enemy.side_sign = 1.0 if i % 2 == 0 else -1.0
 		_connect_enemy(enemy)
-		if room_index == 0 and type == CONFIG.MELEE:
-			enemy.killed.connect(_play_melee_death_smoke, CONNECT_ONE_SHOT)
 		world.actors.add_child(enemy)
 		var stats: Dictionary = CONFIG.ENEMY_STATS[type]
 		enemy.speed = float(stats.speed)
 		enemy.guard_cooldown = 0.0
-		enemy.attack_cooldown = 0.25 if type == CONFIG.RANGED else 0.0
+		enemy.attack_cooldown = maxf(0.25 if type == CONFIG.RANGED else 0.0, CONFIG.WAVE_LANDING_GRACE if from_summon else 0.0)
+		enemy.windup = 0.0
 		enemy.max_health = float(stats.health) * CONFIG.ROOM_SCALES[room_index]
 		enemy.health = enemy.max_health
 		enemy.damage = float(stats.damage) * CONFIG.ROOM_SCALES[room_index]
+		if from_summon:
+			if is_instance_valid(enemy.visual) and enemy.visual.has_method("play_spawn_pop"):
+				enemy.visual.play_spawn_pop()
+			feedback.spawn_death_dissolve(enemy.position, false)
 		triggered_count += 1
 		if enemy.kind == SurvivorEnemy.Kind.HOSTILE:
 			melee.append(enemy)
 	scheduler = preload("res://scripts/pair_scheduler.gd").new()
 	scheduler.configure(melee, CONFIG.PAIR_SIZE, CONFIG.PAIR_APPROACH_TIMEOUT)
-	melee[0].alert_encounter(player.global_position)
+	if not melee.is_empty():
+		melee[0].alert_encounter(player.global_position)
 	_update_status()
 
 func _spawn_boss() -> void:
@@ -228,51 +348,121 @@ func _spawn_boss() -> void:
 
 func _connect_enemy(enemy: SurvivorEnemy) -> void:
 	enemy.killed.connect(_on_enemy_killed)
+	var is_boss := enemy.kind == SurvivorEnemy.Kind.BOSS
+	enemy.killed.connect(func(point: Vector2, xp: int): _play_melee_death_smoke(point, xp, is_boss), CONNECT_ONE_SHOT)
 	enemy.damaged.connect(func(point: Vector2, amount: float):
 		feedback.show_damage(point, amount, false, enemy.damage_shakes_camera,
 			enemy.last_hit_blocked))
 
-func _play_melee_death_smoke(point: Vector2, _xp: int) -> void:
+func _play_melee_death_smoke(point: Vector2, _xp: int, is_boss: bool = false) -> void:
+	feedback.spawn_death_dissolve(point, is_boss)
 	var smoke := AnimatedSprite2D.new()
 	smoke.sprite_frames = MELEE_DEATH_SMOKE
 	smoke.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	smoke.centered = false
-	# Align the source ground pivot with the Bandit's feet, below its body origin.
+	# Align the source ground pivot with the enemy's feet, below its body origin.
 	smoke.offset = Vector2(-32, -57)
+	if is_boss:
+		smoke.scale = Vector2.ONE * 1.85
+		smoke.modulate = Color("ffd591")
 	smoke.animation_finished.connect(smoke.queue_free)
 	world.actors.add_child(smoke)
 	smoke.global_position = point + Vector2(0, 12)
 	smoke.play()
 
-func _on_enemy_killed(_point: Vector2, _xp: int) -> void:
+func _clear_hostile_projectiles() -> void:
+	if not is_instance_valid(world) or not is_instance_valid(world.actors):
+		return
+	for child in world.actors.get_children():
+		if child.get("hostile") == true:
+			child.queue_free()
+
+func _trigger_breakthrough(rank: int) -> void:
+	if rank < 1 or not is_instance_valid(player) or player.dead:
+		return
+	feedback.spawn_breakthrough(player, rank)
+	hud.play_breakthrough_banner(rank)
+
+func _open_clear_portal(had_breakthrough: bool, kill_point: Vector2) -> void:
+	_clear_hostile_projectiles()
+	phase = "exit_ready"
+	clear_is_boss = false
+	clear_banner_pending = true
+	clear_banner_elapsed = 0.0
+	clear_banner_delay = 0.55 if had_breakthrough else CONFIG.CLEAR_BANNER_DELAY
+	world.room_cleared = true
+	world.set_portal_active(true, true)
+	if is_instance_valid(player) and not player.dead:
+		if not kill_point.is_zero_approx():
+			feedback.spawn_clear_spirit_orbs(kill_point, player, 6)
+		portal_trigger_grace = 0.45 if world.at_exit(player.global_position) else 0.0
+	_update_status()
+
+func _trigger_portal_reward() -> void:
+	if phase != "exit_ready":
+		return
+	world.trigger_portal_burst()
+	feedback.play_portal_activate()
+	hud.clear_screen_banner()
+	phase = "reward_select"
+	get_tree().paused = true
+	_draw_rewards()
+	hud.show_rewards()
+	_update_status()
+
+func _begin_clear_celebration(is_boss: bool, had_breakthrough: bool = false, kill_point: Vector2 = Vector2.ZERO) -> void:
+	_clear_hostile_projectiles()
+	phase = "clear_celebration"
+	clear_is_boss = is_boss
+	clear_celebration_elapsed = 0.0
+	clear_celebration_duration = CONFIG.BOSS_CLEAR_CELEBRATION_TIME if is_boss else CONFIG.CLEAR_CELEBRATION_TIME
+	clear_banner_delay = 0.55 if had_breakthrough else CONFIG.CLEAR_BANNER_DELAY
+	clear_banner_shown = false
+	world.room_cleared = true
+	world.queue_redraw()
+	if is_instance_valid(player) and not player.dead and not kill_point.is_zero_approx():
+		feedback.spawn_clear_spirit_orbs(kill_point, player, 8 if is_boss else 6)
+	_update_status()
+
+func _finish_clear_celebration() -> void:
+	if phase != "clear_celebration":
+		return
+	if clear_is_boss:
+		phase = "cleared"
+		_update_status()
+		_show_result(true)
+
+func _on_enemy_killed(point: Vector2, _xp: int) -> void:
 	if phase != "combat":
 		return
 	remaining -= 1
 	wave_remaining -= 1
 	run_kills += 1
+	var broke_through := false
 	if not player.dead:
-		player.health = minf(player.max_health, player.health + CONFIG.KILL_HEAL * reward_counts[2])
+		if reward_counts[2] > 0:
+			player.health = minf(player.max_health, player.health + CONFIG.KILL_HEAL * reward_counts[2])
+			feedback.spawn_lifesteal_orbs(point, player, 5)
 		var rank := _cultivation_rank()
-		if player.cultivation != rank:
+		if int(player.cultivation) != rank:
+			var old_rank: int = int(player.cultivation)
 			player.cultivation = rank
-			hud.show_notice("修为进阶 · " + CONFIG.CULTIVATION_NAMES[rank])
+			if rank > old_rank:
+				broke_through = true
+				_trigger_breakthrough(rank)
+			else:
+				hud.show_notice("修为境界 · " + CONFIG.CULTIVATION_NAMES[rank])
 	if room_index == CONFIG.BOSS_ROOM:
-		phase = "cleared"
-		world.room_cleared = true
-		_update_status()
-		_show_result(true)
+		_begin_clear_celebration(true, broke_through, point)
 		return
 	if wave_remaining == 0 and remaining > 0:
 		phase = "wave_transition"
 		wave_index += 1
-		_spawn_wave.call_deferred()
+		wave_wait_elapsed = 0.0
+		wave_summon_started = false
+		pending_wave_points.clear()
 	elif remaining == 0:
-		phase = "reward_select"
-		world.room_cleared = true
-		world.queue_redraw()
-		get_tree().paused = true
-		_draw_rewards()
-		hud.show_rewards()
+		_open_clear_portal(broke_through, point)
 	_update_status()
 
 func _physics_process(delta: float) -> void:
@@ -280,18 +470,84 @@ func _physics_process(delta: float) -> void:
 		return
 	if phase == "combat" and is_instance_valid(scheduler):
 		scheduler.tick(delta)
+	elif phase == "wave_transition":
+		wave_wait_elapsed += delta
+		if not wave_summon_started and wave_wait_elapsed >= CONFIG.WAVE_PAUSE_TIME:
+			wave_summon_started = true
+			pending_wave_points = _pick_wave_spawn_points()
+			feedback.spawn_wave_summon(pending_wave_points, CONFIG.WAVE_SUMMON_TIME)
+			hud.show_notice("第 %d 波来袭" % (wave_index + 1))
+		if wave_wait_elapsed >= CONFIG.WAVE_PAUSE_TIME + CONFIG.WAVE_SUMMON_TIME:
+			var pts := pending_wave_points.duplicate()
+			pending_wave_points.clear()
+			_spawn_wave(pts, true)
+	elif phase == "clear_celebration":
+		clear_celebration_elapsed += delta
+		if not clear_banner_shown and clear_celebration_elapsed >= clear_banner_delay:
+			clear_banner_shown = true
+			feedback.play_clear_sound(clear_is_boss)
+			hud.play_clear_banner(clear_is_boss)
+		if clear_celebration_elapsed >= clear_celebration_duration:
+			_finish_clear_celebration()
+	elif phase == "exit_ready":
+		if clear_banner_pending:
+			clear_banner_elapsed += delta
+			if clear_banner_elapsed >= clear_banner_delay:
+				clear_banner_pending = false
+				feedback.play_clear_sound(false)
+				hud.play_clear_banner(false)
+				if world.has_exit:
+					feedback.spawn_exit_beacon(world.exit_point)
+		if portal_trigger_grace > 0.0:
+			portal_trigger_grace = maxf(0.0, portal_trigger_grace - delta)
 	_update_camera()
-	if phase == "exit_ready" and world.at_exit(player.global_position):
-		room_index += 1
-		phase = "transition"
-		_enter_room.call_deferred()
+	if phase == "exit_ready" and portal_trigger_grace <= 0.0 and world.at_exit(player.global_position):
+		_trigger_portal_reward()
 
 func _input(event: InputEvent) -> void:
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
 		_debug_menu()
 		get_viewport().set_input_as_handled()
 		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var code_m: int = event.keycode if event.keycode != 0 else event.physical_keycode
+		if code_m == KEY_M and is_instance_valid(audio_mgr):
+			var muted: bool = audio_mgr.toggle_master_mute()
+			hud.show_notice("音频：已静音 [M]" if muted else "音频：已开启 [M]")
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventKey and event.pressed and not event.echo and not get_tree().paused and phase in ["combat", "exit_ready"]:
+		var code: int = event.keycode if event.keycode != 0 else event.physical_keycode
+		if code in [KEY_1, KEY_KP_1]:
+			_quick_set_cultivation(0)
+			get_viewport().set_input_as_handled()
+			return
+		elif code in [KEY_2, KEY_KP_2]:
+			_quick_set_cultivation(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif code in [KEY_3, KEY_KP_3]:
+			_quick_set_cultivation(2)
+			get_viewport().set_input_as_handled()
+			return
+		elif code in [KEY_0, KEY_KP_0]:
+			_quick_set_cultivation(-1)
+			get_viewport().set_input_as_handled()
+			return
 	super._input(event)
+
+func _quick_set_cultivation(rank: int) -> void:
+	if not is_instance_valid(player) or player.dead:
+		return
+	cultivation_override = clampi(rank, -1, CONFIG.CULTIVATION_NAMES.size() - 1)
+	player.cultivation = _cultivation_rank()
+	if cultivation_override < 0:
+		hud.show_notice("恢复自然修为 · " + CONFIG.CULTIVATION_NAMES[player.cultivation])
+	else:
+		if cultivation_override >= 1:
+			_trigger_breakthrough(cultivation_override)
+		else:
+			hud.show_notice("切换境界 · " + CONFIG.CULTIVATION_NAMES[cultivation_override])
 
 func _draw_rewards() -> void:
 	reward_options = CARD_POOL.draw(reward_counts, reward_rng)
@@ -304,12 +560,12 @@ func select_reward(index: int) -> void:
 		return
 	reward_counts[index] += 1
 	_apply_rewards()
-	phase = "exit_ready"
 	world.reward_visible = false
-	world.portal_open = true
-	world.queue_redraw()
 	hud.hide_screen()
 	get_tree().paused = false
+	room_index += 1
+	phase = "transition"
+	_enter_room.call_deferred()
 	_update_status()
 
 func _debug_menu() -> void:
@@ -375,6 +631,8 @@ func debug_spawn(kind: int, count: int) -> void:
 			enemy.intro_room = room_index < 2
 			enemy.home_position = enemy.position
 		enemy.damaged.connect(func(point: Vector2, amount: float): feedback.show_damage(point, amount, false, enemy.damage_shakes_camera, enemy.last_hit_blocked))
+		var gm_boss := kind == 3
+		enemy.killed.connect(func(point: Vector2, xp: int): _play_melee_death_smoke(point, xp, gm_boss), CONNECT_ONE_SHOT)
 		world.actors.add_child(enemy)
 		gm_spawned.append(enemy)
 		if kind != 3:
@@ -415,11 +673,13 @@ func debug_cultivation(rank: int) -> void:
 	cultivation_override = clampi(rank, -1, CONFIG.CULTIVATION_NAMES.size() - 1)
 	player.clear_dash_effects()
 	player.clear_throw()
+	player.clear_sword_rain()
 	player.combo.reset_chain()
 	player.combo.swing_time = 0.0
 	player.visual.cancel_attack()
 	player.dash_cooldown = 0.0
 	player.throw_cooldown = 0.0
+	player.sword_rain_cooldown = 0.0
 	player.cultivation = _cultivation_rank()
 	hud.show_card_debug()
 
@@ -435,10 +695,11 @@ func debug_close() -> void:
 func _update_status() -> void:
 	match phase:
 		"combat":
-			status.text = "守庭者 · 躲开横扫扇区与突进直线，趁收招反击" if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
-		"reward_select": status.text = "已清场 · 选择奖励后开放出口"
-		"exit_ready": status.text = "已领奖 · 前往" + CONFIG.ROOM_EXIT_LABELS[room_index]
-		"cleared": status.text = "守庭者已击败 · 本局通关"
+			status.text = "%s · 躲开横扫扇区与突进直线，趁收招反击" % CONFIG.BOSS_NAME if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
+		"clear_celebration": status.text = "%s已破 · 灵气散尽" % CONFIG.BOSS_NAME if clear_is_boss else "清场 · 破阵成功"
+		"reward_select": status.text = "阵眼领悟 · 选择一项功法奖励后进入下一关"
+		"exit_ready": status.text = "已清场 · 步入%s阵眼领悟功法" % CONFIG.ROOM_EXIT_LABELS[room_index]
+		"cleared": status.text = "%s已击败 · 本局通关" % CONFIG.BOSS_NAME
 		"dead": status.text = "角色倒下 · 重开将清空本局奖励"
 
 func toggle_pause() -> void:

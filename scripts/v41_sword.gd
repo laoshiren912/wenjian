@@ -1,10 +1,12 @@
 extends "res://scripts/sword_orbit.gd"
 
 const CONFIG = preload("res://scripts/v41_config.gd")
-const COLORS := [Color("ffeece"), Color("68e4f5"), Color("c4b2ff")]
-# Toggle only this replacement for local A/B comparison.
-const USE_MID_SLASH_V2 := true
+const SlashVfx = preload("res://scripts/v41_slash_vfx.gd")
+const SwordWave = preload("res://scripts/v41_sword_wave.gd")
+# Legacy mid-slash atlas disabled; procedural pixel shader vfx drives all three combo slots.
+const USE_MID_SLASH_V2 := false
 const MID_SLASH_ATLAS = preload("res://assets/vfx/mid-horizontal-slash-v2/mid_horizontal_slash_v2_atlas_4x4.png")
+const SILVER_SLASH_ATLAS = preload("res://assets/vfx/combo-slash-v2/silver_atlas.png")
 const MID_SLASH_CELL := Vector2(256, 256)
 const MID_SLASH_GRIP := Vector2(64, 154)
 const MID_SLASH_SCALE := 0.55
@@ -18,6 +20,10 @@ const MID_SLASH_LEADS := [
 ]
 signal finisher_contact(point: Vector2)
 signal guard_broken(point: Vector2)
+# One contact can emit a hit/blocked event plus break and kill events.
+# Miss is emitted once after the active window, only if nothing was contacted.
+signal combo_event(kind: String, slot: int, point: Vector2, target: Node2D)
+var sword_rain_reward := false
 var dash_reward := false
 var heavy_reward := false
 var dash_armed := false
@@ -25,15 +31,23 @@ var swing_bonus := 1.0
 var card_multiplier := 1.0
 var swing_rank := 0
 var impact_sent := false
+var miss_checked := false
+var wave_fired := false
+var slash_vfx: Node2D
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	chain_window = 0.30
+	chain_window = CONFIG.COMBO_CHAIN_WINDOW
+	click_buffer = CONFIG.COMBO_INPUT_BUFFER
 	stages = stages.duplicate(true)
 	for i in range(stages.size()):
 		stages[i].windup = CONFIG.SWORD_TIMINGS[i].x
 		stages[i].active = CONFIG.SWORD_TIMINGS[i].y
 		stages[i].recovery = CONFIG.SWORD_TIMINGS[i].z
+	slash_vfx = SlashVfx.new()
+	slash_vfx.name = "SlashVfx"
+	add_child(slash_vfx)
+	slash_vfx.bind_sword(self)
 
 func blade_segment(progress: float) -> PackedVector2Array:
 	var reach: float = float(current_data().reach) + get_parent().reach_bonus + CONFIG.SWORD_EXTENSION[swing_rank]
@@ -49,6 +63,15 @@ func blade_segment(progress: float) -> PackedVector2Array:
 func clear_chain_memory() -> void:
 	next_stage = 0
 	chain_time = 0.0
+
+func preserve_chain_for_dash() -> void:
+	clear_inputs()
+	var preserved_next := next_stage if chain_time > 0.0 else 0
+	if swing_time > 0.0:
+		preserved_next = 0 if charged_swing else (stage + 1) % stages.size()
+		swing_time = 0.0
+	next_stage = preserved_next
+	chain_time = CONFIG.DASH_CHAIN_WINDOW if next_stage != 0 else 0.0
 
 func _held_pose() -> Dictionary:
 	# A relaxed side carry is independent of the cursor.
@@ -110,34 +133,11 @@ func _draw() -> void:
 	var progress := active_progress(swing_time)
 	if _uses_mid_slash_v2():
 		_draw_mid_slash_v2(progress)
-		return
-	var recovery := 0.0
-	if phase() == "recovery":
-		recovery = 1.0 - swing_time * get_parent().attack_speed_multiplier / float(current_data().recovery)
-	if recovery > (0.80 if stage == 2 else 0.42):
-		return
-	var opacity := (1.0 - smoothstep(0.0, 0.80 if stage == 2 else 0.42, recovery))
-	var color: Color = COLORS[swing_rank]
-	var start := maxf(0.0, progress - (0.55 if stage == 2 else 0.43))
-	var previous := display_segment(start)
-	for i in range(1, 11):
-		var t := i / 10.0
-		var sample := lerpf(start, progress, t)
-		var edge := display_segment(sample)
-		_draw_ribbon(previous, edge, color, opacity * t, swing_rank)
-		previous = edge
-	if progress > 0.03:
-		var edge := display_segment(progress)
-		var turn := -1.0 if stage == 1 else 1.0
-		var tangent := (edge[1] - edge[0]).normalized().orthogonal() * turn
-		var bend := edge[0].lerp(edge[1], 0.63) - tangent * (5.0 + swing_rank * 2.5)
-		draw_polyline(PackedVector2Array([edge[0], bend, edge[1]]), Color(color.lightened(0.57), opacity * 0.82),
-			2.0 + swing_rank + (1.5 if stage == 2 else 0.0), true)
-	if stage == 2 and swing_rank > 0 and progress >= 0.38:
-		_draw_heavy_wake(color, opacity, recovery)
+	# Slot three has no replacement sprite yet. Keep its character animation,
+	# but do not draw the obsolete geometric ribbon or wake.
 
 func _uses_mid_slash_v2() -> bool:
-	return USE_MID_SLASH_V2 and stage == 0 and swing_rank == 1 and not charged_swing
+	return USE_MID_SLASH_V2 and stage < 2 and not charged_swing
 
 func _mid_slash_active_frame(progress: float) -> int:
 	# Give the brightest cel half of the active swing. A single physics
@@ -161,47 +161,20 @@ func _draw_mid_slash_v2(progress: float) -> void:
 	var blade := tip - hand
 	var axis := blade.normalized()
 	var source_lead: Vector2 = MID_SLASH_LEADS[mini(frame, 8) - 1] - MID_SLASH_GRIP
-	# The authored sweep runs upward when aimed right. Flip it to follow
-	# this swing, then align that frame's leading edge with the blade.
-	source_lead.y = -source_lead.y
+	# Reverse the authored sweep for the return stroke and realign its edge
+	# to that stroke's actual sword tip.
+	var flip_y := -1.0 if stage == 0 else 1.0
+	source_lead.y *= flip_y
 	var rotation_to_blade := source_lead.angle_to(axis)
-	var origin := tip + axis * (MID_SLASH_EDGE_GAP - source_lead.length() * MID_SLASH_SCALE)
+	var scale_factor: float = [0.44, MID_SLASH_SCALE, 0.55][swing_rank]
+	var origin := tip + axis * (MID_SLASH_EDGE_GAP - source_lead.length() * scale_factor)
 	var cell := Vector2(frame % 4, frame >> 2)
-	draw_set_transform(origin, rotation_to_blade, Vector2(MID_SLASH_SCALE, -MID_SLASH_SCALE))
-	draw_texture_rect_region(MID_SLASH_ATLAS, Rect2(-MID_SLASH_GRIP, MID_SLASH_CELL),
-		Rect2(cell * MID_SLASH_CELL, MID_SLASH_CELL))
+	var atlas: Texture2D = SILVER_SLASH_ATLAS if swing_rank == 0 else MID_SLASH_ATLAS
+	var tint := Color(0.78, 0.90, 1.0) if swing_rank == 2 else Color.WHITE
+	draw_set_transform(origin, rotation_to_blade, Vector2(scale_factor, flip_y * scale_factor))
+	draw_texture_rect_region(atlas, Rect2(-MID_SLASH_GRIP, MID_SLASH_CELL),
+		Rect2(cell * MID_SLASH_CELL, MID_SLASH_CELL), tint)
 	draw_set_transform(Vector2.ZERO)
-
-func _draw_ribbon(previous: PackedVector2Array, edge: PackedVector2Array, color: Color, alpha: float, rank: int) -> void:
-	if previous[1].distance_squared_to(edge[1]) < 0.01:
-		return
-	var inner := 0.10 if stage == 2 else lerpf(0.30, 0.07, maxf(0.0, alpha))
-	var inner_start := previous[0].lerp(previous[1], inner)
-	var inner_end := edge[0].lerp(edge[1], inner)
-	var glow := Color(color, alpha * (0.19 + rank * 0.09 + (0.08 if stage == 2 else 0.0)))
-	if absf((previous[1] - inner_start).cross(edge[1] - inner_start)) > 0.01:
-		draw_colored_polygon(PackedVector2Array([inner_start, previous[1], edge[1]]), glow)
-	if absf((edge[1] - inner_start).cross(inner_end - inner_start)) > 0.01:
-		draw_colored_polygon(PackedVector2Array([inner_start, edge[1], inner_end]), glow)
-	draw_line(previous[1], edge[1], Color(color, alpha * 0.87), 2.0 + rank * 1.6 + (2.0 if stage == 2 else 0.0), true)
-	var core_start := previous[1].lerp(inner_start, 0.2)
-	var core_end := edge[1].lerp(inner_end, 0.2)
-	draw_line(core_start, core_end, Color(Color.WHITE, alpha * 0.80), 1.5, true)
-	if rank == 2:
-		draw_line(previous[0].lerp(previous[1], 0.43), edge[0].lerp(edge[1], 0.43), Color(color.lightened(0.3), alpha * 0.62), 2.0, true)
-
-func _draw_heavy_wake(color: Color, alpha: float, recovery: float) -> void:
-	var tip := blade_segment(1.0)[1]
-	var tangent := swing_direction.orthogonal()
-	var base := tip * 0.24
-	for i in range(-1, 2):
-		if i != 0 and swing_rank < 2:
-			continue
-		var spread := tangent * i * (13.0 + recovery * 19.0)
-		var peak := base.lerp(tip, 0.67) + spread + Vector2.UP * (10.0 if i == 0 else 4.0)
-		var wing := tangent * (10.0 if i == 0 else 5.0)
-		draw_colored_polygon(PackedVector2Array([base, peak - wing, tip, peak + wing]), Color(color, alpha * 0.32))
-		draw_polyline(PackedVector2Array([base, peak, tip]), Color(color.lightened(0.55), alpha * 0.85), 2.0 if i else 4.0, true)
 
 func _draw_blade(_grip: Vector2, _tip: Vector2, _color: Color) -> void:
 	# V4.1's character sprite already contains the weapon.
@@ -215,8 +188,50 @@ func attack(direction: Vector2) -> bool:
 		return false
 	swing_bonus = consume_dash_bonus()
 	impact_sent = false
+	miss_checked = false
+	wave_fired = false
 	get_parent().sword_cue.emit("heavy_swing" if stage == 2 else "light_swing", global_position)
 	return true
+
+func _sword_assist(direction: Vector2) -> Vector2:
+	var player = get_parent()
+	var best_angle := deg_to_rad(CONFIG.COMBO_ASSIST_DEGREES)
+	var best_distance := INF
+	var input_direction := direction.normalized() if not direction.is_zero_approx() else Vector2.RIGHT
+	var result := input_direction
+	var reach: float = float(current_data().reach) + player.reach_bonus + CONFIG.SWORD_EXTENSION[swing_rank]
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.dead or enemy.emerging or enemy.is_queued_for_deletion():
+			continue
+		var offset: Vector2 = enemy.global_position - global_position
+		var distance := offset.length()
+		if distance < 1.0 or distance > reach + CONFIG.COMBO_TARGET_RADIUS:
+			continue
+		var angle := absf(input_direction.angle_to(offset))
+		if angle > best_angle or (is_equal_approx(angle, best_angle) and distance >= best_distance):
+			continue
+		var ray := PhysicsRayQueryParameters2D.create(global_position, enemy.global_position, player.terrain_mask)
+		if not get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
+			continue
+		best_angle = angle
+		best_distance = distance
+		result = offset.normalized()
+	return result
+
+func _physics_process(delta: float) -> void:
+	var player = get_parent()
+	var freeze_chain: bool = not player.dead and player.dash_state != 0 and swing_time <= 0.0
+	var saved_next := next_stage
+	var saved_chain := chain_time
+	var was_swinging: bool = swing_time > 0.0 and not charged_swing and not player.dead
+	super._physics_process(delta)
+	if freeze_chain:
+		next_stage = saved_next
+		chain_time = saved_chain
+	if was_swinging and not miss_checked and active_progress(swing_time) >= 1.0:
+		miss_checked = true
+		if sword_hit_targets.is_empty():
+			combo_event.emit("miss", stage, global_position, null)
 
 func consume_dash_bonus() -> float:
 	var bonus := CONFIG.DASH_SWORD_FACTOR if dash_reward and dash_armed else 1.0
@@ -241,10 +256,10 @@ func _sweep(previous: float, current: float) -> void:
 		if target.dead or target.emerging or target.is_queued_for_deletion() or sword_hit_targets.has(target):
 			continue
 		var offset: Vector2 = target.global_position - global_position
-		if offset.length_squared() > (reach + 17.0) * (reach + 17.0):
+		if offset.length_squared() > (reach + CONFIG.COMBO_TARGET_RADIUS) * (reach + CONFIG.COMBO_TARGET_RADIUS):
 			continue
 		if stage == 2:
-			var half := deg_to_rad(float(data.angle) * 0.5) + atan2(17.0, maxf(1.0, offset.length()))
+			var half := deg_to_rad(float(data.angle) * 0.5) + atan2(CONFIG.COMBO_TARGET_RADIUS, maxf(1.0, offset.length()))
 			if last < CONFIG.THIRD_IMPACT_PROGRESS or absf(swing_direction.angle_to(offset)) > half:
 				continue
 		var contact := false
@@ -254,7 +269,7 @@ func _sweep(previous: float, current: float) -> void:
 				continue
 			var segment := blade_segment(sample)
 			var nearest := Geometry2D.get_closest_point_to_segment(offset, segment[0], segment[1])
-			if offset.distance_squared_to(nearest) <= 17.0 * 17.0:
+			if offset.distance_squared_to(nearest) <= CONFIG.COMBO_TARGET_RADIUS * CONFIG.COMBO_TARGET_RADIUS:
 				contact = true
 				break
 		if contact:
@@ -264,7 +279,7 @@ func _sweep(previous: float, current: float) -> void:
 	candidates.sort_custom(func(a, b): return global_position.distance_squared_to(a.global_position) < global_position.distance_squared_to(b.global_position))
 	for target in candidates:
 		sword_hit_targets.append(target)
-		_deal_hit(target, float(data.damage) * player.damage_multiplier, swing_direction * 115.0)
+		_deal_hit(target, float(data.damage) * player.damage_multiplier, swing_direction * 155.0)
 		if sword_hit_targets.size() >= limit:
 			break
 
@@ -285,13 +300,18 @@ func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	if heavy_hit and target is SurvivorEnemy and target.v41_pressure and target.kind != SurvivorEnemy.Kind.BOSS:
 		push = swing_direction * CONFIG.THIRD_MOB_PUSH
 	target.take_damage(damage * swing_bonus, push, false, false)
+	combo_event.emit("blocked" if target.last_hit_blocked else "hit", stage, target.global_position, target)
 	if suppress and not target.dead:
 		target.suppress_by_third_hit()
 	if break_guard and ordinary:
 		guard_broken.emit(target.global_position)
+		combo_event.emit("guard_break", stage, target.global_position, target)
+	if target.dead:
+		combo_event.emit("kill", stage, target.global_position, target)
 	if not impact_sent:
 		impact_sent = true
-		get_parent().sword_cue.emit("heavy_hit" if heavy_hit else "light_hit", target.global_position)
+		if heavy_hit or not target.last_hit_blocked:
+			get_parent().sword_cue.emit("heavy_hit" if heavy_hit else "light_hit", target.global_position)
 		if heavy_hit:
 			finisher_contact.emit(target.global_position)
 			self.heavy_hit.emit()

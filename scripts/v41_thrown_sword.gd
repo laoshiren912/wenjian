@@ -2,6 +2,8 @@ extends Node2D
 
 const CONFIG = preload("res://scripts/v41_config.gd")
 const STRIKE = preload("res://assets/characters/Swordsman/v41-strike-pose.png")
+const WHEEL_SHADER = preload("res://assets/shaders/v41_spin_wheel.gdshader")
+const SEAL_SHADER = preload("res://assets/shaders/v41_bagua_seal.gdshader")
 const BLADE_SOURCE := Rect2(156 + 84, 180 * 2 + 116, 52, 25)
 const BLADE_PIVOT := Vector2(1, 2)
 const BLADE_SCALE := 0.76
@@ -14,6 +16,8 @@ enum Flight { OUTBOUND, SPIN, RETURN, CATCH }
 var actor: SurvivorPlayer
 var rank := 0
 var aim := Vector2.RIGHT
+var target_distance := -1.0
+var max_travel := 156.0
 var power := 1.0
 var opening_bonus := 1.0
 var terrain_mask := 1
@@ -22,6 +26,9 @@ var angle := 0.0
 var traveled := 0.0
 var left := 0.0
 var age := 0.0
+var spin_tick_timer := 0.0
+var spin_ticks_left := 0
+var spin_tick_interval := 0.10
 var outbound_hits := {}
 var spin_hits := {}
 var return_hits := {}
@@ -33,6 +40,13 @@ var route := PackedVector2Array()
 var route_timer := 0.0
 var probe := PhysicsShapeQueryParameters2D.new()
 var blade_clearance := CircleShape2D.new()
+var flight_trail: Array[Vector2] = []
+var wheel_sprite: Sprite2D
+var wheel_material: ShaderMaterial
+var seal_sprite: Sprite2D
+var seal_material: ShaderMaterial
+var _unit_tex: ImageTexture
+var spin_seal_age := 0.0
 
 func _ready() -> void:
 	z_index = 4
@@ -41,10 +55,45 @@ func _ready() -> void:
 	launch_point = global_position
 	launch_grip = actor.visual.throw_hand(aim)
 	angle = aim.angle()
+	var cap_dist: float = float(CONFIG.THROW_DISTANCE[clampi(rank, 0, 2)])
+	max_travel = clampf(target_distance, CONFIG.THROW_MIN_DISTANCE, cap_dist) if target_distance > 0.0 else cap_dist
 	blade_clearance.radius = 13.0
 	probe.shape = blade_clearance
 	probe.collision_mask = terrain_mask
 	probe.margin = 0.1
+	flight_trail.append(global_position)
+	_setup_wheel_vfx()
+
+func _setup_wheel_vfx() -> void:
+	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	img.set_pixel(0, 0, Color.WHITE)
+	_unit_tex = ImageTexture.create_from_image(img)
+
+	wheel_material = ShaderMaterial.new()
+	wheel_material.shader = WHEEL_SHADER
+	wheel_sprite = Sprite2D.new()
+	wheel_sprite.name = "SpinWheelVfx"
+	wheel_sprite.texture = _unit_tex
+	wheel_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	wheel_sprite.material = wheel_material
+	wheel_sprite.z_index = -1
+	add_child(wheel_sprite)
+
+	seal_material = ShaderMaterial.new()
+	seal_material.shader = SEAL_SHADER
+	seal_material.set_shader_parameter("effect_mode", 0)
+	seal_material.set_shader_parameter("pixel_grid", 56.0)
+	seal_material.set_shader_parameter("primary_color", Color("48d6ff"))
+	seal_material.set_shader_parameter("core_color", Color("f4fdff"))
+	seal_sprite = Sprite2D.new()
+	seal_sprite.name = "SpinGroundSeal"
+	seal_sprite.texture = _unit_tex
+	seal_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	seal_sprite.material = seal_material
+	seal_sprite.z_as_relative = false
+	seal_sprite.z_index = 0
+	seal_sprite.visible = false
+	add_child(seal_sprite)
 
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(actor) or actor.dead:
@@ -57,7 +106,13 @@ func _physics_process(delta: float) -> void:
 		Flight.OUTBOUND:
 			_outbound(delta)
 		Flight.SPIN:
-			_contact(global_position, global_position, CONFIG.THROW_RADIUS[rank], CONFIG.THROW_SPIN_DAMAGE[rank], spin_hits, aim)
+			spin_seal_age += delta
+			spin_tick_timer -= delta
+			if spin_ticks_left > 0 and spin_tick_timer <= 0.0:
+				spin_ticks_left -= 1
+				spin_tick_timer += spin_tick_interval
+				spin_hits.clear()
+				_contact(global_position, global_position, CONFIG.THROW_RADIUS[rank], CONFIG.THROW_SPIN_DAMAGE[rank], spin_hits, aim, true)
 			left -= delta
 			if left <= 0.0:
 				_return_now()
@@ -68,7 +123,48 @@ func _physics_process(delta: float) -> void:
 			if left <= 0.0:
 				actor.finish_throw(self)
 				queue_free()
+	flight_trail.append(global_position)
+	if flight_trail.size() > 11:
+		flight_trail.remove_at(0)
+	_update_wheel_vfx()
 	queue_redraw()
+
+func _update_wheel_vfx() -> void:
+	if not is_instance_valid(wheel_sprite) or not is_instance_valid(actor):
+		return
+	var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
+	var strength := smoothstep(0.0, 0.06, age)
+	var center := Vector2.ZERO
+	if flight == Flight.CATCH:
+		var caught := smoothstep(0.0, 1.0, 1.0 - left / CATCH_TIME)
+		strength *= 1.0 - caught
+	elif flight == Flight.OUTBOUND:
+		center = (launch_grip + aim * BLADE_CENTER_FROM_HILT) * (1.0 - strength)
+	var base_radius: float = (CONFIG.THROW_RADIUS[rank] + 10.0) if flight == Flight.SPIN else (30.0 + rank * 4.5)
+	if twin:
+		base_radius *= 1.26
+	var diameter := base_radius * 2.0
+	wheel_sprite.visible = strength > 0.02
+	wheel_sprite.position = center
+	wheel_sprite.scale = Vector2(diameter, diameter)
+	wheel_material.set_shader_parameter("rank_stage", rank)
+	wheel_material.set_shader_parameter("twin_star", 1 if twin else 0)
+	wheel_material.set_shader_parameter("spin_angle", angle)
+	wheel_material.set_shader_parameter("strength", strength)
+	wheel_material.set_shader_parameter("pixel_grid", clampf(roundf(diameter / 1.4), 68.0, 128.0))
+
+	# 【双星旋刃】旋停期在地面映射微弱像素八卦/剑阵光纹
+	if is_instance_valid(seal_sprite):
+		var show_seal := twin and flight == Flight.SPIN
+		seal_sprite.visible = show_seal
+		if show_seal:
+			var total_spin := maxf(0.01, float(CONFIG.THROW_SPIN_TIME[rank]))
+			var seal_prog := clampf(spin_seal_age / total_spin, 0.0, 1.0)
+			var seal_size: float = float(CONFIG.THROW_RADIUS[rank]) * 2.35
+			seal_sprite.position = Vector2(0, 8)
+			seal_sprite.scale = Vector2(seal_size, seal_size)
+			seal_material.set_shader_parameter("progress", seal_prog)
+			seal_material.set_shader_parameter("intensity", 0.72)
 
 func _motion_fraction(from: Vector2, motion: Vector2) -> float:
 	if motion.length_squared() < 0.001:
@@ -78,7 +174,7 @@ func _motion_fraction(from: Vector2, motion: Vector2) -> float:
 	return get_world_2d().direct_space_state.cast_motion(probe)[0]
 
 func _outbound(delta: float) -> void:
-	var remaining: float = CONFIG.THROW_DISTANCE[rank] - traveled
+	var remaining: float = max_travel - traveled
 	var length := minf(remaining, CONFIG.THROW_OUT_SPEED * delta)
 	var from := global_position
 	var fraction := _motion_fraction(from, aim * length)
@@ -91,9 +187,12 @@ func _outbound(delta: float) -> void:
 		_contact(from, global_position, 18.0, CONFIG.THROW_OUT_DAMAGE[rank] * opening_bonus, outbound_hits, aim)
 	if fraction < 1.0:
 		_return_now()
-	elif traveled >= CONFIG.THROW_DISTANCE[rank] - 0.01:
+	elif traveled >= max_travel - 0.01:
 		flight = Flight.SPIN
-		left = CONFIG.THROW_SPIN_TIME[rank]
+		left = float(CONFIG.THROW_SPIN_TIME[rank])
+		spin_ticks_left = int(CONFIG.THROW_SPIN_TICKS[rank])
+		spin_tick_interval = left / float(maxi(1, spin_ticks_left))
+		spin_tick_timer = 0.0
 		actor.sword_cue.emit("throw_spin", global_position)
 
 func _return_now() -> void:
@@ -133,7 +232,7 @@ func _recall(delta: float) -> void:
 		catch_angle = angle
 		actor.sword_cue.emit("throw_catch", global_position)
 
-func _contact(from: Vector2, to: Vector2, radius: float, amount: float, hits: Dictionary, push: Vector2) -> void:
+func _contact(from: Vector2, to: Vector2, radius: float, amount: float, hits: Dictionary, push: Vector2, pull_inward: bool = false) -> void:
 	var first := hits.is_empty()
 	var contact := Vector2.INF
 	for candidate in get_tree().get_nodes_in_group("enemies"):
@@ -149,19 +248,37 @@ func _contact(from: Vector2, to: Vector2, radius: float, amount: float, hits: Di
 			if not get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 				continue
 		hits[enemy.get_instance_id()] = true
-		var direction := nearest.direction_to(point) if flight == Flight.SPIN and not nearest.is_equal_approx(point) else push
-		enemy.take_damage(amount * power, direction * 56.0, false, false)
+		var impulse := push * 56.0
+		if pull_inward:
+			# 旋停期轻度向心牵引 + 短暂减速，方便聚怪衔接 E 或空格
+			var to_center := global_position - point
+			var pull_dist := to_center.length()
+			impulse = to_center.normalized() * minf(CONFIG.THROW_PULL_STRENGTH, pull_dist * 3.2) if pull_dist > 6.0 else Vector2.ZERO
+			enemy.slow_time = maxf(enemy.slow_time, CONFIG.THROW_SLOW_DURATION)
+		enemy.take_damage(amount * power, impulse, false, false)
 		contact = point
 	if first and contact.is_finite():
-		actor.sword_cue.emit("throw_hit", contact)
+		var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
+		actor.sword_cue.emit("throw_hit_twin" if twin else "throw_hit", contact)
 
 func _draw() -> void:
 	if not is_instance_valid(actor):
 		return
+	var twin: bool = is_instance_valid(actor.combo) and actor.combo.heavy_reward
 	var center := Vector2.ZERO
 	var blade_angle := angle
-	var strength := smoothstep(0.0, 0.075, age)
-	var tint: Color = COLORS[rank]
+	var strength := smoothstep(0.0, 0.06, age)
+	var trail_col := Color("7be8ff") if rank < 2 else Color("4ad6ff")
+	if twin:
+		trail_col = trail_col.lerp(Color("ffe27a"), 0.28)
+	# 飞行青白像素流光长拖尾（出剑/回剑一眼清晰可见）
+	if flight != Flight.SPIN and flight_trail.size() >= 2:
+		for i in range(1, flight_trail.size()):
+			var t := float(i) / float(flight_trail.size())
+			var p0 := to_local(flight_trail[i - 1]).round()
+			var p1 := to_local(flight_trail[i]).round()
+			draw_line(p0, p1, Color(trail_col, t * 0.62 * strength), (8.0 if twin else 5.5) * t, false)
+			draw_line(p0, p1, Color(0.96, 1.0, 1.0, t * 0.85 * strength), (3.0 if twin else 2.0) * t, false)
 	if flight == Flight.CATCH:
 		var caught := smoothstep(0.0, 1.0, 1.0 - left / CATCH_TIME)
 		var grip: Vector2 = actor.global_position + actor.visual.throw_hand(aim)
@@ -171,10 +288,13 @@ func _draw() -> void:
 		strength *= 1.0 - caught
 	elif flight == Flight.OUTBOUND:
 		center = (launch_grip + aim * BLADE_CENTER_FROM_HILT) * (1.0 - strength)
-	var radius: float = CONFIG.THROW_RADIUS[rank] if flight == Flight.SPIN else 21.0 + rank * 3.0
-	_draw_crescent(center, blade_angle, radius, tint, strength)
-	if rank > 0 and flight == Flight.SPIN:
-		_draw_crescent(center, blade_angle + PI, radius - 6.0, tint.lightened(0.3), strength * 0.64)
+	if twin and flight != Flight.CATCH:
+		# 对称青金副刃
+		var sub_angle := blade_angle + PI
+		var sub_hilt := center - Vector2.from_angle(sub_angle) * BLADE_CENTER_FROM_HILT
+		draw_set_transform(sub_hilt, sub_angle - BLADE_ANGLE)
+		draw_texture_rect_region(STRIKE, Rect2(-BLADE_PIVOT * BLADE_SCALE, BLADE_SOURCE.size * BLADE_SCALE), BLADE_SOURCE, Color(0.70, 0.97, 1.0, strength * 0.82))
+		draw_set_transform(Vector2.ZERO)
 	var hilt := center - Vector2.from_angle(blade_angle) * BLADE_CENTER_FROM_HILT
 	draw_set_transform(hilt, blade_angle)
 	# A dark edge below the actual blade pixels keeps the steel readable over impact flashes.

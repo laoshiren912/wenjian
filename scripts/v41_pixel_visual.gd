@@ -13,6 +13,7 @@ const B_ATTACK = preload("res://assets/characters/Bandit/Bandit_Attack_Sheet_140
 const B_DEATH = preload("res://assets/characters/Bandit/Bandit_Death_Sheet_1404x328.png")
 const H_WALK = preload("res://assets/characters/Herbalist/Herbalist_Walk_Sheet_972x928.png")
 const H_DEATH = preload("res://assets/characters/Herbalist/Herbalist_Death_Sheet_972x348.png")
+const HIT_FLASH_SHADER = preload("res://assets/shaders/v41_hit_flash.gdshader")
 const ART_SCALE := 0.55
 const S_CELL := Vector2(156, 180)
 const S_ORIGIN := -Vector2(79, 135) * ART_SCALE + Vector2(0, 15)
@@ -30,15 +31,31 @@ var animation_clock := 0.0
 var player_death := false
 var player_death_age := 0.0
 var herbalist_visual := false
+var spawn_pop_time := 0.0
+var hit_flash_mat: ShaderMaterial
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	herbalist_visual = get_parent() is SurvivorEnemy and get_parent().kind == SurvivorEnemy.Kind.RANGED
+	if get_parent() is SurvivorEnemy:
+		hit_flash_mat = ShaderMaterial.new()
+		hit_flash_mat.shader = HIT_FLASH_SHADER
+		material = hit_flash_mat
 	if get_parent() is SurvivorPlayer:
 		process_mode = Node.PROCESS_MODE_ALWAYS
 		get_parent().died.connect(_player_died)
 		if empty_hand_sheet == null:
 			_prepare_empty_hand_pose()
+
+func play_hurt() -> void:
+	hurt_time = 0.07
+	queue_redraw()
+
+func play_spawn_pop() -> void:
+	spawn_pop_time = 0.24
+	modulate.a = 0.0
+	scale = Vector2(0.76, 1.24)
+	queue_redraw()
 
 func _player_died() -> void:
 	player_death = true
@@ -46,6 +63,16 @@ func _player_died() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
+	if spawn_pop_time > 0.0:
+		spawn_pop_time = maxf(0.0, spawn_pop_time - delta)
+		var t := 1.0 - spawn_pop_time / 0.24
+		modulate.a = clampf(t * 1.35, 0.0, 1.0)
+		var s := lerpf(0.76, 1.0, smoothstep(0.0, 1.0, t))
+		scale = Vector2(s, lerpf(1.24, 1.0, smoothstep(0.0, 1.0, t)))
+		if spawn_pop_time <= 0.0:
+			modulate.a = 1.0
+			scale = Vector2.ONE
+		queue_redraw()
 	if player_death:
 		player_death_age += delta
 		queue_redraw()
@@ -99,7 +126,9 @@ func _strike_row(direction: Vector2, chain_stage: int) -> int:
 func _strike_offset(direction: Vector2, chain_stage: int, progress: float) -> Vector2:
 	if chain_stage == 2:
 		return _heavy_lean(direction, progress)
-	return direction * sin(progress * PI) * 3.0
+	if chain_stage == 1:
+		return direction * sin(progress * PI) * 3.8 + Vector2(0.0, -2.5 * sin(progress * PI))
+	return direction * sin(progress * PI) * 4.5
 
 func sword_hand(direction: Vector2, chain_stage: int, progress: float) -> Vector2:
 	var row := _strike_row(direction, chain_stage)
@@ -118,7 +147,9 @@ func sword_tip(direction: Vector2, chain_stage: int, progress: float, projected_
 	return hand + hand.direction_to(projected_edge) * blade_length
 
 func _heavy_lean(direction: Vector2, progress: float) -> Vector2:
-	return direction * lerpf(-4.0, 5.0, smoothstep(0.17, 0.34, progress))
+	var thrust := lerpf(-5.5, 7.5, smoothstep(0.18, 0.36, progress))
+	var crouch := lerpf(2.2, 3.2, smoothstep(0.20, 0.42, progress))
+	return direction * thrust + Vector2(0.0, crouch)
 
 func dash_ghost_pose(direction: Vector2) -> Dictionary:
 	return {"sheet": S_ATTACK, "destination": Rect2(S_ORIGIN + direction * 3.0, S_CELL * ART_SCALE),
@@ -159,32 +190,62 @@ func _draw_player_attack(player) -> void:
 	var row := _strike_row(direction, stage)
 	var frame := 0
 	var progress: float = sword.active_progress(sword.swing_time)
+	var data: Dictionary = sword.current_data()
 	var elapsed: float = (sword.swing_duration - sword.swing_time) * player.attack_speed_multiplier
 	var wound: bool = sword.phase() == "windup"
 	var recover: bool = sword.phase() == "recovery"
 	var color := Color(2.0, 2.0, 2.0) if hurt_time > 0.0 else Color.WHITE
 	var lift := stage == 2 and progress < CONFIG.THIRD_IMPACT_PROGRESS
-	var settling: bool = recover and sword.swing_time < (0.055 if stage == 2 else 0.078)
+	var rec_ratio := clampf((elapsed - float(data.windup) - float(data.active)) / maxf(0.001, float(data.recovery)), 0.0, 1.0) if recover else 0.0
+	var settling: bool = recover and (rec_ratio >= 0.42 if stage == 2 else rec_ratio >= 0.34)
 	if not wound and not lift and not settling:
 		var edge: Vector2 = sword.blade_segment(progress)[1]
-		_draw_strike_pose(direction, stage, progress, edge, color)
+		_draw_strike_pose(direction, stage, progress, edge, color, rec_ratio)
 		return
-	var offset := S_ORIGIN
+	var body_offset := Vector2.ZERO
+	var body_scale := Vector2.ONE
+	var body_tilt := 0.0
+	var mirror_x := 1.0
 	if stage == 2:
 		if wound or lift:
-			frame = 3 if wound and elapsed < 0.036 else 4
-			offset += _heavy_lean(direction, 0.0) - Vector2(0, 2)
+			var windup_ratio := clampf(elapsed / maxf(0.001, float(data.windup)), 0.0, 1.0)
+			frame = 3 if wound and windup_ratio < 0.45 else 4
+			# 第三击蓄力压低重心 + 后撤高举，肉眼可辨蓄势重斩
+			var crouch_t := smoothstep(0.0, 1.0, windup_ratio if wound else 1.0)
+			body_scale = Vector2(lerpf(1.0, 1.09, crouch_t), lerpf(1.0, 0.87, crouch_t))
+			body_offset = _heavy_lean(direction, 0.0)
+			body_tilt = -0.06 * signf(direction.x if absf(direction.x) > 0.15 else 1.0) * crouch_t
 		else:
-			frame = 8
+			# 重斩收招前半滞重压低，后半平稳起身收刀
+			frame = 5 if rec_ratio < 0.68 else 8
+			var rise_t := smoothstep(0.42, 1.0, rec_ratio)
+			body_scale = Vector2(lerpf(1.07, 1.0, rise_t), lerpf(0.92, 1.0, rise_t))
+			body_offset = _heavy_lean(direction, 1.0) * (1.0 - rise_t)
+	elif stage == 1:
+		mirror_x = -1.0
+		if wound:
+			var windup_ratio := clampf(elapsed / maxf(0.001, float(data.windup)), 0.0, 1.0)
+			frame = 2 if windup_ratio < 0.52 else 3
+			body_scale = Vector2(1.03, 0.96)
+			body_offset = -direction * 2.2 * windup_ratio + Vector2(0.0, 1.2)
+		else:
+			frame = 7 if rec_ratio < 0.65 else 8
+			body_scale = Vector2(0.98, 1.02)
 	else:
-		if stage == 1:
-			draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
-		frame = (1 if stage == 0 else 2) if wound else 8
-	draw_texture_rect_region(S_ATTACK, Rect2(offset, S_CELL * ART_SCALE),
+		if wound:
+			var windup_ratio := clampf(elapsed / maxf(0.001, float(data.windup)), 0.0, 1.0)
+			frame = 0 if windup_ratio < 0.45 else 1
+			body_scale = Vector2(1.02, 0.98)
+			body_offset = -direction * 2.5 * windup_ratio
+		else:
+			frame = 6 if rec_ratio < 0.62 else 7
+	var foot_comp := Vector2(0.0, 15.0 * (1.0 - body_scale.y))
+	draw_set_transform(body_offset + foot_comp, body_tilt, Vector2(mirror_x * body_scale.x, body_scale.y))
+	draw_texture_rect_region(S_ATTACK, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
 		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL), color)
 	draw_set_transform(Vector2.ZERO)
 
-func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Vector2, color: Color) -> void:
+func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Vector2, color: Color, rec_ratio: float = 0.0) -> void:
 	var row := _strike_row(direction, stage)
 	var mirror := Vector2(-1, 1) if stage == 1 else Vector2.ONE
 	var hand := sword_hand(direction, stage, progress)
@@ -193,10 +254,27 @@ func _draw_strike_pose(direction: Vector2, stage: int, progress: float, edge: Ve
 	var blade_direction := hand.direction_to(edge)
 	var angle := source_blade.angle_to(blade_direction)
 	var offset := _strike_offset(direction, stage, progress)
+	var body_scale := Vector2.ONE
+	var body_tilt := 0.0
+	if stage == 0:
+		# 第一击横斩：利落前冲、轻微横向速度拉伸
+		var pulse := sin(progress * PI) * (1.0 - rec_ratio)
+		body_scale = Vector2(1.0 + 0.05 * pulse, 1.0 - 0.04 * pulse)
+	elif stage == 1:
+		# 第二击反向斜挑：微上提拉长 + 反向斜倾
+		var lift_pulse := sin(progress * PI) * (1.0 - rec_ratio * 0.8)
+		body_scale = Vector2(1.0 - 0.04 * lift_pulse, 1.0 + 0.06 * lift_pulse)
+		body_tilt = -0.055 * lift_pulse * signf(direction.x if absf(direction.x) > 0.15 else 1.0)
+	else:
+		# 第三击重劈：下压蓄劲爆发压低重心，收招前段保持厚重定势
+		var slam := smoothstep(CONFIG.THIRD_IMPACT_PROGRESS, 0.45, progress) * (1.0 - rec_ratio * 0.4)
+		body_scale = Vector2(1.0 + 0.09 * slam, 1.0 - 0.09 * slam)
+		body_tilt = 0.065 * slam * signf(direction.x if absf(direction.x) > 0.15 else 1.0)
 	var behind := direction.y < -0.55 and blade_direction.y < -0.4
 	if behind:
 		_draw_strike_blade(row, hand_cell, hand, angle, mirror, color)
-	draw_set_transform(offset, 0.0, mirror)
+	var foot_comp := Vector2(0.0, 15.0 * (1.0 - body_scale.y))
+	draw_set_transform(offset + foot_comp, body_tilt, Vector2(mirror.x * body_scale.x, mirror.y * body_scale.y))
 	draw_texture_rect_region(S_STRIKE_POSE, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
 		Rect2(Vector2(0, row * S_CELL.y), S_CELL), color)
 	if not behind:
@@ -214,6 +292,8 @@ func _draw() -> void:
 		return
 	var is_player := get_parent() is SurvivorPlayer or player_death
 	var player = get_parent() if is_player and not player_death else null
+	if player != null and is_instance_valid(player.combo) and player.combo.dash_reward and player.combo.dash_armed:
+		_draw_thunder_armed_aura()
 	if player != null and is_instance_valid(player.thrown_sword):
 		_draw_throw_pose(player.thrown_sword.aim)
 		return
@@ -222,6 +302,9 @@ func _draw() -> void:
 		return
 	if player != null and is_instance_valid(player.combo) and player.combo.swing_time > 0.0:
 		_draw_player_attack(player)
+		return
+	if player != null and player.is_casting_sword_rain():
+		_draw_sword_rain_cast(player)
 		return
 	var direction := look_direction
 	var index := _direction_index(direction)
@@ -253,11 +336,16 @@ func _draw() -> void:
 		frame = int(animation_clock * 8.0) % 9
 	var destination := Rect2(-pivot * ART_SCALE + Vector2(0, 15), size * ART_SCALE)
 	var source := Rect2(Vector2(frame * size.x, row * size.y), size)
-	var color := Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE
-	if flip:
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
+	if is_instance_valid(hit_flash_mat):
+		hit_flash_mat.set_shader_parameter("hurt_flash", 1.0 if hurt_time > 0.0 else 0.0)
+	var color := Color.WHITE if is_instance_valid(hit_flash_mat) else (Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE)
+	var recoil_sx := 1.08 if (not is_player and hurt_time > 0.0) else 1.0
+	var recoil_sy := 0.92 if (not is_player and hurt_time > 0.0) else 1.0
+	var sx := -recoil_sx if flip else recoil_sx
+	if flip or not is_equal_approx(recoil_sx, 1.0):
+		draw_set_transform(Vector2(0.0, 15.0 * (1.0 - recoil_sy)), 0.0, Vector2(sx, recoil_sy))
 	draw_texture_rect_region(sheet, destination, source, color)
-	if flip:
+	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2.ZERO)
 
 func _draw_herbalist() -> void:
@@ -275,9 +363,64 @@ func _draw_herbalist() -> void:
 		frame = 0
 	var destination := Rect2(-Vector2(54, 103) * ART_SCALE + Vector2(0, 15), Vector2(108, 116) * ART_SCALE)
 	var source := Rect2(Vector2(frame * 108, row * 116), Vector2(108, 116))
-	var color := Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE
-	if flip:
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2(-1, 1))
+	if is_instance_valid(hit_flash_mat):
+		hit_flash_mat.set_shader_parameter("hurt_flash", 1.0 if hurt_time > 0.0 else 0.0)
+	var color := Color.WHITE if is_instance_valid(hit_flash_mat) else (Color(2.0, 2.0, 2.0, 1.0) if hurt_time > 0.0 else Color.WHITE)
+	var recoil_sx := 1.08 if hurt_time > 0.0 else 1.0
+	var recoil_sy := 0.92 if hurt_time > 0.0 else 1.0
+	var sx := -recoil_sx if flip else recoil_sx
+	if flip or not is_equal_approx(recoil_sx, 1.0):
+		draw_set_transform(Vector2(0.0, 15.0 * (1.0 - recoil_sy)), 0.0, Vector2(sx, recoil_sy))
 	draw_texture_rect_region(sheet, destination, source, color)
-	if flip:
+	if flip or not is_equal_approx(recoil_sx, 1.0):
 		draw_set_transform(Vector2.ZERO)
+
+func _draw_thunder_armed_aura() -> void:
+	# 【雷霆残影】下一剑伤害翻倍蓄力就绪时的青金电弧微光提示
+	var pulse := 0.55 + 0.45 * sin(animation_clock * 16.0)
+	draw_set_transform(Vector2(0, 14), 0.0, Vector2(1.0, 0.38))
+	draw_arc(Vector2.ZERO, 20.0 + pulse * 3.0, 0.0, TAU, 24, Color(0.55, 0.96, 1.0, 0.42 + pulse * 0.25), 2.0, false)
+	draw_set_transform(Vector2.ZERO)
+	for i in range(4):
+		var a := animation_clock * 5.2 + i * PI * 0.5
+		var p := Vector2(cos(a) * 18.0, sin(a) * 11.0 - 4.0).round()
+		var q := (p + Vector2(cos(a + 0.9) * 6.0, -5.0)).round()
+		draw_line(p, q, Color(1.0, 0.92, 0.52, 0.85), 1.5, false)
+		draw_rect(Rect2(p - Vector2(1, 1), Vector2(2, 2)), Color(0.68, 1.0, 0.98, 0.92))
+
+func _draw_sword_rain_cast(player) -> void:
+	# 【万剑归宗】念咒/结印前摇姿态：沉身起诀、双层聚灵法环与旋升法诀微光
+	var rain = player.sword_rain_node
+	var t: float = rain.cast_progress() if is_instance_valid(rain) else 0.5
+	var aim: Vector2 = rain.aim if is_instance_valid(rain) else look_direction
+	var row := _direction_index(aim)
+	var rank: int = clampi(player.cultivation, 0, 2)
+	var ring_col := Color("8be6ff") if rank == 0 else (Color("56eee8") if rank == 1 else Color("44d2ff"))
+	var core_col := Color("ffe17d") if player.sword_rain_card_level > 0 else Color("f6ffff")
+
+	# 脚下双层聚灵法环
+	draw_set_transform(Vector2(0, 14), 0.0, Vector2(1.0, 0.38))
+	draw_arc(Vector2.ZERO, lerpf(16.0, 34.0, t), 0.0, TAU, 24, Color(ring_col, 0.55 + 0.30 * t), 2.2, false)
+	draw_arc(Vector2.ZERO, lerpf(10.0, 24.0, t), t * TAU, t * TAU + TAU * 0.72, 20, Color(core_col, 0.72), 1.6, false)
+	draw_set_transform(Vector2.ZERO)
+
+	# 沉身起诀姿态（脚底锚定微压蓄势 + 末段轻提）
+	var frame := 3 if t < 0.55 else 4
+	var sy := lerpf(1.0, 0.92, sin(t * PI))
+	var sx := lerpf(1.0, 1.06, sin(t * PI))
+	var foot_comp := Vector2(0.0, 15.0 * (1.0 - sy))
+	var tint := Color(2.0, 2.0, 2.0) if hurt_time > 0.0 else Color.WHITE
+	draw_set_transform(foot_comp, 0.0, Vector2(sx, sy))
+	draw_texture_rect_region(S_ATTACK, Rect2(S_ORIGIN, S_CELL * ART_SCALE),
+		Rect2(Vector2(frame * S_CELL.x, row * S_CELL.y), S_CELL), tint)
+	draw_set_transform(Vector2.ZERO)
+
+	# 胸前结印微芒 + 周身旋升 4 枚法诀灵点
+	var seal_pos := (aim * 11.0 + Vector2(0, -12.0 - t * 4.0)).round()
+	draw_line(seal_pos + Vector2(-5, 0), seal_pos + Vector2(5, 0), Color(core_col, 0.85 * t), 1.5, false)
+	draw_line(seal_pos + Vector2(0, -5), seal_pos + Vector2(0, 5), Color(core_col, 0.85 * t), 1.5, false)
+	for i in range(4):
+		var a := t * TAU * 1.4 + i * PI * 0.5
+		var rad := lerpf(26.0, 16.0, t)
+		var p := Vector2(cos(a) * rad, sin(a) * rad * 0.45 + lerpf(8.0, -24.0, t)).round()
+		draw_rect(Rect2(p - Vector2(1.5, 1.5), Vector2(3, 3)), Color(ring_col if i % 2 == 0 else core_col, 0.88))
