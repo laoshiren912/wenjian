@@ -6,6 +6,7 @@ const COMBO_PLAYER = preload("res://scenes/player_v41.tscn")
 const CARD_POOL = preload("res://scripts/v41_card_pool.gd")
 const AudioManager = preload("res://scripts/v41_audio.gd")
 const MELEE_DEATH_SMOKE = preload("res://assets/vfx/pvfx-small-explosion-tail/smoke-frames.tres")
+@export var skip_title_screen := false
 var audio_mgr: Node
 var room_index := 0
 var reward_counts: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -134,6 +135,17 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 			_trigger_combo_shake(4.4 if slot == 2 else 3.0, 0.16 if slot == 2 else 0.12)
 			_trigger_combo_hitstop(0.046 if slot == 2 else 0.030, 0.15 if slot == 2 else 0.22)
 
+func _should_start_on_title() -> bool:
+	if skip_title_screen:
+		return false
+	if DisplayServer.get_name() == "headless":
+		return false
+	for arg in OS.get_cmdline_args():
+		var lower := arg.replace("\\", "/").to_lower()
+		if lower.contains("tests/"):
+			return false
+	return true
+
 func _ready() -> void:
 	_setup_inputs()
 	audio_mgr = AudioManager.new()
@@ -142,7 +154,7 @@ func _ready() -> void:
 	world.build_battle()
 	_build_ui()
 	get_viewport().size_changed.connect(_update_camera)
-	start_room()
+	start_room(_should_start_on_title())
 
 func _create_player() -> SurvivorPlayer:
 	return COMBO_PLAYER.instantiate()
@@ -152,9 +164,45 @@ func _build_ui() -> void:
 	reward_rng.randomize()
 	hud.run = self
 	hud.reward_selected.connect(select_reward)
+	hud.title_start_requested.connect(start_run_from_title)
+	hud.title_mute_requested.connect(_toggle_master_mute)
+
+func _toggle_master_mute() -> void:
+	if not is_instance_valid(audio_mgr):
+		return
+	var muted: bool = audio_mgr.toggle_master_mute()
+	hud.sync_title_mute(muted)
+	if phase != "title":
+		hud.show_notice("音频：已静音 [M]" if muted else "音频：已开启 [M]")
+
+func enter_title_screen() -> void:
+	start_room(true)
+
+func start_run_from_title(instant: bool = false) -> void:
+	if phase != "title":
+		return
+	if is_instance_valid(player):
+		player.input_locked = false
+	if is_instance_valid(audio_mgr):
+		audio_mgr.set_title_soft_mode(false, instant)
+	if instant:
+		hud.hide_title_screen(true)
+		_spawn_wave()
+		_update_status()
+		hud.update_room(remaining, total, triggered_count)
+		return
+	feedback.play_title_start()
+	hud.hide_title_screen(false)
+	phase = "wave_transition"
+	wave_index = 0
+	wave_wait_elapsed = CONFIG.WAVE_PAUSE_TIME
+	wave_summon_started = false
+	pending_wave_points.clear()
+	_update_status()
+	hud.update_room(remaining, total, triggered_count)
 
 # All existing restart signals reset the run; room transitions use _enter_room.
-func start_room() -> void:
+func start_room(open_title: bool = false) -> void:
 	_end_hitstop()
 	gm_invincible = false
 	gm_infinite_stamina = false
@@ -163,9 +211,9 @@ func start_room() -> void:
 	run_kills = 0
 	cultivation_override = -1
 	reward_options.clear()
-	_enter_room()
+	_enter_room(false, open_title)
 
-func _enter_room(returning_to_room_one := false) -> void:
+func _enter_room(returning_to_room_one := false, enter_title: bool = false) -> void:
 	_end_hitstop()
 	last_combo_impact_ms = -10000
 	last_combo_shake_ms = -10000
@@ -194,12 +242,17 @@ func _enter_room(returning_to_room_one := false) -> void:
 	world.set_room_style(room_index)
 	if is_instance_valid(audio_mgr):
 		audio_mgr.play_room_bgm(room_index == CONFIG.BOSS_ROOM)
-	phase = "combat"
+		audio_mgr.set_title_soft_mode(enter_title, enter_title)
+	phase = "title" if enter_title else "combat"
 	player = _create_player()
 	gm_spawned.clear()
 	player.gm_invulnerable = OS.is_debug_build() and gm_invincible
 	player.gm_infinite_stamina = OS.is_debug_build() and gm_infinite_stamina
-	player.position = CONFIG.ROOM1_RETURN if returning_to_room_one else CONFIG.ROOM_ENTRY_POINTS[room_index]
+	player.input_locked = enter_title
+	if enter_title and room_index == 0:
+		player.position = Vector2(640, 545)
+	else:
+		player.position = CONFIG.ROOM1_RETURN if returning_to_room_one else CONFIG.ROOM_ENTRY_POINTS[room_index]
 	player.collision_mask = world.terrain_movement_mask | 4
 	player.terrain_mask = world.terrain_movement_mask
 	world.actors.add_child(player)
@@ -250,10 +303,14 @@ func _enter_room(returning_to_room_one := false) -> void:
 	remaining = total
 	triggered_count = 0
 	reward_options.clear()
-	if room_index == CONFIG.BOSS_ROOM:
-		_spawn_boss()
+	if enter_title:
+		hud.show_title_screen(audio_mgr.master_muted if is_instance_valid(audio_mgr) else false)
 	else:
-		_spawn_wave()
+		hud.hide_title_screen(true)
+		if room_index == CONFIG.BOSS_ROOM:
+			_spawn_boss()
+		else:
+			_spawn_wave()
 	_update_status()
 	hud.update_room(remaining, total, triggered_count)
 	world.queue_redraw()
@@ -505,17 +562,27 @@ func _physics_process(delta: float) -> void:
 		_trigger_portal_reward()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var code_m: int = event.keycode if event.keycode != 0 else event.physical_keycode
+		if code_m == KEY_M and is_instance_valid(audio_mgr):
+			_toggle_master_mute()
+			get_viewport().set_input_as_handled()
+			return
+	if phase == "title":
+		if event is InputEventKey and event.pressed and not event.echo:
+			var code_t: int = event.keycode if event.keycode != 0 else event.physical_keycode
+			if code_t in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+				start_run_from_title()
+				get_viewport().set_input_as_handled()
+				return
+			if code_t in [KEY_ESCAPE, KEY_TAB, KEY_QUOTELEFT]:
+				get_viewport().set_input_as_handled()
+				return
+		return
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
 		_debug_menu()
 		get_viewport().set_input_as_handled()
 		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		var code_m: int = event.keycode if event.keycode != 0 else event.physical_keycode
-		if code_m == KEY_M and is_instance_valid(audio_mgr):
-			var muted: bool = audio_mgr.toggle_master_mute()
-			hud.show_notice("音频：已静音 [M]" if muted else "音频：已开启 [M]")
-			get_viewport().set_input_as_handled()
-			return
 	if event is InputEventKey and event.pressed and not event.echo and not get_tree().paused and phase in ["combat", "exit_ready"]:
 		var code: int = event.keycode if event.keycode != 0 else event.physical_keycode
 		if code in [KEY_1, KEY_KP_1]:
@@ -694,6 +761,7 @@ func debug_close() -> void:
 
 func _update_status() -> void:
 	match phase:
+		"title": status.text = "问剑"
 		"combat":
 			status.text = "%s · 躲开横扫扇区与突进直线，趁收招反击" % CONFIG.BOSS_NAME if room_index == CONFIG.BOSS_ROOM else "第 %d / %d 间 · 第 %d / %d 波" % [room_index + 1, CONFIG.RUN_ROOMS, wave_index + 1, CONFIG.WAVES[room_index].size()]
 		"clear_celebration": status.text = "%s已破 · 灵气散尽" % CONFIG.BOSS_NAME if clear_is_boss else "清场 · 破阵成功"

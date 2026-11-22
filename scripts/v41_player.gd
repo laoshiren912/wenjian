@@ -28,8 +28,11 @@ var primary_after_throw := false
 var sword_rain_node: Node2D
 var sword_rain_cooldown := 0.0
 var sword_rain_card_level := 0
+var input_locked := false
 
 func _unhandled_input(event: InputEvent) -> void:
+	if input_locked:
+		return
 	if event.is_action_pressed("attack") or event.is_action_pressed("ranged_attack"):
 		if event is InputEventMouseButton:
 			_aim_viewport_position = event.position
@@ -99,6 +102,11 @@ func _clear_throw_request() -> void:
 
 func _physics_process(delta: float) -> void:
 	if dead:
+		return
+	if input_locked:
+		velocity = Vector2.ZERO
+		if is_instance_valid(visual):
+			visual.update_pose(Vector2.ZERO, Vector2.UP, Color.WHITE, Vector2.UP)
 		return
 	dash_cooldown = maxf(0.0, dash_cooldown - delta)
 	throw_cooldown = maxf(0.0, throw_cooldown - delta)

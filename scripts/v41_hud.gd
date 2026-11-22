@@ -1,11 +1,28 @@
 extends "res://scripts/combo_hud.gd"
 
 signal reward_selected(index: int)
+signal title_start_requested
+signal title_mute_requested
 const CONFIG = preload("res://scripts/v41_config.gd")
 const SkillSlot = preload("res://scripts/v41_skill_slot.gd")
+const TITLE_FADE_DURATION := 0.35
 
 var run
 var gm_scroll: ScrollContainer
+
+# 无框水墨暗金开局标题画面节点
+var title_layer: Control
+var title_art: Control
+var title_center_box: VBoxContainer
+var title_main_label: Label
+var title_divider: Control
+var title_btn_spacer: Control
+var title_start_btn: Button
+var title_mute_btn: Button
+var title_controls_label: Label
+var _title_active := false
+var _title_fading_out := false
+var _title_fade_elapsed := 0.0
 
 # 无框极简仙侠 HUD 节点
 var minimal_layer: Control
@@ -62,6 +79,116 @@ class InkBackdrop extends Control:
 			draw_colored_polygon(pts, Color(0.05, 0.08, 0.11, 0.84))
 			draw_polyline(pts + PackedVector2Array([pts[0]]), Color(0.92, 0.84, 0.62, 0.92), 1.4, false)
 			draw_rect(Rect2(Vector2(cx - 1.5, y - 1.5), Vector2(3.0, 3.0)), Color("f6eed4"))
+		elif mode == 2:
+			# 标题专用：加宽古风细云纹暗金分割线（主线 + 两侧细回纹 + 中心玉金菱印）
+			var y := size.y * 0.5
+			var cx := size.x * 0.5
+			var half := minf(size.x * 0.48, 142.0)
+			draw_line(Vector2(cx - half, y), Vector2(cx - 15.0, y), Color(0.03, 0.05, 0.08, 0.84), 4.0, false)
+			draw_line(Vector2(cx + 15.0, y), Vector2(cx + half, y), Color(0.03, 0.05, 0.08, 0.84), 4.0, false)
+			draw_line(Vector2(cx - half + 2.0, y), Vector2(cx - 15.0, y), Color(0.92, 0.80, 0.48, 0.94), 1.5, false)
+			draw_line(Vector2(cx + 15.0, y), Vector2(cx + half - 2.0, y), Color(0.92, 0.80, 0.48, 0.94), 1.5, false)
+			for side in [-1.0, 1.0]:
+				var s: float = float(side)
+				var tip_x: float = cx + s * (half + 4.0)
+				var curl := PackedVector2Array([
+					Vector2(tip_x - s * 4.0, y),
+					Vector2(tip_x, y - 3.0),
+					Vector2(tip_x + s * 4.0, y),
+					Vector2(tip_x, y + 3.0),
+				])
+				draw_colored_polygon(curl, Color(0.94, 0.82, 0.50, 0.90))
+			var pts := PackedVector2Array([
+				Vector2(cx, y - 5.5), Vector2(cx + 8.0, y),
+				Vector2(cx, y + 5.5), Vector2(cx - 8.0, y),
+			])
+			draw_colored_polygon(pts, Color(0.04, 0.06, 0.10, 0.90))
+			draw_polyline(pts + PackedVector2Array([pts[0]]), Color(0.96, 0.86, 0.54, 0.96), 1.6, false)
+			draw_rect(Rect2(Vector2(cx - 2.0, y - 2.0), Vector2(4.0, 4.0)), Color("fff4cf"))
+
+class TitleArtOverlay extends Control:
+	var clock := 0.0
+	var title_ref: Control
+	var controls_ref: Control
+
+	func _process(delta: float) -> void:
+		if not visible:
+			return
+		clock += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		if not visible or size.x < 10.0 or size.y < 10.0:
+			return
+		var cx := size.x * 0.5
+		var compact := size.x < 1100.0 or size.y < 620.0
+
+		# 1. 极轻上下边缘水墨暗角（保持竹林与山门中景完全通透）
+		var edge_h := 54.0 if compact else 72.0
+		var steps := 6
+		for i in range(steps):
+			var frac := float(i) / float(steps)
+			var next_frac := float(i + 1) / float(steps)
+			var band_h := edge_h * (next_frac - frac)
+			var a := pow(1.0 - frac, 1.8) * 0.24
+			draw_rect(Rect2(0.0, edge_h * frac, size.x, band_h + 1.0), Color(0.02, 0.04, 0.07, a))
+			draw_rect(Rect2(0.0, size.y - edge_h * next_frac, size.x, band_h + 1.0), Color(0.02, 0.04, 0.07, a * 1.15))
+
+		# 2. 主标题背后柔滑椭圆水墨晕染（彻底无矩形边缘，仅柔和托出暗金字迹对比度）
+		var title_cy := (84.0 if compact else 118.0)
+		var title_w := (170.0 if compact else 220.0)
+		if is_instance_valid(title_ref) and title_ref.size.x > 10.0:
+			var r := title_ref.get_global_rect()
+			var local_center := r.get_center() - global_position
+			title_cy = local_center.y
+			title_w = maxf(title_w, r.size.x * 0.90)
+		var pulse := 0.82 + 0.18 * sin(clock * 1.9)
+		draw_set_transform(Vector2(cx, title_cy), 0.0, Vector2(1.0, 0.34))
+		for seg in range(7):
+			var frac := float(seg) / 7.0
+			var rad := title_w * lerpf(1.38, 0.42, frac)
+			var sa := lerpf(0.022, 0.068, frac)
+			draw_circle(Vector2.ZERO, rad, Color(0.02, 0.04, 0.07, sa))
+		# 主标题后极淡暖金灵气微晕
+		draw_circle(Vector2.ZERO, title_w * 0.86, Color(0.95, 0.82, 0.48, 0.055 * pulse))
+		draw_circle(Vector2.ZERO, title_w * 0.48, Color(1.0, 0.90, 0.58, 0.050 * pulse))
+		draw_set_transform(Vector2.ZERO)
+
+		# 3. 题字右侧一枚精致朱砂小印（「剑」印，凸显国风仙侠气息）
+		if is_instance_valid(title_ref) and title_ref.size.x > 10.0:
+			var tr := title_ref.get_global_rect()
+			var seal_sz := 16.0 if compact else 20.0
+			var sx := (tr.position.x + tr.size.x - global_position.x) + (8.0 if compact else 12.0)
+			var sy := (tr.position.y + tr.size.y - global_position.y) - seal_sz - (8.0 if compact else 12.0)
+			var seal_rect := Rect2(sx, sy, seal_sz, seal_sz)
+			draw_rect(seal_rect.grow(1.5), Color(0.03, 0.04, 0.06, 0.78))
+			draw_rect(seal_rect, Color(0.72, 0.18, 0.15, 0.92))
+			draw_rect(seal_rect, Color(0.96, 0.78, 0.64, 0.55), false, 1.0)
+			var font := ThemeDB.fallback_font
+			var fsz := 10 if compact else 12
+			var gdim := font.get_string_size("剑", HORIZONTAL_ALIGNMENT_CENTER, -1, fsz)
+			var gp := Vector2(roundf(sx + (seal_sz - gdim.x) * 0.5), roundf(sy + seal_sz * 0.76))
+			draw_string(font, gp, "剑", HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, Color("f8eee2"))
+
+		# 4. 漂浮在标题四周的细碎金色灵尘
+		for i in range(10):
+			var phase := float(i) * 1.17 + clock * (0.45 + float(i % 3) * 0.14)
+			var px := cx + sin(phase * 0.78 + float(i)) * (title_w * 1.15)
+			var py := title_cy + cos(phase * 0.95 + float(i) * 0.7) * (36.0 if compact else 48.0) - 6.0
+			var pa := (0.28 + 0.36 * (0.5 + 0.5 * sin(phase * 1.8))) * pulse
+			var dot_sz := 2.5 if i % 3 == 0 else 2.0
+			draw_rect(Rect2(roundf(px), roundf(py), dot_sz, dot_sz), Color(0.98, 0.88, 0.56, pa))
+
+		# 5. 底部操作指南背后的极淡椭圆墨晕（无硬框边缘，确保浅色地面可读）
+		if is_instance_valid(controls_ref) and controls_ref.size.x > 10.0:
+			var cr := controls_ref.get_global_rect()
+			var cc := cr.get_center() - global_position
+			var cw := cr.size.x * 0.58 + 26.0
+			draw_set_transform(cc, 0.0, Vector2(1.0, 0.11))
+			for seg in range(4):
+				var rad := cw * lerpf(1.18, 0.62, float(seg) / 4.0)
+				draw_circle(Vector2.ZERO, rad, Color(0.02, 0.04, 0.07, 0.065 + float(seg) * 0.032))
+			draw_set_transform(Vector2.ZERO)
 
 class ScreenBannerFX extends Control:
 	var active := false
@@ -183,6 +310,7 @@ func _resize_modal() -> void:
 	super._resize_modal()
 	if is_instance_valid(gm_scroll) and is_instance_valid(modal_panel) and gm_scroll.get_parent().get_parent() == modal_panel:
 		gm_scroll.custom_minimum_size.y = maxf(0.0, minf(440.0, root.size.y - 180.0))
+	_layout_title_screen()
 
 func _ink_label(text: String, font_size: int, color: Color = Color("f2f6f4"), outline_px: int = 4) -> Label:
 	var lbl := Label.new()
@@ -408,10 +536,210 @@ func _ready() -> void:
 	PrototypeUI.fill(banner_fx)
 	root.add_child(banner_fx)
 
+	# 无框水墨暗金开局标题画面（不加入 combat_panels，默认隐藏，由 run.phase == "title" 激活）
+	_build_title_screen()
+
 	# 确保全屏红闪与遮罩弹窗始终位于最顶层
+	root.move_child(title_layer, root.get_child_count() - 4)
 	root.move_child(banner_fx, root.get_child_count() - 3)
 	root.move_child(hurt_flash, root.get_child_count() - 2)
 	root.move_child(overlay, root.get_child_count() - 1)
+
+func _build_title_screen() -> void:
+	title_layer = Control.new()
+	title_layer.name = "TitleScreenLayer"
+	PrototypeUI.fill(title_layer)
+	title_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_layer.visible = false
+	root.add_child(title_layer)
+
+	var art := TitleArtOverlay.new()
+	art.name = "TitleArtOverlay"
+	PrototypeUI.fill(art)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_layer.add_child(art)
+	title_art = art
+
+	# 1. 屏幕中上方偏中：大号主标题 + 细云纹线 + 副标题 + 古风暗金细边按钮
+	title_center_box = PrototypeUI.column(6)
+	title_center_box.name = "TitleCenterBox"
+	title_center_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_center_box.anchor_left = 0.5
+	title_center_box.anchor_right = 0.5
+	title_center_box.anchor_top = 0.0
+	title_center_box.anchor_bottom = 0.0
+	title_center_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	title_center_box.grow_vertical = Control.GROW_DIRECTION_END
+	title_center_box.offset_top = 64.0
+	title_layer.add_child(title_center_box)
+
+	title_main_label = Label.new()
+	title_main_label.text = "问 剑"
+	title_main_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_main_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	title_main_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_main_label.add_theme_font_size_override("font_size", 76)
+	title_main_label.add_theme_color_override("font_color", Color("f6dfa2"))
+	title_main_label.add_theme_color_override("font_outline_color", Color(0.03, 0.05, 0.09, 0.96))
+	title_main_label.add_theme_constant_override("outline_size", 10)
+	title_main_label.add_theme_color_override("font_shadow_color", Color(0.01, 0.03, 0.06, 0.82))
+	title_main_label.add_theme_constant_override("shadow_offset_x", 2)
+	title_main_label.add_theme_constant_override("shadow_offset_y", 4)
+	title_center_box.add_child(title_main_label)
+	art.title_ref = title_main_label
+
+	var tdiv := InkBackdrop.new()
+	tdiv.mode = 2
+	tdiv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tdiv.custom_minimum_size = Vector2(300, 18)
+	tdiv.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	title_divider = tdiv
+	title_center_box.add_child(title_divider)
+
+	title_btn_spacer = Control.new()
+	title_btn_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_btn_spacer.custom_minimum_size = Vector2(0, 26)
+	title_center_box.add_child(title_btn_spacer)
+
+	title_start_btn = Button.new()
+	title_start_btn.name = "TitleStartButton"
+	title_start_btn.text = "踏入仙途"
+	title_start_btn.focus_mode = Control.FOCUS_NONE
+	title_start_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	title_start_btn.custom_minimum_size = Vector2(214, 48)
+	title_start_btn.add_theme_font_size_override("font_size", 22)
+	title_start_btn.add_theme_color_override("font_color", Color("f7e6b8"))
+	title_start_btn.add_theme_color_override("font_hover_color", Color("fff9e2"))
+	title_start_btn.add_theme_color_override("font_pressed_color", Color("ffffff"))
+	title_start_btn.add_theme_color_override("font_outline_color", Color(0.03, 0.05, 0.09, 0.96))
+	title_start_btn.add_theme_constant_override("outline_size", 4)
+	var btn_normal := StyleBoxFlat.new()
+	btn_normal.bg_color = Color(0.05, 0.08, 0.11, 0.62)
+	btn_normal.border_color = Color(0.84, 0.71, 0.40, 0.88)
+	btn_normal.set_border_width_all(1)
+	btn_normal.set_corner_radius_all(2)
+	btn_normal.shadow_color = Color(0.01, 0.03, 0.06, 0.45)
+	btn_normal.shadow_size = 4
+	btn_normal.content_margin_left = 26.0
+	btn_normal.content_margin_right = 26.0
+	btn_normal.content_margin_top = 8.0
+	btn_normal.content_margin_bottom = 8.0
+	var btn_hover := btn_normal.duplicate()
+	btn_hover.bg_color = Color(0.11, 0.14, 0.16, 0.78)
+	btn_hover.border_color = Color(1.0, 0.90, 0.56, 1.0)
+	btn_hover.set_border_width_all(2)
+	btn_hover.shadow_color = Color(0.96, 0.82, 0.40, 0.42)
+	btn_hover.shadow_size = 8
+	var btn_pressed := btn_hover.duplicate()
+	btn_pressed.bg_color = Color(0.16, 0.20, 0.21, 0.88)
+	btn_pressed.shadow_size = 4
+	title_start_btn.add_theme_stylebox_override("normal", btn_normal)
+	title_start_btn.add_theme_stylebox_override("hover", btn_hover)
+	title_start_btn.add_theme_stylebox_override("pressed", btn_pressed)
+	title_start_btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	title_start_btn.pressed.connect(func(): title_start_requested.emit())
+	title_center_box.add_child(title_start_btn)
+
+	# 2. 右上角：极低调静音开关（与 M 键双向同步）
+	title_mute_btn = _ghost_button("声音：开 [M]", func(): title_mute_requested.emit())
+	title_mute_btn.name = "TitleMuteButton"
+	title_mute_btn.custom_minimum_size = Vector2(106, 32)
+	title_mute_btn.add_theme_font_size_override("font_size", 14)
+	title_mute_btn.add_theme_color_override("font_color", Color("dfe7e2"))
+	title_mute_btn.anchor_left = 1.0
+	title_mute_btn.anchor_right = 1.0
+	title_mute_btn.anchor_top = 0.0
+	title_mute_btn.anchor_bottom = 0.0
+	title_mute_btn.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	title_mute_btn.grow_vertical = Control.GROW_DIRECTION_END
+	title_mute_btn.offset_right = -22.0
+	title_mute_btn.offset_top = 18.0
+	title_layer.add_child(title_mute_btn)
+
+	# 3. 屏幕底部居中：一行带深墨描边的清晰操作指南
+	title_controls_label = _ink_label("左键三连 · 右键旋斩 · 空格穿阵 · E万剑归宗", 17, Color("eef2ec"), 5)
+	title_controls_label.name = "TitleControlsLabel"
+	title_controls_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_controls_label.anchor_left = 0.5
+	title_controls_label.anchor_right = 0.5
+	title_controls_label.anchor_top = 1.0
+	title_controls_label.anchor_bottom = 1.0
+	title_controls_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	title_controls_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	title_controls_label.offset_bottom = -20.0
+	title_layer.add_child(title_controls_label)
+	art.controls_ref = title_controls_label
+
+	_layout_title_screen()
+
+func _layout_title_screen() -> void:
+	if not is_instance_valid(title_layer) or not is_instance_valid(root):
+		return
+	var compact := root.size.x < 1100.0 or root.size.y < 620.0
+	title_center_box.offset_top = 48.0 if compact else 76.0
+	title_main_label.add_theme_font_size_override("font_size", 60 if compact else 78)
+	title_main_label.add_theme_constant_override("outline_size", 8 if compact else 10)
+	title_divider.custom_minimum_size = Vector2(236, 14) if compact else Vector2(300, 18)
+	title_btn_spacer.custom_minimum_size = Vector2(0, 18) if compact else Vector2(0, 26)
+	title_start_btn.custom_minimum_size = Vector2(184, 42) if compact else Vector2(214, 48)
+	title_start_btn.add_theme_font_size_override("font_size", 19 if compact else 22)
+	title_mute_btn.offset_top = 14.0 if compact else 18.0
+	title_mute_btn.offset_right = -20.0 if compact else -22.0
+	title_controls_label.add_theme_font_size_override("font_size", 15 if compact else 17)
+	title_controls_label.offset_bottom = -14.0 if compact else -20.0
+	if is_instance_valid(title_art):
+		title_art.queue_redraw()
+
+func show_title_screen(muted: bool = false) -> void:
+	_title_active = true
+	_title_fading_out = false
+	_title_fade_elapsed = 0.0
+	if is_instance_valid(minimal_layer):
+		minimal_layer.visible = false
+		minimal_layer.modulate.a = 0.0
+	if is_instance_valid(title_layer):
+		title_layer.visible = true
+		title_layer.modulate.a = 1.0
+	if is_instance_valid(title_start_btn):
+		title_start_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		title_start_btn.disabled = false
+	if is_instance_valid(title_mute_btn):
+		title_mute_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	sync_title_mute(muted)
+	_layout_title_screen()
+
+func hide_title_screen(instant: bool = false) -> void:
+	if instant:
+		_title_active = false
+		_title_fading_out = false
+		_title_fade_elapsed = 0.0
+		if is_instance_valid(title_layer):
+			title_layer.visible = false
+			title_layer.modulate.a = 0.0
+		if is_instance_valid(minimal_layer):
+			minimal_layer.visible = true
+			minimal_layer.modulate.a = 1.0
+		return
+	if not _title_active and not _title_fading_out:
+		if is_instance_valid(minimal_layer):
+			minimal_layer.visible = true
+			minimal_layer.modulate.a = 1.0
+		return
+	_title_active = false
+	_title_fading_out = true
+	_title_fade_elapsed = 0.0
+	if is_instance_valid(title_start_btn):
+		title_start_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		title_start_btn.disabled = true
+	if is_instance_valid(title_mute_btn):
+		title_mute_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if is_instance_valid(minimal_layer):
+		minimal_layer.visible = true
+		minimal_layer.modulate.a = 0.0
+
+func sync_title_mute(muted: bool) -> void:
+	if is_instance_valid(title_mute_btn):
+		title_mute_btn.text = "声音：静音 [M]" if muted else "声音：开 [M]"
 
 func play_breakthrough_banner(rank: int) -> void:
 	if not is_instance_valid(banner_fx):
@@ -441,6 +769,22 @@ func show_notice(text: String) -> void:
 func _process(delta: float) -> void:
 	super._process(delta)
 	_hud_clock += delta
+	if _title_fading_out:
+		_title_fade_elapsed += delta
+		var t := clampf(_title_fade_elapsed / TITLE_FADE_DURATION, 0.0, 1.0)
+		var smooth := t * t * (3.0 - 2.0 * t)
+		if is_instance_valid(title_layer):
+			title_layer.modulate.a = 1.0 - smooth
+		if is_instance_valid(minimal_layer):
+			minimal_layer.visible = true
+			minimal_layer.modulate.a = smooth
+		if t >= 1.0:
+			_title_fading_out = false
+			if is_instance_valid(title_layer):
+				title_layer.visible = false
+				title_layer.modulate.a = 0.0
+			if is_instance_valid(minimal_layer):
+				minimal_layer.modulate.a = 1.0
 	if _cult_flash > 0.0:
 		_cult_flash = maxf(0.0, _cult_flash - delta)
 	if _boss_break_flash > 0.0:

@@ -13,6 +13,7 @@ var boss_bgm: AudioStream
 var current_boss_mode := false
 var bgm_muted := false
 var master_muted := false
+var _bgm_target_db := -3.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -20,11 +21,20 @@ func _ready() -> void:
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.name = "BgmPlayer"
 	bgm_player.bus = BGM_BUS
-	bgm_player.volume_db = -3.0
+	bgm_player.volume_db = _bgm_target_db
 	add_child(bgm_player)
 	normal_bgm = _load_or_build_bgm(false)
 	boss_bgm = _load_or_build_bgm(true)
 	play_room_bgm(false)
+
+func _process(delta: float) -> void:
+	if is_instance_valid(bgm_player) and not is_equal_approx(bgm_player.volume_db, _bgm_target_db):
+		bgm_player.volume_db = move_toward(bgm_player.volume_db, _bgm_target_db, delta * 9.0)
+
+func set_title_soft_mode(enabled: bool, instant: bool = false) -> void:
+	_bgm_target_db = -7.8 if enabled else -3.0
+	if instant and is_instance_valid(bgm_player):
+		bgm_player.volume_db = _bgm_target_db
 
 func _ensure_buses() -> void:
 	# Master 挂 Limiter 防止群怪连击或万剑齐落瞬间削波爆音

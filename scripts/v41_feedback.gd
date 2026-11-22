@@ -50,6 +50,7 @@ func _ready() -> void:
 		"portal_activate": _chime_sound([783.99, 1174.66, 1567.98], 0.56, 0.32),
 		"boss_clear": _chime_sound([523.25, 783.99, 1046.5, 1567.98], 0.85, 0.42),
 		"wave_summon": _layered_sound(145.0, 56.0, 0.36, 0.62, 0.46, 0.72),
+		"title_start": _unsheathe_sound(),
 	}
 
 func reset_sword_cues() -> void:
@@ -240,6 +241,14 @@ func play_portal_activate() -> void:
 		voice.pitch_scale = 1.0
 		voice.play()
 
+func play_title_start() -> void:
+	if sword_sounds.has("title_start"):
+		var voice := _voice("title_start")
+		voice.stream = sword_sounds["title_start"]
+		voice.volume_db = -6.5
+		voice.pitch_scale = 1.0
+		voice.play()
+
 func spawn_wave_summon(points: Array[Vector2], duration: float = 0.55) -> void:
 	for pt in points:
 		wave_summons.append({
@@ -403,6 +412,48 @@ func _chime_sound(notes: Array, duration: float, sword_ring: float) -> AudioStre
 		var shimmer := (sin(TAU * ring_f * t) * 0.6 + sin(TAU * ring_f * 1.006 * t) * 0.4) * sword_ring * ring_env
 		var bass := sin(TAU * float(notes[0]) * 0.25 * t) * 0.22 * minf(t * 60.0, 1.0) * exp(-t * 6.5)
 		var sample := clampf((mix + shimmer + bass) * 0.78, -0.95, 0.95)
+		bytes.encode_s16(i * 2, int(sample * 32767.0))
+	stream.data = bytes
+	return stream
+
+func _unsheathe_sound() -> AudioStreamWAV:
+	# 清脆出鞘擦刃 + 仙侠清越剑鸣（点击「踏入仙途」专用）
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = 22050
+	var duration := 0.72
+	var samples := int(duration * stream.mix_rate)
+	var bytes := PackedByteArray()
+	bytes.resize(samples * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261
+	var hp_prev := 0.0
+	var phase_slide := 0.0
+	for i in range(samples):
+		var t := float(i) / float(stream.mix_rate)
+		# 1. 前 0.16s 清脆出鞘金属擦音
+		var slide := 0.0
+		if t < 0.18:
+			var sp := t / 0.18
+			var s_env := sin(sp * PI) * (1.0 - sp * 0.25)
+			var raw_n := rng.randf_range(-1.0, 1.0)
+			var hp := raw_n - hp_prev * 0.86
+			hp_prev = raw_n
+			var slide_f := lerpf(1180.0, 3420.0, sp * sp)
+			phase_slide += TAU * slide_f / float(stream.mix_rate)
+			slide = (sin(phase_slide) * 0.42 + hp * 0.46) * s_env * 0.62
+		# 2. 0.05s 起清越剑鸣泛音（D5 + A5 + D6 交叠共鸣）
+		var ring := 0.0
+		if t >= 0.04:
+			var rt := t - 0.04
+			var r_env := minf(rt * 110.0, 1.0) * exp(-rt * 4.6)
+			var f1 := 587.33
+			var f2 := 880.0
+			var f3 := 1174.66
+			var shimmer := sin(TAU * f1 * rt) * 0.36 + sin(TAU * f2 * rt) * 0.30 + sin(TAU * f3 * rt) * 0.22 + sin(TAU * f3 * 2.012 * rt) * 0.14 * exp(-rt * 7.0)
+			var sub := sin(TAU * 146.83 * rt) * 0.18 * exp(-rt * 9.5)
+			ring = (shimmer + sub) * r_env * 0.85
+		var sample := clampf(tanh((slide + ring) * 1.15), -0.95, 0.95)
 		bytes.encode_s16(i * 2, int(sample * 32767.0))
 	stream.data = bytes
 	return stream
