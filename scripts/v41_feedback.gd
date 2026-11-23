@@ -357,7 +357,7 @@ func _spawn_slash_impact(kind: String, point: Vector2, direction: Vector2, slot:
 		duration = 0.17
 	slash_impacts.append({
 		"kind": kind,
-		"point": point - Vector2(0, 25) if kind in ["hit", "blocked", "guard_break", "kill"] else point,
+		"point": point,
 		"dir": direction,
 		"slot": slot,
 		"rank": clampi(rank, 0, 2),
@@ -640,11 +640,11 @@ func _draw() -> void:
 				var ring_r := lerpf(7.0, 34.0, pow(t, 0.52))
 				draw_arc(point, ring_r, 0.0, TAU, 24, Color(1.0, 0.92, 0.56, inv * 0.88), 3.0 * inv + 1.0, false)
 				draw_arc(point, ring_r * 0.68, 0.0, TAU, 18, Color(accent, inv * 0.78), 2.0, false)
-			var spark_n := 16 if heavy_impact else (10 if slot == 1 else 6)
+			var spark_n := 10 if heavy_impact else 7
 			for i in range(spark_n):
 				var frac := (float(i) / float(maxi(1, spark_n - 1))) * 2.0 - 1.0
-				var sdir := (dir * 0.35 + tangent * frac * 1.3).normalized()
-				var dist := lerpf(4.0, (44.0 if heavy_impact else (32.0 if slot == 1 else 23.0)) + float(i % 3) * 6.0, pow(t, 0.62))
+				var sdir := (dir * 0.78 + tangent * frac * 0.95).normalized()
+				var dist := lerpf(4.0, (32.0 if heavy_impact else 24.0) + float(i % 3) * 6.0, pow(t, 0.62))
 				var p0 := (point + sdir * dist).round()
 				var tail := (7.0 if heavy_impact else 5.0) * inv + 2.0
 				var p1 := (p0 + sdir * tail).round()

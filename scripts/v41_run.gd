@@ -134,6 +134,8 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 		"miss":
 			pass
 		"hit":
+			if sword.swing_bonus > 1.01 and is_instance_valid(sword.slash_vfx):
+				sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.18)
 			var slot_index := clampi(slot, 0, 2)
 			var kick_dir := (dir * 0.65 + Vector2.DOWN * 0.75).normalized() if slot == 2 else dir
 			feedback.trigger_camera_kick(kick_dir, CONFIG.COMBO_KICKS[slot_index])

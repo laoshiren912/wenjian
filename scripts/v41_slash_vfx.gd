@@ -73,9 +73,6 @@ func spawn_ground_effect(world_point: Vector2, effect_mode: int, rank: int, inte
 	if effect_mode == 1 and intensity > 1.05:
 		# 破防气浪略带金青锋锐
 		primary = primary.lerp(Color("ffd98a"), 0.45)
-	if effect_mode == 1:
-		primary = Color("075acc")
-		core = Color("16c8ff")
 	mat.set_shader_parameter("primary_color", primary)
 	mat.set_shader_parameter("core_color", core)
 
@@ -85,8 +82,6 @@ func spawn_ground_effect(world_point: Vector2, effect_mode: int, rank: int, inte
 	sprite.material = mat
 	var size_px := 92.0 if effect_mode == 0 else (98.0 + float(rank) * 12.0)
 	sprite.scale = Vector2(size_px, size_px)
-	if effect_mode == 1:
-		sprite.scale.y *= 0.48
 	fx.add_child(sprite)
 	host.add_child(fx)
 
