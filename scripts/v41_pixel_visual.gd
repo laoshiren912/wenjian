@@ -42,6 +42,7 @@ var player_death := false
 var player_death_age := 0.0
 var herbalist_visual := false
 var spawn_pop_time := 0.0
+var melee_flash := false
 var hit_flash_mat: ShaderMaterial
 var player_hit_flash_mat: ShaderMaterial
 
@@ -62,7 +63,15 @@ func _ready() -> void:
 		if empty_hand_sheet == null:
 			_prepare_player_poses()
 
+func play_melee_hurt() -> void:
+	melee_flash = true
+	hurt_time = CONFIG.MELEE_FLASH_DURATION
+	hurt_flash_lock = maxf(hurt_flash_lock, CONFIG.ENEMY_FLASH_INTERVAL)
+	queue_redraw()
+
 func play_hurt() -> void:
+	if hurt_flash_lock <= 0.00001:
+		melee_flash = false
 	if hit_flash_mat != null:
 		start_limited_hurt_flash(CONFIG.ENEMY_FLASH_INTERVAL, CONFIG.ENEMY_FLASH_DURATION)
 		return
@@ -390,7 +399,7 @@ func _draw() -> void:
 	var destination := Rect2(-pivot * ART_SCALE + Vector2(0, 15), size * ART_SCALE)
 	var source := Rect2(Vector2(frame * size.x, row * size.y), size)
 	if is_instance_valid(hit_flash_mat):
-		hit_flash_mat.set_shader_parameter("hurt_flash", CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
+		hit_flash_mat.set_shader_parameter("hurt_flash", (1.0 if melee_flash and hurt_time > 0.0 else CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0)))
 	var recoil_sx := 1.035 if (not is_player and hurt_time > 0.0) else (1.05 if enemy_guarding else 1.0)
 	var recoil_sy := 0.965 if (not is_player and hurt_time > 0.0) else (0.95 if enemy_guarding else 1.0)
 	var sx := -recoil_sx if flip else recoil_sx
@@ -416,7 +425,7 @@ func _draw_herbalist() -> void:
 	var destination := Rect2(-Vector2(54, 103) * ART_SCALE + Vector2(0, 15), Vector2(108, 116) * ART_SCALE)
 	var source := Rect2(Vector2(frame * 108, row * 116), Vector2(108, 116))
 	if is_instance_valid(hit_flash_mat):
-		hit_flash_mat.set_shader_parameter("hurt_flash", CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
+		hit_flash_mat.set_shader_parameter("hurt_flash", (1.0 if melee_flash and hurt_time > 0.0 else CONFIG.ENEMY_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0)))
 	var recoil_sx := 1.035 if hurt_time > 0.0 else 1.0
 	var recoil_sy := 0.965 if hurt_time > 0.0 else 1.0
 	var sx := -recoil_sx if flip else recoil_sx

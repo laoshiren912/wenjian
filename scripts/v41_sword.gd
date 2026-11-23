@@ -43,7 +43,7 @@ func _ready() -> void:
 		stages[i].windup = CONFIG.SWORD_TIMINGS[i].x
 		stages[i].active = CONFIG.SWORD_TIMINGS[i].y
 		stages[i].recovery = CONFIG.SWORD_TIMINGS[i].z
-		stages[i].lunge = 0.0
+		stages[i].lunge = CONFIG.COMBO_LUNGE[i]
 	slash_vfx = SlashVfx.new()
 	slash_vfx.name = "SlashVfx"
 	add_child(slash_vfx)
@@ -191,7 +191,7 @@ func attack(direction: Vector2) -> bool:
 	impact_sent = false
 	miss_checked = false
 	wave_fired = false
-	get_parent().sword_cue.emit("heavy_swing" if stage == 2 else "light_swing", global_position)
+	get_parent().sword_cue.emit("combo_swing_%d" % stage, global_position)
 	return true
 
 func _sword_assist(direction: Vector2) -> Vector2:
@@ -320,7 +320,15 @@ func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	var crit_mult := 1.5 if (backstab_break or posture_shattered) else 1.0
 	var dealt := damage * swing_bonus * crit_mult
 	var ignore_guard := break_guard or backstab_break or (heavy_hit and not is_elite)
+	if target is SurvivorEnemy and target.v41_pressure and target.kind != SurvivorEnemy.Kind.BOSS:
+		push = swing_direction * CONFIG.COMBO_PUSH[clampi(stage, 0, 2)]
 	target.take_damage(dealt, push, ignore_guard, false, false, is_crit)
+	if not target.last_hit_blocked and not target.dead and target.visual.has_method("play_melee_hurt"):
+		target.visual.play_melee_hurt()
+	if heavy_hit and not target.last_hit_blocked and not target.dead and target is SurvivorEnemy and target.v41_pressure and target.kind != SurvivorEnemy.Kind.BOSS and not target.v41_guard_elite:
+		target.windup = 0.0
+		target.lunge_time = 0.0
+		target.v41_heavy_stun = maxf(target.v41_heavy_stun, CONFIG.BREAK_STUN)
 	if swing_bonus > 1.0 and not critical_slash_fired and target is SurvivorEnemy:
 		critical_slash_fired = true
 		get_parent().trigger_card_slash(target, swing_direction)
@@ -345,7 +353,7 @@ func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
 	if not impact_sent:
 		impact_sent = true
 		if heavy_hit or backstab_break or posture_shattered or not target.last_hit_blocked:
-			get_parent().sword_cue.emit("heavy_hit" if (heavy_hit or backstab_break or posture_shattered) else "light_hit", target.global_position)
+			get_parent().sword_cue.emit("combo_hit_%d" % stage, target.global_position)
 		if heavy_hit:
 			finisher_contact.emit(target.global_position)
 			self.heavy_hit.emit()

@@ -37,7 +37,7 @@ void fragment() {
 	}
 
 	// 受击纯白高对比度闪白
-	remapped = mix(remapped, vec3(1.0), clamp(hurt_flash, 0.0, 0.26));
+	remapped = mix(remapped, vec3(1.0), clamp(hurt_flash, 0.0, 1.0));
 
 	COLOR = vec4(remapped, tex.a * COLOR.a);
 }

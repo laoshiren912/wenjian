@@ -16,11 +16,20 @@ var animation_clock := 0.0
 var boss_material: ShaderMaterial
 var charge_ghosts: Array[Dictionary] = []
 var _ghost_timer := 0.0
+var melee_flash := false
 
 func _ready() -> void:
 	ensure_material()
 
+func play_melee_hurt() -> void:
+	melee_flash = true
+	hurt_time = CONFIG.MELEE_FLASH_DURATION
+	hurt_flash_lock = maxf(hurt_flash_lock, CONFIG.ENEMY_FLASH_INTERVAL)
+	queue_redraw()
+
 func play_hurt() -> void:
+	if hurt_flash_lock <= 0.00001:
+		melee_flash = false
 	start_limited_hurt_flash(CONFIG.ENEMY_FLASH_INTERVAL, CONFIG.ENEMY_FLASH_DURATION)
 
 func ensure_material() -> void:
@@ -118,7 +127,7 @@ func _draw() -> void:
 					frame = 8
 
 	if is_instance_valid(boss_material):
-		boss_material.set_shader_parameter("hurt_flash", CONFIG.BOSS_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0))
+		boss_material.set_shader_parameter("hurt_flash", (1.0 if melee_flash and hurt_time > 0.0 else CONFIG.BOSS_FLASH_STRENGTH * clampf(hurt_time / CONFIG.ENEMY_FLASH_DURATION, 0.0, 1.0)))
 	if hurt_time > 0.0:
 		body_scale *= Vector2(1.022, 0.978)
 

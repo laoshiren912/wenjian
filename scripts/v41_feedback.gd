@@ -14,7 +14,7 @@ var wave_summons: Array[Dictionary] = []
 var card_arcs: Array[Dictionary] = []
 var card_slashes: Array[Dictionary] = []
 const SHAKE_MERGE_WINDOW := 0.18
-const SHAKE_MAX_STRENGTH := 6.5
+const SHAKE_MAX_STRENGTH := 7.5
 var shake_gate_left := 0.0
 var shake_duration := 0.0
 var shake_direction := Vector2.RIGHT
@@ -28,6 +28,12 @@ func _ready() -> void:
 	guard_sound = _metal_sound(false)
 	break_sound = _metal_sound(true)
 	sword_sounds = {
+		"combo_swing_0": _layered_sound(900.0, 180.0, 0.085, 0.74, 0.52, 0.12),
+		"combo_swing_1": _layered_sound(680.0, 135.0, 0.115, 0.65, 0.55, 0.22),
+		"combo_swing_2": _layered_sound(320.0, 80.0, 0.17, 0.54, 0.50, 0.42),
+		"combo_hit_0": _layered_sound(560.0, 125.0, 0.10, 0.90, 0.28, 0.48),
+		"combo_hit_1": _layered_sound(380.0, 90.0, 0.135, 0.68, 0.30, 0.65),
+		"combo_hit_2": _layered_sound(165.0, 52.0, 0.23, 0.48, 0.22, 0.94),
 		"light_swing": _layered_sound(780.0, 190.0, 0.10, 0.68, 0.56, 0.18),
 		"heavy_swing": _layered_sound(320.0, 95.0, 0.18, 0.54, 0.52, 0.46),
 		"light_hit": _layered_sound(440.0, 118.0, 0.095, 1.16, 0.32, 0.72),
@@ -112,9 +118,8 @@ func _update_camera_shake(delta: float) -> void:
 		return
 	camera.offset = Vector2.ZERO
 	if shake_time > 0.0:
-		var phase := (shake_duration - shake_time) * 65.0
 		var envelope := pow(shake_time / shake_duration, 2.1)
-		var motion := shake_direction * sin(phase) + shake_direction.orthogonal() * (sin(phase * 1.17) * 0.18)
+		var motion := shake_direction * sin((shake_duration - shake_time) / shake_duration * PI * 1.4)
 		camera.offset = motion.limit_length() * shake_strength * envelope
 	camera.force_update_scroll()
 
@@ -148,7 +153,7 @@ func play_sword_cue(kind: String, point: Vector2) -> void:
 		channel = "rain_hit"
 	elif sound_key.begins_with("sword_rain"):
 		channel = "rain"
-	elif sound_key.ends_with("hit") or sound_key == "thunder_burst":
+	elif sound_key.begins_with("combo_hit_") or sound_key.ends_with("hit") or sound_key == "thunder_burst":
 		channel = "contact"
 	var gap := CONFIG.COMBO_SOUND_GAP_MS
 	if channel == "mark":
@@ -165,8 +170,11 @@ func play_sword_cue(kind: String, point: Vector2) -> void:
 			db = -10.5
 		elif sound_key == "light_swing":
 			db = -17.0
+		if sound_key.begins_with("combo_"):
+			var slot := clampi(int(sound_key.right(1)), 0, 2)
+			db = [-16.5, -15.0, -12.5][slot] if sound_key.begins_with("combo_swing") else [-13.5, -11.5, -8.5][slot]
 		voice.volume_db = db
-		voice.pitch_scale = randf_range(0.92, 1.08)
+		voice.pitch_scale = randf_range(0.98, 1.02) if sound_key.begins_with("combo_") else randf_range(0.92, 1.08)
 		voice.play()
 	if kind in ["throw_hit", "throw_hit_twin"]:
 		_spawn_slash_impact("spin_twin" if kind == "throw_hit_twin" else "spin_hit", point, Vector2.RIGHT, 0, 2 if kind == "throw_hit_twin" else 1)
@@ -349,7 +357,7 @@ func _spawn_slash_impact(kind: String, point: Vector2, direction: Vector2, slot:
 		duration = 0.17
 	slash_impacts.append({
 		"kind": kind,
-		"point": point,
+		"point": point - Vector2(0, 25) if kind in ["hit", "blocked", "guard_break", "kill"] else point,
 		"dir": direction,
 		"slot": slot,
 		"rank": clampi(rank, 0, 2),
@@ -632,11 +640,11 @@ func _draw() -> void:
 				var ring_r := lerpf(7.0, 34.0, pow(t, 0.52))
 				draw_arc(point, ring_r, 0.0, TAU, 24, Color(1.0, 0.92, 0.56, inv * 0.88), 3.0 * inv + 1.0, false)
 				draw_arc(point, ring_r * 0.68, 0.0, TAU, 18, Color(accent, inv * 0.78), 2.0, false)
-			var spark_n := 10 if heavy_impact else 7
+			var spark_n := 16 if heavy_impact else (10 if slot == 1 else 6)
 			for i in range(spark_n):
 				var frac := (float(i) / float(maxi(1, spark_n - 1))) * 2.0 - 1.0
-				var sdir := (dir * 0.78 + tangent * frac * 0.95).normalized()
-				var dist := lerpf(4.0, (32.0 if heavy_impact else 24.0) + float(i % 3) * 6.0, pow(t, 0.62))
+				var sdir := (dir * 0.35 + tangent * frac * 1.3).normalized()
+				var dist := lerpf(4.0, (44.0 if heavy_impact else (32.0 if slot == 1 else 23.0)) + float(i % 3) * 6.0, pow(t, 0.62))
 				var p0 := (point + sdir * dist).round()
 				var tail := (7.0 if heavy_impact else 5.0) * inv + 2.0
 				var p1 := (p0 + sdir * tail).round()

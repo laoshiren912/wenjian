@@ -102,7 +102,7 @@ void fragment() {
 			float r_outer = base_r + 0.06 * lead_curve - 0.10 * (1.0 - s) * (1.0 - s);
 
 			// 凡剑窄利、御气适中、仙术饱满且加独立双层外轮廓
-			float base_thick = (combo_slot == 0) ? 0.18 : 0.21;
+			float base_thick = (combo_slot == 0) ? 0.15 : 0.25;
 			if (rank_stage == 1) {
 				base_thick += 0.04;
 			} else if (rank_stage == 2) {
@@ -135,7 +135,7 @@ void fragment() {
 			}
 
 			// 阶段 3（后期仙术成型）：主锋外侧独立霜青双层剑气轮廓
-			if (rank_stage == 2) {
+			if (rank_stage == 2 || combo_slot == 1) {
 				float gap = 0.045;
 				float rim_w = 0.036 * (0.22 + 0.78 * crescent);
 				float rim_lo = r_outer + gap;
@@ -245,6 +245,14 @@ void fragment() {
 		col_rim  = vec3(0.64, 0.96, 1.0);
 	}
 
+	if (combo_slot == 0) {
+		col_body = mix(col_body, vec3(0.85, 0.94, 1.0), 0.65);
+	} else if (combo_slot == 2) {
+		col_body = vec3(0.70, 0.48, 0.20);
+		col_tail = vec3(0.16, 0.11, 0.07);
+		col_rim = vec3(0.94, 0.72, 0.35);
+		col_core = vec3(1.0, 0.94, 0.77);
+	}
 	col_core = mix(col_core, vec3(1.0, 0.94, 0.80), block_recoil * 0.70);
 
 	vec3 final_rgb = mix(col_tail, col_body, clamp(trail_grad * 1.15, 0.0, 1.0));

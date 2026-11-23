@@ -104,12 +104,11 @@ func _trigger_combo_hitstop(duration: float, scale: float, allow_upgrade: bool =
 	hitstop_generation += 1
 	var generation := hitstop_generation
 	Engine.time_scale = scale
-	await get_tree().create_timer(duration, true, false, true).timeout
+	await get_tree().create_timer(duration, false, false, true).timeout
 	if generation == hitstop_generation:
 		_end_hitstop()
 
 func _third_impact(_point: Vector2) -> void:
-	_trigger_combo_shake(CONFIG.THIRD_SHAKE, CONFIG.THIRD_SHAKE_TIME)
 	_trigger_combo_hitstop(CONFIG.THIRD_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
 
 func _on_sword_cue(kind: String, point: Vector2) -> void:
@@ -135,25 +134,17 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 		"miss":
 			pass
 		"hit":
-			if sword.swing_bonus > 1.01:
-				if is_instance_valid(sword.slash_vfx):
-					sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.18)
-				feedback.trigger_camera_kick(dir, 7.8)
-				_trigger_combo_shake(3.4, 0.12)
-				_trigger_combo_hitstop(CONFIG.THIRD_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
-			if slot == 2:
-				if is_instance_valid(sword.slash_vfx):
-					sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.0)
-					sword.slash_vfx.notify_third_impact(point, rank, false)
-				feedback.trigger_camera_kick(dir, 7.2)
-			else:
-				feedback.trigger_camera_kick(dir, 4.6)
-				_trigger_combo_hitstop(CONFIG.LIGHT_HITSTOP, CONFIG.LIGHT_HITSTOP_SCALE, false, 65)
+			var slot_index := clampi(slot, 0, 2)
+			var kick_dir := (dir * 0.65 + Vector2.DOWN * 0.75).normalized() if slot == 2 else dir
+			feedback.trigger_camera_kick(kick_dir, CONFIG.COMBO_KICKS[slot_index])
+			_trigger_combo_hitstop(CONFIG.COMBO_HITSTOPS[slot_index], CONFIG.THIRD_HITSTOP_SCALE if slot == 2 else CONFIG.LIGHT_HITSTOP_SCALE, true)
+			if slot == 2 and is_instance_valid(sword.slash_vfx):
+				sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.0)
+				sword.slash_vfx.notify_third_impact(point, rank, false)
 		"blocked":
 			if is_instance_valid(sword.slash_vfx):
 				sword.slash_vfx.trigger_block_recoil()
 			feedback.trigger_camera_kick(-dir, 3.6)
-			_trigger_combo_shake(1.8, 0.08)
 		"guard_break":
 			if is_instance_valid(target):
 				var break_dur := CONFIG.HEAVY_BASE_BREAK
@@ -161,15 +152,9 @@ func _on_combo_event(kind: String, slot: int, point: Vector2, target: Node2D) ->
 			if is_instance_valid(sword.slash_vfx):
 				sword.slash_vfx.spawn_ground_effect(point, 1, rank, 1.24)
 				sword.slash_vfx.notify_third_impact(point, rank, true)
-			feedback.trigger_camera_kick(dir, 8.2)
-			_trigger_combo_shake(CONFIG.THIRD_SHAKE * 1.15, CONFIG.THIRD_SHAKE_TIME)
-			_trigger_combo_hitstop(CONFIG.GUARD_BREAK_HITSTOP, CONFIG.THIRD_HITSTOP_SCALE, true)
 		"kill":
 			if slot == 2 and is_instance_valid(sword.slash_vfx):
 				sword.slash_vfx.notify_third_impact(point, rank, true)
-			feedback.trigger_camera_kick(dir, 6.2)
-			_trigger_combo_shake(4.4 if slot == 2 else 3.0, 0.16 if slot == 2 else 0.12)
-			_trigger_combo_hitstop(0.046 if slot == 2 else 0.030, 0.15 if slot == 2 else 0.22)
 
 func _should_start_on_title() -> bool:
 	if skip_title_screen:
