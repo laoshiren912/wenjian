@@ -287,11 +287,12 @@ func show_start() -> void:
 		profession_layout.add_child(button)
 		profession_buttons.append(button)
 	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · 左键攻击 · Space 翻滚\n攻击动作期间站立；可翻滚脱离。Q/E 使用秘籍，可在翻滚中释放。\n翻滚耗 %.0f 体力；升级获得技能点，在 Tab 属性页修炼秘籍。" % [player.roll_stamina_cost], 16))
-	var gm_check := CheckBox.new()
-	gm_check.text = "GM 测试模式：锁血并获得 5000 金币（本局）"
-	gm_check.button_pressed = player.gm_invulnerable
-	gm_check.toggled.connect(func(enabled: bool): gm_toggle_requested.emit(enabled))
-	box.add_child(gm_check)
+	if preload("res://scripts/test_runtime.gd").enabled():
+		var gm_check := CheckBox.new()
+		gm_check.text = "GM 测试模式：锁血并获得 5000 金币（本局）"
+		gm_check.button_pressed = player.gm_invulnerable
+		gm_check.toggled.connect(func(enabled: bool): gm_toggle_requested.emit(enabled))
+		box.add_child(gm_check)
 	start_button = PrototypeUI.button("开始试炼  [Enter]", func(): start_requested.emit(), 48)
 	box.add_child(start_button)
 	select_profession(0)
@@ -322,13 +323,16 @@ func show_pause(gold: int = -1) -> void:
 	var box := _screen("已暂停", "战斗已暂停。" if gold < 0 else "战斗已暂停 · 金币 %d" % gold)
 	var controls := "左键刺击 · 右键射箭" if player.dual_attack_enabled else "左键攻击"
 	box.add_child(_modal_label("WASD 移动 · 鼠标瞄准 · %s · Space 翻滚\nQ/E 使用秘籍 · Tab 修炼秘籍 · Esc 继续战斗\n\n红色区域是攻击预警；紫色标记是远程怪。" % controls, 18))
-	box.add_child(PrototypeUI.button("GM 测试工具", func(): show_gm_panel(gold), 38))
+	if preload("res://scripts/test_runtime.gd").enabled():
+		box.add_child(PrototypeUI.button("GM 测试工具", func(): show_gm_panel(gold), 38))
 	var button := PrototypeUI.button("继续  [Esc]", func(): resume_requested.emit())
 	box.add_child(button)
 	box.add_child(PrototypeUI.button("重新开始", func(): restart_requested.emit()))
 	button.grab_focus()
 
 func show_gm_panel(gold: int) -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	var box := _screen("GM 测试工具", "当前金币 %d · 操作仅影响本局" % gold)
 	box.add_child(PrototypeUI.button("GM 模式：%s（锁血；首次开启送 5000 金币）" % ("开" if player.gm_invulnerable else "关"), func(): gm_toggle_requested.emit(not player.gm_invulnerable), 36))
 	if player.gm_invulnerable:

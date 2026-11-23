@@ -1,0 +1,15 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player_combo.tscn" id="1"]
+[ext_resource type="Script" path="res://scripts/v41_player.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/v41_sword.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/v41_pixel_visual.gd" id="4"]
+
+[node name="Player" instance=ExtResource("1")]
+script = ExtResource("2")
+
+[node name="Weapon" parent="." index="1"]
+script = ExtResource("3")
+
+[node name="VisualRoot" parent="." index="2"]
+script = ExtResource("4")

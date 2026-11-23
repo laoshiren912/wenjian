@@ -168,9 +168,12 @@ func _sweep(previous: float, current: float) -> void:
 	candidates.sort_custom(func(a, b): return a.global_position.distance_squared_to(player.global_position) < b.global_position.distance_squared_to(player.global_position))
 	hit_done = true
 	sword_hit_targets.append(candidates[0])
-	candidates[0].take_damage(float(data.damage) * player.damage_multiplier, swing_direction * (210.0 if stage == 2 else 115.0))
+	_deal_hit(candidates[0], float(data.damage) * player.damage_multiplier, swing_direction * (210.0 if stage == 2 else 115.0))
 	if stage == 2:
 		heavy_hit.emit()
+
+func _deal_hit(target: Node2D, damage: float, push: Vector2) -> void:
+	target.take_damage(damage, push)
 
 func _draw() -> void:
 	if swing_time <= 0.0:

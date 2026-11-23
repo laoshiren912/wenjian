@@ -1,0 +1,218 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: V4 remains available via explicit scene
+PASS: old entry loadable: main_v33
+PASS: old entry loadable: main_v32
+PASS: old entry loadable: main_v31
+PASS: old entry loadable: main
+PASS: old entry loadable: corridor_trial
+PASS: old entry loadable: trigger_room
+PASS: old entry loadable: combat_room
+PASS: old entry loadable: combat_sample
+PASS: entry starts room 1
+PASS: entry clears run state
+PASS: entry restores vitals
+PASS: entry restores combat baselines
+PASS: no early reward or exit
+PASS: cannot choose before reward
+PASS: combat blocks exit
+PASS: clear spawns reward
+PASS: distant reward does not auto-popup or allow exit
+PASS: outside 40-pixel reward radius does not open selection
+PASS: pause supported while waiting for reward
+PASS: proximity opens paused selection
+PASS: Esc/Tab cannot dismiss reward
+PASS: invalid choice cannot consume reward
+PASS: button available: 剑伤害
+PASS: GUI choice applied once and resumes
+PASS: reward click never queues attack
+PASS: duplicate choice ignored, reward removed, exit open
+PASS: sword +15 percent without shared bow multiplier
+PASS: real blade sweep deals boosted damage
+PASS: actual bow projectile retains 21 damage
+PASS: exit advances to second room
+PASS: room transition preserves health and stamina
+PASS: bonus preserved without re-multiplication
+PASS: transition clears projectile, queued input and cooldown
+PASS: second room has one ranged enemy
+PASS: health reward adds 20 to both current and max
+PASS: third room keeps vitals and rewards
+PASS: third room has four melee and one ranged
+PASS: roll reward reduces cooldown only
+PASS: actual roll uses rewarded cooldown
+PASS: terminal room wins without combat
+PASS: terminal has 12 kills, 3 rewards, no enemies/reward
+PASS: win Enter restart starts room 1
+PASS: win Enter restart clears run state
+PASS: win Enter restart restores vitals
+PASS: win Enter restart restores combat baselines
+PASS: repeat reward count 0/1
+PASS: sword stacks additively
+PASS: repeat reward count 0/2
+PASS: sword stacks additively
+PASS: repeat reward count 0/3
+PASS: sword stacks additively
+PASS: repeat reward route reaches terminal
+PASS: repeat reward count 1/1
+PASS: health repeat stays capped
+PASS: repeat reward count 1/2
+PASS: health repeat stays capped
+PASS: repeat reward count 1/3
+PASS: health repeat stays capped
+PASS: repeat reward route reaches terminal
+PASS: repeat reward count 2/1
+PASS: roll stacks multiplicatively
+PASS: repeat reward count 2/2
+PASS: roll stacks multiplicatively
+PASS: repeat reward count 2/3
+PASS: roll stacks multiplicatively
+PASS: repeat reward route reaches terminal
+PASS: death result in room 1
+PASS: death restart 0 starts room 1
+PASS: death restart 0 clears run state
+PASS: death restart 0 restores vitals
+PASS: death restart 0 restores combat baselines
+PASS: death result in room 2
+PASS: death restart 1 starts room 1
+PASS: death restart 1 clears run state
+PASS: death restart 1 restores vitals
+PASS: death restart 1 restores combat baselines
+PASS: death result in room 3
+PASS: button available: 重新开始
+PASS: death restart 2 starts room 1
+PASS: death restart 2 clears run state
+PASS: death restart 2 restores vitals
+PASS: death restart 2 restores combat baselines
+PASS: button available: 重新开始
+PASS: pause restart starts room 1
+PASS: pause restart clears run state
+PASS: pause restart restores vitals
+PASS: pause restart restores combat baselines
+PASS: V3.3 new instance untouched by V4 rewards
+PASS: 960_combat heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_combat heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_combat HUD fits
+PASS: 960_combat HUD fits
+PASS: 960_combat HUD fits
+PASS: 960_reward_marker heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_reward_marker heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_reward_marker HUD fits
+PASS: 960_reward_marker HUD fits
+PASS: 960_reward_marker HUD fits
+PASS: 960_reward heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_reward heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_reward HUD fits
+PASS: 960_reward HUD fits
+PASS: 960_reward HUD fits
+PASS: 960_reward modal fits
+PASS: 960_reward content fits: @VBoxContainer@509
+PASS: 960_reward content fits: @Label@510
+PASS: 960_reward content fits: @Label@511
+PASS: 960_reward content fits: @Label@512
+PASS: 960_reward content fits: @Button@513
+PASS: 960_reward content fits: @Button@514
+PASS: 960_reward content fits: @Button@515
+PASS: 960_reward content fits: @Label@516
+PASS: 960_stats heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_stats heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats modal fits
+PASS: 960_stats content fits: @VBoxContainer@518
+PASS: 960_stats content fits: @Label@519
+PASS: 960_stats content fits: @Label@520
+PASS: 960_stats content fits: @Label@521
+PASS: 960_stats content fits: @Label@522
+PASS: 960_stats content fits: @Label@523
+PASS: 960_stats content fits: @Label@524
+PASS: 960_stats content fits: @Label@525
+PASS: 960_stats content fits: @Button@526
+PASS: 960_death heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_death heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_death HUD fits
+PASS: 960_death HUD fits
+PASS: 960_death HUD fits
+PASS: 960_death modal fits
+PASS: 960_death content fits: @VBoxContainer@529
+PASS: 960_death content fits: @Label@530
+PASS: 960_death content fits: @Label@531
+PASS: 960_death content fits: @Label@532
+PASS: 960_death content fits: @Label@533
+PASS: 960_death content fits: @Button@534
+PASS: 960_win heading fits: [P: (262.0, 16.0), S: (436.0, 36.0)]
+PASS: 960_win heading fits: [P: (262.0, 55.0), S: (436.0, 20.0)]
+PASS: 960_win HUD fits
+PASS: 960_win HUD fits
+PASS: 960_win HUD fits
+PASS: 960_win modal fits
+PASS: 960_win content fits: @VBoxContainer@593
+PASS: 960_win content fits: @Label@594
+PASS: 960_win content fits: @Label@595
+PASS: 960_win content fits: @Label@596
+PASS: 960_win content fits: @Label@597
+PASS: 960_win content fits: @Button@598
+PASS: 1280_combat heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_combat heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_combat HUD fits
+PASS: 1280_combat HUD fits
+PASS: 1280_combat HUD fits
+PASS: 1280_reward_marker heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_reward_marker heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_reward_marker HUD fits
+PASS: 1280_reward_marker HUD fits
+PASS: 1280_reward_marker HUD fits
+PASS: 1280_reward heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_reward heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_reward HUD fits
+PASS: 1280_reward HUD fits
+PASS: 1280_reward HUD fits
+PASS: 1280_reward modal fits
+PASS: 1280_reward content fits: @VBoxContainer@607
+PASS: 1280_reward content fits: @Label@608
+PASS: 1280_reward content fits: @Label@609
+PASS: 1280_reward content fits: @Label@610
+PASS: 1280_reward content fits: @Button@611
+PASS: 1280_reward content fits: @Button@612
+PASS: 1280_reward content fits: @Button@613
+PASS: 1280_reward content fits: @Label@614
+PASS: 1280_stats heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_stats heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats modal fits
+PASS: 1280_stats content fits: @VBoxContainer@616
+PASS: 1280_stats content fits: @Label@617
+PASS: 1280_stats content fits: @Label@618
+PASS: 1280_stats content fits: @Label@619
+PASS: 1280_stats content fits: @Label@620
+PASS: 1280_stats content fits: @Label@621
+PASS: 1280_stats content fits: @Label@622
+PASS: 1280_stats content fits: @Label@623
+PASS: 1280_stats content fits: @Button@624
+PASS: 1280_death heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_death heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_death HUD fits
+PASS: 1280_death HUD fits
+PASS: 1280_death HUD fits
+PASS: 1280_death modal fits
+PASS: 1280_death content fits: @VBoxContainer@627
+PASS: 1280_death content fits: @Label@628
+PASS: 1280_death content fits: @Label@629
+PASS: 1280_death content fits: @Label@630
+PASS: 1280_death content fits: @Label@631
+PASS: 1280_death content fits: @Button@632
+PASS: 1280_win heading fits: [P: (262.0, 16.0), S: (756.0, 36.0)]
+PASS: 1280_win heading fits: [P: (262.0, 55.0), S: (756.0, 20.0)]
+PASS: 1280_win HUD fits
+PASS: 1280_win HUD fits
+PASS: 1280_win HUD fits
+PASS: 1280_win modal fits
+PASS: 1280_win content fits: @VBoxContainer@691
+PASS: 1280_win content fits: @Label@692
+PASS: 1280_win content fits: @Label@693
+PASS: 1280_win content fits: @Label@694
+PASS: 1280_win content fits: @Label@695
+PASS: 1280_win content fits: @Button@696
+V4 LOOP: 215 checks, 0 failures; controlled fixtures, not human play

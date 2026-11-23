@@ -1,0 +1,17 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS: 60 Hz press has no premature ordinary hit
+PASS: 60 Hz short release starts ordinary sword
+PASS: 60 Hz GUI long hold enters charge only
+PASS: 60 Hz charge remains mobile
+PASS: 60 Hz full charge remains held
+PASS: 60 Hz release fires charged sword without ordinary extra
+PASS: 60 Hz release does not repeat
+PASS: release locks event-time aim even if mouse moves before physics frame
+PASS: 60 Hz roll wins over simultaneous charge release
+PASS: 60 Hz cancelled charge does not create delayed ordinary hit
+PASS: 60 Hz pause cancels held charge
+PASS: 60 Hz release across pause cannot fire
+PASS: 60 Hz GUI press dragged into world never charges or attacks
+PASS: 60 Hz restart with held mouse cannot fire on release
+CHARGED LIVE: 14 checks, 0 failures; engine-dispatched input, not human playtest

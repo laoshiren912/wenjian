@@ -117,6 +117,8 @@ func select_profession(index: int) -> void:
 	hud.select_profession(index)
 
 func set_gm_mode(enabled: bool) -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if state != State.START and state != State.PAUSED:
 		return
 	player.gm_invulnerable = enabled
@@ -128,11 +130,15 @@ func set_gm_mode(enabled: bool) -> void:
 		hud.show_gm_panel(gold)
 
 func add_gm_gold() -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if state == State.PAUSED and player.gm_invulnerable:
 		gold += 1000
 		hud.show_gm_panel(gold)
 
 func gm_kill_floor() -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if state != State.PAUSED or not player.gm_invulnerable:
 		return
 	remaining = maxi(0, remaining - pending_wave.size())
@@ -143,6 +149,8 @@ func gm_kill_floor() -> void:
 	resume_run()
 
 func gm_select_floor(floor: int) -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if state != State.PAUSED or not player.gm_invulnerable or floor < 1 or floor > 4:
 		return
 	floor_number = floor
@@ -153,6 +161,8 @@ func gm_select_floor(floor: int) -> void:
 	hud.show_notice("GM 选关 · 第 %d 层" % floor)
 
 func _grant_gm_bonus() -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if not gm_bonus_granted:
 		gold += 5000
 		gm_bonus_granted = true

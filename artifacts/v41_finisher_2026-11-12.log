@@ -1,0 +1,59 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+CHECK three normal buffered clicks true
+CHECK third whiff never hitstops true
+CHECK configured full timing stage 1 true
+CHECK configured full timing stage 2 true
+CHECK configured full timing stage 3 true
+TIMING starts=[0.06666666666667, 0.4, 0.8] third_active_from_first=0.85 completion_from_first=1.18333333333333
+CHECK normal first front guard 32 x 25% true
+CHECK blue arc display extended without AI wait true
+CHECK block sparks emitted true
+CHECK blue block number labelled true
+CHECK block sound samples present true
+CHECK first hit has no finisher hitstop true
+CHECK full charge normal input full 95 front damage true
+CHECK charge clears guard true
+CHECK charge breaks into existing stun true
+CHECK charge does not gain third-only hitstop true
+CHECK charge emits shield shatter true
+CHECK third full break count=1 dir=(1.0, 0.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=1 dir=(1.0, 0.0) end=0.85 first=1.717 hits=[[1.85, 1, 32.0, false], [2.217, 2, 40.0, false], [2.6, 3, 60.0, false], [3.051, 1, 32.0, false]] third_minus_actual=0.067 marks={ "end": 3.34999999999999, "first": 4.21666666666666, "third": 5.09999999999999, "next_damage_due": 5.01999999999999, "next_actual": 5.03333333333332, "recovered": 5.41733333333332, "third_distance": 56.7329330444336, "push": 81.3333358764648 } player_damage=[[2.533, 12.0]]
+CHECK third full break count=1 dir=(0.0, 1.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=1 dir=(0.0, 1.0) end=0.85 first=1.7 hits=[[1.833, 1, 32.0, false], [2.2, 2, 40.0, false], [2.633, 3, 60.0, false], [3.034, 1, 32.0, false]] third_minus_actual=0.1 marks={ "end": 7.06733333333331, "first": 7.91733333333331, "third": 8.85066666666669, "next_damage_due": 8.73733333333331, "next_actual": 8.75066666666668, "recovered": 9.11800000000003, "third_distance": 65.8893508911133, "push": 81.3333206176758 } player_damage=[[2.533, 12.0]]
+CHECK third full break count=1 dir=(-1.0, 0.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=1 dir=(-1.0, 0.0) end=0.85 first=1.717 hits=[[1.85, 1, 32.0, false], [2.217, 2, 40.0, false], [2.6, 3, 60.0, false], [3.051, 1, 32.0, false]] third_minus_actual=0.067 marks={ "end": 10.8180000000001, "first": 11.6846666666668, "third": 12.5680000000002, "next_damage_due": 12.4880000000002, "next_actual": 12.5013333333335, "recovered": 12.8853333333336, "third_distance": 55.400218963623, "push": 81.3333282470703 } player_damage=[[2.533, 12.0]]
+CHECK third full break count=1 dir=(0.0, -1.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=1 dir=(0.0, -1.0) end=0.85 first=1.7 hits=[[1.833, 1, 32.0, false], [2.2, 2, 40.0, false], [2.683, 3, 60.0, false], [3.034, 1, 32.0, false]] third_minus_actual=0.15 marks={ "end": 14.5353333333336, "first": 15.3853333333337, "third": 16.368666666667, "next_damage_due": 16.2053333333337, "next_actual": 16.218666666667, "recovered": 16.5860000000003, "third_distance": 77.1559753417969, "push": 81.3333282470703 } player_damage=[[2.533, 12.0]]
+CHECK third full break count=2 dir=(1.0, 0.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=2 dir=(1.0, 0.0) end=0.85 first=1.75 hits=[[1.883, 1, 32.0, false], [2.25, 2, 40.0, false], [2.633, 3, 60.0, false], [3.084, 1, 32.0, false]] third_minus_actual=0.05 marks={ "end": 18.3360000000002, "first": 19.2360000000002, "third": 20.1193333333335, "next_damage_due": 20.0560000000002, "next_actual": 20.0693333333335, "recovered": 20.4366666666668, "third_distance": 52.3482246398926, "push": 81.3333358764648 } player_damage=[[2.583, 12.0]]
+CHECK third full break count=2 dir=(0.0, 1.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=2 dir=(0.0, 1.0) end=0.85 first=1.75 hits=[[1.883, 1, 32.0, false], [2.25, 2, 40.0, false], [2.683, 3, 60.0, false], [3.084, 1, 32.0, false]] third_minus_actual=0.1 marks={ "end": 22.0866666666667, "first": 22.9866666666666, "third": 23.9199999999999, "next_damage_due": 23.8066666666666, "next_actual": 23.8199999999999, "recovered": 24.1873333333332, "third_distance": 65.0405120849609, "push": 81.3333282470703 } player_damage=[[2.583, 12.0]]
+CHECK third full break count=2 dir=(-1.0, 0.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=2 dir=(-1.0, 0.0) end=0.85 first=1.767 hits=[[1.9, 1, 32.0, false], [2.267, 2, 40.0, false], [2.65, 3, 60.0, false], [3.101, 1, 32.0, false]] third_minus_actual=0.067 marks={ "end": 25.8873333333331, "first": 26.8039999999997, "third": 27.687333333333, "next_damage_due": 27.6073333333331, "next_actual": 27.6206666666664, "recovered": 28.0046666666663, "third_distance": 56.561954498291, "push": 81.3333282470703 } player_damage=[[2.583, 12.0]]
+CHECK third full break count=2 dir=(0.0, -1.0) true
+CHECK third damage remains 60 true
+CHECK third actual hit starts hitstop true
+COUNTER count=2 dir=(0.0, -1.0) end=0.85 first=1.75 hits=[[1.883, 1, 32.0, false], [2.25, 2, 40.0, false], [2.733, 3, 60.0, false], [3.084, 1, 32.0, false]] third_minus_actual=0.15 marks={ "end": 29.6546666666662, "first": 30.5546666666662, "third": 31.5379999999995, "next_damage_due": 31.3746666666662, "next_actual": 31.3879999999995, "recovered": 31.7553333333328, "third_distance": 76.4648361206055, "push": 81.3333282470703 } player_damage=[[2.583, 12.0]]
+CHECK overhead display/collision (1.0, 0.0) true
+CHECK overhead display/collision (0.0, 1.0) true
+CHECK overhead display/collision (-1.0, 0.0) true
+CHECK overhead display/collision (0.0, -1.0) true
+CHECK hitstop restores speed true
+FINISHER_RESULT checks=45 failures=0
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

@@ -1,0 +1,204 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 - Build 32.0.101.7092 - Compatibility - Using Device: Intel - Intel(R) UHD Graphics 730
+
+PASS: F5 uses integrated V4.1
+PASS: room1: four spawned melee, two real pairs
+PASS: approved courtyard texture and two collidable lanterns
+PASS: F5 uses orbit sword with rewards
+PASS: seeded draws vary and can offer all four rewards
+PASS: configured point reachable: (740.0, 360.0)
+PASS: configured point reachable: (815.0, 390.0)
+PASS: configured point reachable: (690.0, 305.0)
+PASS: configured point reachable: (900.0, 355.0)
+PASS: configured point reachable: (680.0, 490.0)
+PASS: configured point reachable: (535.0, 365.0)
+PASS: configured point reachable: (340.0, 370.0)
+PASS: configured point reachable: (640.0, 420.0)
+PASS: configured point reachable: (960.0, 370.0)
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: spawn enables encounter mechanics and configured stats
+PASS: REAL F5 defender: front 35 percent and active blue-arc state
+PASS: REAL F5 defender: back full damage
+PASS: guard HUD fits
+PASS: guard HUD fits
+PASS: guard HUD fits
+PASS: guard screenshot saved
+PASS: real physics: only selected pair attacks, multiple attack rounds occur
+PASS: real physics: pair 0 -> pair 1 -> pair 0, not a mere cap
+PASS: real physics: non-active pair moves aside
+PASS: configurable pair size changes permission, not just number cap
+PASS: unreachable/unstarted turn times out instead of stalling queue
+PASS: finished recovery hands off immediately without artificial delay
+PASS: dead active member immediately releases turn
+PASS: full room clear required before reward
+PASS: real reward point opens selection
+PASS: three random options are distinct
+PASS: room2 starts only wave1 of six total
+PASS: vitals preserved; only normal stamina regeneration after entry
+PASS: room2 scales both health and damage
+PASS: room2 scales both health and damage
+PASS: room2 scales both health and damage
+PASS: REAL F5 spawned ranger physically retreats at close range
+PASS: ranged_retreat HUD fits
+PASS: ranged_retreat HUD fits
+PASS: ranged_retreat HUD fits
+PASS: ranged_retreat screenshot saved
+PASS: second wave only after first clear, no early reward
+PASS: real reward point opens selection
+PASS: three random options are distinct
+PASS: room3 starts first four of eight
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: room3 health scale
+PASS: third room second wave includes one fast thrust and odd singleton turn
+PASS: real reward point opens selection
+PASS: three random options are distinct
+PASS: three rooms finish at terminal with eighteen kills
+PASS: win restart clears full run
+PASS: real mixed melee/ranged wave respects total configurable cap3
+PASS: short hold does not attack on press
+PASS: short release attacks first stage
+PASS: short release buffers second stage
+PASS: short release buffers third stage
+PASS: 0.22 threshold starts charge without extra ordinary hit
+PASS: 0.60 more seconds reaches full charge without auto release
+PASS: release starts exactly one charged attack
+PASS: real Space cancels charging only on successful roll
+PASS: release after cancelled charge never produces delayed attack
+PASS: successful roll arms reward while rolling does not consume it
+PASS: ordinary short-release attack consumes roll reward even on miss
+PASS: roll multiplier is not reused for second ordinary attack
+PASS: focus loss clears hold and release cannot attack
+PASS: +30 percent applies to ordinary and charged base, without shared bow multiplier
+PASS: roll arms one empowered sword
+PASS: charge release consumes roll bonus once
+PASS: actual charged orbit hit combines 95 x 1.3 x 2
+PASS: third-stage reward never boosts charged knockback
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: charged multi-target deals exactly one 95 hit per spawned enemy
+PASS: guard interaction: charged block / ordinary third break = false
+PASS: correct charged vs third knockback
+PASS: guard interaction: charged block / ordinary third break = true
+PASS: correct charged vs third knockback
+PASS: stacked kill heal capped at max health
+PASS: real damage enters death result
+PASS: death R resets run and rewards
+PASS: already unlocked unique reward is visibly disabled
+PASS: disabled unique reward cannot be selected through code
+PASS: real reward button applies once without ordinary or charged attack
+PASS: room transition preserves unlock but clears armed multiplier and held charge
+PASS: imported sample runs: courtyard_trial
+PASS: imported sample runs: sword_motion_trial
+PASS: imported sample runs: sword_motion_combat
+PASS: 960_courtyard HUD fits
+PASS: 960_courtyard HUD fits
+PASS: 960_courtyard HUD fits
+PASS: 960_courtyard screenshot saved
+PASS: 960_close HUD fits
+PASS: 960_close HUD fits
+PASS: 960_close HUD fits
+PASS: 960_close screenshot saved
+PASS: 960_charge HUD fits
+PASS: 960_charge HUD fits
+PASS: 960_charge HUD fits
+PASS: 960_charge screenshot saved
+PASS: 960_pause HUD fits
+PASS: 960_pause HUD fits
+PASS: 960_pause HUD fits
+PASS: 960_pause modal fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause text/button fits
+PASS: 960_pause screenshot saved
+PASS: pause clears charge gesture
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats HUD fits
+PASS: 960_stats modal fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats text/button fits
+PASS: 960_stats screenshot saved
+PASS: 960_rewards HUD fits
+PASS: 960_rewards HUD fits
+PASS: 960_rewards HUD fits
+PASS: 960_rewards modal fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards text/button fits
+PASS: 960_rewards screenshot saved
+PASS: 1280_courtyard HUD fits
+PASS: 1280_courtyard HUD fits
+PASS: 1280_courtyard HUD fits
+PASS: 1280_courtyard screenshot saved
+PASS: 1280_close HUD fits
+PASS: 1280_close HUD fits
+PASS: 1280_close HUD fits
+PASS: 1280_close screenshot saved
+PASS: 1280_charge HUD fits
+PASS: 1280_charge HUD fits
+PASS: 1280_charge HUD fits
+PASS: 1280_charge screenshot saved
+PASS: 1280_pause HUD fits
+PASS: 1280_pause HUD fits
+PASS: 1280_pause HUD fits
+PASS: 1280_pause modal fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause text/button fits
+PASS: 1280_pause screenshot saved
+PASS: pause clears charge gesture
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats HUD fits
+PASS: 1280_stats modal fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats text/button fits
+PASS: 1280_stats screenshot saved
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards HUD fits
+PASS: 1280_rewards modal fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards text/button fits
+PASS: 1280_rewards screenshot saved
+V41 FLOW: 200 checks, 0 failures; real-scene controlled tests, not human play

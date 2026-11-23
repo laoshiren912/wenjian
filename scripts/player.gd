@@ -96,6 +96,9 @@ var _ranged_pending: bool = false
 @onready var camera: Camera2D = $Camera2D
 @onready var visual: ActorVisual = $VisualRoot
 
+func _uses_charge() -> bool:
+	return combo_enabled and is_instance_valid(combo) and combo.has_method("press_primary")
+
 func _ready() -> void:
 	if combo_enabled:
 		combo = weapon
@@ -137,7 +140,7 @@ func _on_attack_started(index: int, direction: Vector2) -> void:
 			return
 	visual.play_attack(index, direction, weapon.swing_duration)
 	if combo_enabled and index == 0:
-		visual.set_combo_pose(combo.stage, combo.current_data())
+		visual.set_combo_pose(0 if _uses_charge() and combo.charged_swing else combo.stage, combo.current_data())
 
 func consume_momentum() -> float:
 	if momentum_ready > 0.0:
@@ -197,6 +200,11 @@ func is_bow_recovering() -> bool:
 	return weapon.selected == 2 and _bow_shot_remaining > 0.0 and not is_rolling()
 
 func movement_multiplier() -> float:
+	if _uses_charge():
+		if combo.charging:
+			return combo.charge_move_multiplier
+		if combo.charged_swing and weapon.swing_time > 0.0:
+			return combo.release_move_multiplier
 	return 0.0 if weapon.swing_time > 0.0 or (is_instance_valid(ranged_weapon) and ranged_weapon.swing_time > 0.0) else 1.0
 
 func _on_weapon_selected(_index: int) -> void:
@@ -239,6 +247,13 @@ func _finish_roll() -> void:
 	_roll_remaining = 0.0
 	weapon.show()
 	visual.stop_roll()
+
+func _tick_ranged_attack(_delta: float, rolling: bool) -> void:
+	if dual_attack_enabled and not rolling and weapon.swing_time <= 0.0 and (not _uses_charge() or not combo.bow_blocked()) and (_ranged_pending or (_ranged_held and Input.is_action_pressed("ranged_attack"))):
+		ranged_weapon.attack(aim_direction)
+
+func _ranged_recoil_velocity() -> Vector2:
+	return Vector2.ZERO
 
 func _physics_process(delta: float) -> void:
 	if dead:
@@ -284,8 +299,7 @@ func _physics_process(delta: float) -> void:
 		if weapon.attack(attack_direction):
 			_target_marker = _click_target if weapon.selected != 0 and _attack_pending and is_instance_valid(_click_target) and not _click_target.dead else null
 			_target_marker_remaining = 0.65 if is_instance_valid(_target_marker) else 0.0
-	if dual_attack_enabled and not rolling_this_frame and weapon.swing_time <= 0.0 and (_ranged_pending or (_ranged_held and Input.is_action_pressed("ranged_attack"))):
-		ranged_weapon.attack(aim_direction)
+	_tick_ranged_attack(delta, rolling_this_frame)
 	_ranged_pending = false
 	if not rolling_this_frame:
 		_attack_pending = false
@@ -295,7 +309,7 @@ func _physics_process(delta: float) -> void:
 		var step: float = minf(delta, _roll_remaining)
 		velocity = _roll_direction * (roll_distance / maxf(0.001, roll_duration)) * (step / delta) + knockback
 	else:
-		velocity = movement * speed * movement_multiplier() + knockback
+		velocity = movement * speed * movement_multiplier() + knockback + _ranged_recoil_velocity()
 		if combo_enabled:
 			velocity += combo.lunge_velocity(delta)
 	knockback = knockback.move_toward(Vector2.ZERO, 650.0 * delta)
@@ -305,21 +319,29 @@ func _physics_process(delta: float) -> void:
 		color = Color("ffffff") if fmod(invulnerability, 0.16) > 0.08 else Color("e88385")
 	if not rolling_this_frame and not movement.is_zero_approx():
 		_movement_facing = Vector2(signf(movement.x), 0) if absf(movement.x) > absf(movement.y) else Vector2(0, signf(movement.y))
-	var body_look: Vector2 = visual.facing
-	if weapon.swing_time > 0.0:
-		body_look = weapon.swing_direction
-	elif is_instance_valid(ranged_weapon) and ranged_weapon.swing_time > 0.0:
-		body_look = ranged_weapon.swing_direction
-	elif not movement.is_zero_approx():
-		body_look = movement
-	if rolling_this_frame:
-		body_look = _roll_direction
+	var body_look := _body_look(movement, rolling_this_frame)
+	if _uses_charge():
+		visual.charge_aim = aim_direction if combo.charging else Vector2.ZERO
 	visual.update_pose(get_real_velocity(), body_look, color, body_look)
 	if rolling_this_frame:
 		_roll_remaining = maxf(0.0, _roll_remaining - delta)
 		if not is_rolling():
 			_finish_roll()
 	queue_redraw()
+
+func _body_look(movement: Vector2, rolling_this_frame: bool) -> Vector2:
+	var body_look: Vector2 = visual.facing
+	if weapon.swing_time > 0.0:
+		body_look = weapon.swing_direction
+	elif is_instance_valid(ranged_weapon) and ranged_weapon.swing_time > 0.0:
+		body_look = ranged_weapon.swing_direction
+	elif _uses_charge() and combo.charging:
+		body_look = aim_direction
+	elif not movement.is_zero_approx():
+		body_look = movement
+	if rolling_this_frame:
+		body_look = _roll_direction
+	return body_look
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
@@ -328,6 +350,16 @@ func _input(event: InputEvent) -> void:
 	# Releases must clear the gesture even when a GUI control consumes them later.
 	if event.is_action_released("attack"):
 		_attack_held = false
+		if _uses_charge():
+			if event is InputEventMouseButton:
+				_aim_viewport_position = event.position
+				_has_aim_event = true
+				var release_world: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * event.position
+				var release_aim := release_world - global_position
+				combo.release_direction = release_aim.normalized() if release_aim.length_squared() > 1.0 else aim_direction
+			else:
+				combo.release_direction = aim_direction
+			combo.release_pending = combo.gesture_held
 	if dual_attack_enabled and event.is_action_released("ranged_attack"):
 		_ranged_held = false
 
@@ -340,8 +372,11 @@ func _notification(what: int) -> void:
 		_attack_pending = false
 		_click_target = null
 		_roll_requested = false
-		_ranged_held = false
-		_ranged_pending = false
+		_clear_ranged_input()
+
+func _clear_ranged_input() -> void:
+	_ranged_held = false
+	_ranged_pending = false
 
 func _target_at_click(world_position: Vector2) -> Node2D:
 	var best: Node2D = null
@@ -361,7 +396,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton:
 			_aim_viewport_position = event.position
 			_has_aim_event = true
-		combo.queue_click()
+		if _uses_charge():
+			if combo.release_pending:
+				combo.release_primary()
+			combo.press_primary()
+		else:
+			combo.queue_click()
 		get_viewport().set_input_as_handled()
 		return
 	if combo_enabled and event.is_action_pressed("roll"):
@@ -406,7 +446,7 @@ func spend_stamina(amount: float) -> bool:
 	return true
 
 func take_damage(amount: float, direction: Vector2) -> bool:
-	if dead or gm_invulnerable or invulnerability > 0.0:
+	if dead or (gm_invulnerable and preload("res://scripts/test_runtime.gd").enabled()) or invulnerability > 0.0:
 		return false
 	var actual_damage: float = minf(health, amount * (1.0 - damage_reduction))
 	health = maxf(0.0, health - actual_damage)

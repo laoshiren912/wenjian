@@ -9,12 +9,19 @@ var motion: Vector2 = Vector2.ZERO
 var tint := Color("79e2d0")
 var walk_phase: float = 0.0
 var hurt_time: float = 0.0
+var hurt_flash_lock := 0.0
 var attack_time: float = 0.0
 var attack_duration: float = 0.18
 var attack_weapon: int = 0
 var attack_direction: Vector2 = Vector2.RIGHT
 var combo_stage := -1
 var combo_data: Dictionary = {}
+var charge_aim := Vector2.ZERO
+var sword_pose: Dictionary = {}
+var bow_aim := Vector2.ZERO
+var bow_pull := 0.0
+var bow_release := 0.0
+var bow_step := 0.0
 var dying: bool = false
 var death_age: float = 0.0
 var roll_time: float = 0.0
@@ -46,7 +53,9 @@ func play_attack(index: int, direction: Vector2, duration: float) -> void:
 
 func cancel_attack() -> void:
 	attack_time = 0.0
+	charge_aim = Vector2.ZERO
 	combo_stage = -1
+	sword_pose = {}
 	queue_redraw()
 
 func set_combo_pose(stage: int, data: Dictionary) -> void:
@@ -70,6 +79,13 @@ func play_hurt() -> void:
 	hurt_time = 0.14
 	queue_redraw()
 
+func start_limited_hurt_flash(interval: float, duration: float) -> void:
+	if hurt_flash_lock > 0.00001:
+		return
+	hurt_flash_lock = interval
+	hurt_time = duration
+	queue_redraw()
+
 func detach_and_die(world_parent: Node) -> void:
 	# The enemy is still freed immediately; only this non-physical child survives briefly.
 	reparent(world_parent, true)
@@ -82,6 +98,7 @@ func detach_and_die(world_parent: Node) -> void:
 	queue_redraw()
 
 func _physics_process(delta: float) -> void:
+	hurt_flash_lock = maxf(0.0, hurt_flash_lock - delta)
 	if dying:
 		death_age += delta
 		var progress: float = clampf(death_age / DEATH_DURATION, 0.0, 1.0)
@@ -107,6 +124,10 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	var drawing_bow := not bow_aim.is_zero_approx() and not dying and roll_time <= 0.0
+	if drawing_bow or (not sword_pose.is_empty() and not dying and roll_time <= 0.0):
+		_draw_armed_actor(drawing_bow)
+		return
 	var moving: bool = motion.length_squared() >= 1.0 and not dying and roll_time <= 0.0
 	if roll_time > 0.0:
 		draw_arc(Vector2.ZERO, 24.0, -1.8, 1.8, 24, Color(0.55, 0.92, 0.86, 0.5), 2.0, true)
@@ -148,6 +169,9 @@ func _draw() -> void:
 			if combo_stage == 2:
 				right_hand = attack_direction * 18.0 + Vector2(0, lerpf(-28.0, 5.0, progress))
 				left_hand = right_hand - attack_direction * 6.0
+	if not charge_aim.is_zero_approx():
+		right_hand = charge_aim * 13.0 + Vector2(0, -20)
+		left_hand = right_hand - charge_aim * 6.0
 	draw_line(Vector2(-7, -1) + offset, left_hand, outline, 5.0, true)
 	draw_line(Vector2(7, -1) + offset, right_hand, outline, 5.0, true)
 	draw_circle(left_hand, 2.5, color.lightened(0.2))
@@ -176,3 +200,71 @@ func _draw() -> void:
 	else:
 		draw_circle(head + Vector2(facing.x * 3, 0), 1.2, outline)
 		draw_line(head + Vector2(facing.x * 4, 2), head + Vector2(facing.x * 7, 2), color.lightened(0.3), 2.0, true)
+
+
+func _draw_bow(right_hand: Vector2, left_hand: Vector2) -> void:
+	var side := bow_aim.orthogonal() * 13.0
+	var limb_base := right_hand - bow_aim * lerpf(7.0, 11.0, bow_pull)
+	var upper := limb_base - side
+	var lower := limb_base + side
+	draw_polyline(PackedVector2Array([upper, right_hand - side * 0.55, right_hand,
+		right_hand + side * 0.55, lower]), Color("e3ad62"), 3.0, true)
+	var string_center := left_hand if bow_release <= 0.0 and bow_step <= 0.0 else limb_base
+	draw_polyline(PackedVector2Array([upper, string_center, lower]), Color("fff1cf"), 1.5, true)
+	if bow_pull > 0.0:
+		draw_line(left_hand, right_hand + bow_aim * 9.0, Color("fff1cf"), 2.0, true)
+
+func _draw_armed_actor(drawing_bow: bool) -> void:
+	var body: Vector2 = bow_aim if drawing_bow else sword_pose.torso
+	var side := body.orthogonal()
+	var lean: Vector2 = -bow_aim * (5.0 * sin(PI * bow_step)) if drawing_bow else sword_pose.lean
+	var center := lean + Vector2(0, -2)
+	var color := Color.WHITE if hurt_time > 0.0 else tint
+	var dark := Color("203c43")
+	var step := sin(walk_phase) * 4.0 if motion.length_squared() > 1.0 else 0.0
+	draw_set_transform(Vector2(0, 12), 0.0, Vector2(1.0, 0.35))
+	draw_circle(Vector2.ZERO, 18.0, Color(0, 0, 0, 0.3))
+	draw_set_transform(Vector2.ZERO)
+	for foot in [-1.0, 1.0]:
+		var ankle: Vector2 = side * foot * 6.0 + Vector2(0, 14) + leg_facing * step * foot
+		if drawing_bow and (bow_release > 0.0 or bow_step > 0.0):
+			var stride := 14.0 * sin(PI * smoothstep(0.0, 0.78, bow_step)) if foot > 0.0 else -10.0 * sin(PI * smoothstep(0.32, 1.0, bow_step))
+			ankle = side * foot * 6.0 + Vector2(0, 14) - body * (3.0 + stride)
+		draw_line(center + side * foot * 4.0, ankle, dark, 6.0, true)
+		draw_line(ankle - body * 2.0, ankle + body * 4.0, Color("77958c"), 4.0, true)
+	var grip: Vector2 = center + bow_aim * lerpf(21.0, 27.0, maxf(bow_pull, bow_release)) if drawing_bow else sword_pose.grip
+	var rear: bool = not drawing_bow and sword_pose.get("rear", grip.y < -3.0)
+	if rear:
+		_draw_sword_arms(center, side, grip, color)
+	# Shoulders and lapels turn continuously around the waist with the sword.
+	var robe := PackedVector2Array([center + side * 11.0 + body * 2.0, center + side * 8.0 - body * 9.0, center - side * 8.0 - body * 9.0, center - side * 11.0 + body * 2.0, center - side * 7.0 + body * 10.0, center + side * 7.0 + body * 10.0])
+	draw_colored_polygon(robe, dark)
+	draw_colored_polygon(PackedVector2Array([center + side * 8.0, center + side * 6.0 - body * 7.0, center - side * 6.0 - body * 7.0, center - side * 8.0, center - side * 5.0 + body * 8.0, center + side * 5.0 + body * 8.0]), color)
+	draw_line(center - side * 7.0 + body * 3.0, center + side * 7.0 + body * 3.0, Color("e3c98e"), 3.0, true)
+	draw_line(center - side * 4.0 - body * 5.0, center + body * 3.0, color.lightened(0.4), 1.5, true)
+	var head := lean * 0.5 + Vector2(0, -13)
+	draw_circle(head, 7.5, dark)
+	draw_circle(head, 5.8, Color("e0c7a6") if hurt_time <= 0.0 else Color.WHITE)
+	draw_arc(head, 6.0, PI, TAU, 12, Color("283c42"), 4.5, true)
+	draw_circle(head + Vector2(0, -8), 3.0, Color("233a40"))
+	draw_line(head + Vector2(-3, -8), head + Vector2(4, -8), Color("e0c58c"), 1.5, true)
+	if drawing_bow:
+		var string_hand := grip - bow_aim * (lerpf(5.0, 37.0, bow_pull) + 24.0 * bow_release)
+		_draw_armed_hands(center, side, grip, string_hand, color)
+		_draw_bow(grip, string_hand)
+	elif not rear:
+		_draw_sword_arms(center, side, grip, color)
+
+func _draw_sword_arms(center: Vector2, side: Vector2, grip: Vector2, color: Color) -> void:
+	var blade: Vector2 = (sword_pose.tip - grip).normalized()
+	var left := grip - blade * 7.0 if sword_pose.support else center - side * 14.0 - blade * 4.0
+	_draw_armed_hands(center, side, grip, left, color)
+
+func _draw_armed_hands(center: Vector2, side: Vector2, grip: Vector2, left: Vector2, color: Color) -> void:
+	for pair in [[center + side * 8.0, grip], [center - side * 8.0, left]]:
+		var shoulder: Vector2 = pair[0]
+		var hand: Vector2 = pair[1]
+		var elbow := shoulder.lerp(hand, 0.5) + (hand - shoulder).orthogonal().normalized() * 4.0
+		draw_polyline(PackedVector2Array([shoulder, elbow, hand]), Color("203c43"), 6.0, true)
+		draw_polyline(PackedVector2Array([shoulder, elbow, hand]), color.darkened(0.1), 3.5, true)
+		draw_circle(hand, 2.7, Color("e0c7a6"))
