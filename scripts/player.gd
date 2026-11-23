@@ -446,7 +446,7 @@ func spend_stamina(amount: float) -> bool:
 	return true
 
 func take_damage(amount: float, direction: Vector2) -> bool:
-	if dead or gm_invulnerable or invulnerability > 0.0:
+	if dead or (gm_invulnerable and preload("res://scripts/test_runtime.gd").enabled()) or invulnerability > 0.0:
 		return false
 	var actual_damage: float = minf(health, amount * (1.0 - damage_reduction))
 	health = maxf(0.0, health - actual_damage)

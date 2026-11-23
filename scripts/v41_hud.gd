@@ -1268,6 +1268,8 @@ func _layout_reward_screen() -> void:
 	modal_panel.custom_minimum_size.x = minf(card_w * 3.0 + sep * 2.0 + 32.0, sz.x - 32.0)
 
 func show_card_debug() -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	var panel := _screen("GM 调试 · `", "仅调试运行有效；滚动查看全部功能")
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(680, 0)
@@ -1348,10 +1350,11 @@ func show_pause(_gold: int = -1) -> void:
 		tools_row.add_child(mute_btn)
 	box.add_child(tools_row)
 	_add_button(box, "重新开始", func(): restart_requested.emit())
-	_add_button(box, "庭院 / 镜头独立样板（结束本局）", func(): _open_sample("courtyard_trial"))
-	_add_button(box, "挥剑慢动作样板（结束本局）", func(): _open_sample("sword_motion_trial"))
+
 
 func _open_sample(scene: String) -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	get_tree().paused = false
 	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file("res://scenes/" + scene + ".tscn")

@@ -2,6 +2,8 @@ extends "res://scripts/charged_hud.gd"
 
 func _ready() -> void:
 	super._ready()
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	var center := CenterContainer.new()
 	root.add_child(center)
 	root.move_child(center, 0)

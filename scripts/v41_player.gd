@@ -482,7 +482,7 @@ func movement_multiplier() -> float:
 	return super.movement_multiplier()
 
 func spend_stamina(amount: float) -> bool:
-	if OS.is_debug_build() and gm_infinite_stamina:
+	if preload("res://scripts/test_runtime.gd").enabled() and gm_infinite_stamina:
 		return true
 	if not super.spend_stamina(amount):
 		return false

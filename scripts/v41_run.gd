@@ -295,8 +295,8 @@ func _enter_room(returning_to_room_one := false, enter_title: bool = false, retr
 	phase = "title" if enter_title else "combat"
 	player = _create_player()
 	gm_spawned.clear()
-	player.gm_invulnerable = OS.is_debug_build() and gm_invincible
-	player.gm_infinite_stamina = OS.is_debug_build() and gm_infinite_stamina
+	player.gm_invulnerable = preload("res://scripts/test_runtime.gd").enabled() and gm_invincible
+	player.gm_infinite_stamina = preload("res://scripts/test_runtime.gd").enabled() and gm_infinite_stamina
 	player.input_locked = enter_title
 	if enter_title and room_index == 0:
 		player.position = Vector2(640, 545)
@@ -747,31 +747,11 @@ func _input(event: InputEvent) -> void:
 				retry_current_room()
 				get_viewport().set_input_as_handled()
 		return
-	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_QUOTELEFT:
-		_debug_menu()
-		get_viewport().set_input_as_handled()
-		return
-	if event is InputEventKey and event.pressed and not event.echo and not get_tree().paused and phase in ["combat", "exit_ready"]:
-		var code: int = event.keycode if event.keycode != 0 else event.physical_keycode
-		if code in [KEY_1, KEY_KP_1]:
-			_quick_set_cultivation(0)
-			get_viewport().set_input_as_handled()
-			return
-		elif code in [KEY_2, KEY_KP_2]:
-			_quick_set_cultivation(1)
-			get_viewport().set_input_as_handled()
-			return
-		elif code in [KEY_3, KEY_KP_3]:
-			_quick_set_cultivation(2)
-			get_viewport().set_input_as_handled()
-			return
-		elif code in [KEY_0, KEY_KP_0]:
-			_quick_set_cultivation(-1)
-			get_viewport().set_input_as_handled()
-			return
 	super._input(event)
 
 func _quick_set_cultivation(rank: int) -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	if not is_instance_valid(player) or player.dead:
 		return
 	cultivation_override = clampi(rank, -1, CONFIG.CULTIVATION_NAMES.size() - 1)
@@ -810,29 +790,29 @@ func select_reward(index: int) -> void:
 	_update_status()
 
 func _debug_menu() -> void:
-	if not OS.is_debug_build():
+	if not preload("res://scripts/test_runtime.gd").enabled():
 		return
 	get_tree().paused = true
 	hud.show_card_debug()
 
 func debug_toggle_invincible() -> void:
-	if not OS.is_debug_build(): return
+	if not preload("res://scripts/test_runtime.gd").enabled(): return
 	gm_invincible = not gm_invincible
 	player.gm_invulnerable = gm_invincible
 	hud.show_card_debug()
 
 func debug_toggle_stamina() -> void:
-	if not OS.is_debug_build(): return
+	if not preload("res://scripts/test_runtime.gd").enabled(): return
 	gm_infinite_stamina = not gm_infinite_stamina
 	player.gm_infinite_stamina = gm_infinite_stamina
 	hud.show_card_debug()
 
 func debug_fill_stamina() -> void:
-	if not OS.is_debug_build(): return
+	if not preload("res://scripts/test_runtime.gd").enabled(): return
 	player.stamina = player.max_stamina
 
 func debug_jump(index: int) -> void:
-	if not OS.is_debug_build() or index < 0 or index >= CONFIG.RUN_ROOMS: return
+	if not preload("res://scripts/test_runtime.gd").enabled() or index < 0 or index >= CONFIG.RUN_ROOMS: return
 	var returning_to_room_one := room_index == 1 and index == 0
 	room_index = index
 	_enter_room(returning_to_room_one)
@@ -840,7 +820,7 @@ func debug_jump(index: int) -> void:
 	hud.show_card_debug()
 
 func debug_spawn(kind: int, count: int) -> void:
-	if not OS.is_debug_build() or kind < 0 or kind > 3: return
+	if not preload("res://scripts/test_runtime.gd").enabled() or kind < 0 or kind > 3: return
 	var spawn_count := clampi(count, 1, 20)
 	var use_walkable_spawns := room_index == 0 or room_index >= 3
 	var available: Array[Vector2] = []
@@ -896,20 +876,20 @@ func debug_spawn(kind: int, count: int) -> void:
 					enemy.pair_scheduler = scheduler
 
 func debug_clear_enemies() -> void:
-	if not OS.is_debug_build(): return
+	if not preload("res://scripts/test_runtime.gd").enabled(): return
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(enemy) or enemy.dead: continue
 		enemy.take_damage(enemy.health * 4.0 + 1.0, Vector2.ZERO, true)
 
 func debug_grant(index: int) -> void:
-	if not OS.is_debug_build() or not CARD_POOL.eligible(index, reward_counts, 2):
+	if not preload("res://scripts/test_runtime.gd").enabled() or not CARD_POOL.eligible(index, reward_counts, 2):
 		return
 	reward_counts[index] += 1
 	_apply_rewards()
 	hud.show_card_debug()
 
 func debug_cultivation(rank: int) -> void:
-	if not OS.is_debug_build() or not is_instance_valid(player) or player.dead:
+	if not preload("res://scripts/test_runtime.gd").enabled() or not is_instance_valid(player) or player.dead:
 		return
 	cultivation_override = clampi(rank, -1, CONFIG.CULTIVATION_NAMES.size() - 1)
 	player.clear_dash_effects()
@@ -925,7 +905,7 @@ func debug_cultivation(rank: int) -> void:
 	hud.show_card_debug()
 
 func debug_close() -> void:
-	if not OS.is_debug_build():
+	if not preload("res://scripts/test_runtime.gd").enabled():
 		return
 	if phase == "reward_select":
 		hud.show_rewards()

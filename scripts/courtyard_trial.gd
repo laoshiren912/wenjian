@@ -69,6 +69,7 @@ func _build_ui() -> void:
 		get_tree().paused = false
 		get_tree().change_scene_to_file("res://scenes/sword_motion_trial.tscn"), 34)
 	for button in [reset, zoom, old]:
+		button.visible = preload("res://scripts/test_runtime.gd").enabled()
 		button.focus_mode = Control.FOCUS_NONE
 		top.add_child(button)
 	var footer := CenterContainer.new()
@@ -98,6 +99,8 @@ func _build_ui() -> void:
 	paused_panel.hide()
 
 func reset_position() -> void:
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	player.position = START
 	player.velocity = Vector2.ZERO
 	player.knockback = Vector2.ZERO

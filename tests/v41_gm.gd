@@ -23,7 +23,17 @@ func run() -> void:
 	key.keycode = KEY_QUOTELEFT
 	key.pressed = true
 	game._input(key)
-	check(paused and game.hud.modal_panel != null, "backtick panel opens paused")
+	check(not paused and not game.menu_open, "backtick cannot open GM panel even in a debug build")
+	for code in [KEY_0, KEY_1, KEY_2, KEY_3, KEY_KP_0, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_QUOTELEFT]:
+		for modifiers in range(8):
+			key.keycode = code
+			key.ctrl_pressed = bool(modifiers & 1)
+			key.alt_pressed = bool(modifiers & 2)
+			key.shift_pressed = bool(modifiers & 4)
+			game._input(key)
+			check(game.cultivation_override == -1 and game.room_index == 0 and not paused, "GM key combination inert")
+	game._debug_menu()
+	check(paused and game.hud.modal_panel != null, "only internal test call opens fixture panel")
 	game.debug_toggle_invincible()
 	var hp: float = p.health
 	p.take_damage(12.0, Vector2.RIGHT)

@@ -2,6 +2,8 @@ extends "res://scripts/room_hud.gd"
 
 func _ready() -> void:
 	super._ready()
+	if not preload("res://scripts/test_runtime.gd").enabled():
+		return
 	var return_button := PrototypeUI.button("返回V4.1（新局）", func():
 		Engine.time_scale = 1.0
 		get_tree().paused = false
