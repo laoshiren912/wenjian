@@ -352,7 +352,7 @@ func _encounter_process(delta: float) -> void:
 		lunge_time = maxf(0.0, lunge_time - delta)
 		movement = attack_direction * _encounter_lunge_speed_factor()
 		if lunge_time <= 0.0:
-			if distance < _encounter_melee_hit_reach() and absf(attack_direction.angle_to(offset)) < _encounter_melee_half_angle() and _boss_has_sight(player.global_position):
+			if _encounter_melee_connects(player.global_position) and _boss_has_sight(player.global_position):
 				player.take_damage(damage, offset.normalized())
 			attack_cooldown = V41.MELEE_RECOVERY if v41_pressure else (1.0 if thrust_type else 1.2)
 	elif guard_time > 0.0:
@@ -433,6 +433,19 @@ func _uses_melee_telegraph() -> bool:
 
 func _holding_encounter_melee_facing() -> bool:
 	return _uses_melee_telegraph() and attack_cooldown > V41.MELEE_RECOVERY - V41.MELEE_FACING_RECOVERY
+
+func _uses_single_target_slash() -> bool:
+	return v41_pressure and kind == Kind.HOSTILE and not v41_guard_elite
+
+func _encounter_melee_connects(target: Vector2) -> bool:
+	var offset := target - global_position
+	var reach := _encounter_melee_hit_reach()
+	if _uses_single_target_slash():
+		# One player, one contact at the end of the swing; no sector damage.
+		var tip := global_position + attack_direction * reach
+		var closest := Geometry2D.get_closest_point_to_segment(target, global_position, tip)
+		return offset.dot(attack_direction) > 0.0 and offset.length() < reach and target.distance_to(closest) <= 16.0
+	return offset.length() < reach and absf(attack_direction.angle_to(offset)) < _encounter_melee_half_angle()
 
 func _encounter_melee_hit_reach() -> float:
 	return 80.0 if thrust_type else 72.0
@@ -878,6 +891,12 @@ func _draw() -> void:
 		draw_circle(blade_mid - side * 11.0, 2.8, Color("f0cf7a"))
 
 func _draw_encounter_melee_cue(impact_cue: float) -> void:
+	if _uses_single_target_slash():
+		var hand := attack_direction * 10.0 + Vector2(0, -12)
+		var blade := -Vector2(attack_direction.x * 8.0, 20.0) if windup > 0.0 else attack_direction.rotated(-0.30) * 28.0
+		draw_line(hand, hand + blade, Color("102638"), 5.0, true)
+		draw_line(hand, hand + blade, Color("a9d3dd"), 2.0, true)
+		return
 	var aiming := windup > 0.0
 	var half_angle := _encounter_melee_half_angle()
 	var angle := attack_direction.angle()

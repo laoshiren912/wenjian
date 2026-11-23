@@ -74,8 +74,8 @@ func spawn_ground_effect(world_point: Vector2, effect_mode: int, rank: int, inte
 		# 破防气浪略带金青锋锐
 		primary = primary.lerp(Color("ffd98a"), 0.45)
 	if effect_mode == 1:
-		primary = Color("242a2a")
-		core = Color("bd9452")
+		primary = Color("075acc")
+		core = Color("16c8ff")
 	mat.set_shader_parameter("primary_color", primary)
 	mat.set_shader_parameter("core_color", core)
 

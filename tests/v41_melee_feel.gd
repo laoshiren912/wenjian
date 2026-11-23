@@ -6,6 +6,7 @@ var game
 var checks := 0
 var failures := 0
 var capture := false
+var output_dir := OUT
 
 func _initialize() -> void:
 	run.call_deferred()
@@ -24,11 +25,17 @@ func frames(count: int) -> void:
 func run() -> void:
 	root.size = Vector2i(1280, 720)
 	capture = "--capture" in OS.get_cmdline_user_args() and DisplayServer.get_name() != "headless"
+	var boss_background := "--boss-background" in OS.get_cmdline_user_args()
+	if boss_background:
+		output_dir = "res://artifacts/runtime/blue-polish/"
 	if capture:
-		DirAccess.make_dir_recursive_absolute(OUT)
+		DirAccess.make_dir_recursive_absolute(output_dir)
 	game = load("res://scenes/main_v41.tscn").instantiate()
 	root.add_child(game)
 	await frames(2)
+	if boss_background:
+		game.world.set_room_style(CONFIG.BOSS_ROOM)
+		await frames(2)
 	var p = game.player
 	p.gm_invulnerable = true
 	var foes := get_nodes_in_group("enemies")
@@ -79,11 +86,11 @@ func run() -> void:
 			check(enemy.windup == 0.0 and enemy.v41_heavy_stun > 0.0, "heavy interrupts thrust mob windup")
 		if capture:
 			await RenderingServer.frame_post_draw
-			check(root.get_texture().get_image().save_png(OUT + "combo-%d.png" % (slot + 1)) == OK, "native capture")
+			check(root.get_texture().get_image().save_png(output_dir + "combo-%d.png" % (slot + 1)) == OK, "native capture")
 			if slot == 2:
 				await frames(7)
 				await RenderingServer.frame_post_draw
-				check(root.get_texture().get_image().save_png(OUT + "combo-3-impact.png") == OK, "native heavy impact peak")
+				check(root.get_texture().get_image().save_png(output_dir + "combo-3-impact.png") == OK, "native heavy impact peak")
 		await create_timer(0.12, false, false, true).timeout
 		await frames(60)
 		check(not game.hitstop_active, "stop restores time")
@@ -123,6 +130,37 @@ func run() -> void:
 		walker.combo.attack(Vector2.LEFT)
 		await frames(60)
 		check(walker.position.x >= 260.0 and Geometry2D.is_point_in_polygon(walker.position, game.world.walkable), "step cannot cross terrain boundary")
+	game.start_room()
+	var target_player = game.player
+	target_player.set_physics_process(false)
+	var mobs := get_nodes_in_group("enemies")
+	var mob = mobs[0]
+	for other in mobs.slice(1):
+		other.free()
+	mob.set_physics_process(false)
+	for thrust in [false, true]:
+		for offset in [Vector2(45, 0), Vector2(30, 30), Vector2(-30, 0), Vector2(90, 0)]:
+			mob.position = Vector2(640, 400)
+			mob.thrust_type = thrust
+			mob.v41_guard_elite = false
+			mob.attack_direction = Vector2.RIGHT
+			mob.windup = 0.0
+			mob.lunge_time = 0.01
+			mob.v41_heavy_stun = 0.0
+			mob.guard_cooldown = 10.0
+			target_player.position = mob.position + offset
+			target_player.health = 100.0
+			target_player.invulnerability = 0.0
+			mob._encounter_process(0.02)
+			check((target_player.health < 100.0) == (offset == Vector2(45, 0)), "single slash only hits the close forward target")
+			var after: float = target_player.health
+			mob._encounter_process(0.02)
+			check(target_player.health == after, "one swing cannot apply repeated area damage")
+	mob.v41_guard_elite = true
+	mob.thrust_type = false
+	mob.position = Vector2(640, 400)
+	check(mob._encounter_melee_connects(mob.position + Vector2(30, 30)), "elite attack remains unchanged")
+	check(CONFIG.COMBO_HITSTOPS == [0.025, 0.035, 0.065] and CONFIG.COMBO_LUNGE == [6.0, 8.0, 14.0] and CONFIG.COMBO_KICKS == [3.0, 4.8, 7.5], "previous feel parameters remain locked")
 	game.free()
 	await frames(2)
 	print("MELEE_FEEL checks=", checks, " FAILED=", failures)

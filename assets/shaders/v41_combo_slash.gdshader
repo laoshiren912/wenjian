@@ -28,9 +28,9 @@ float band_mask(float x, float lo, float hi) {
 	return step(lo, x) * step(x, hi);
 }
 
-void fragment() {
+vec4 slash_sample(vec2 uv) {
 	// 像素网格量化：边缘与角色 Nearest 像素密度严格匹配
-	vec2 cell = floor(UV * pixel_grid);
+	vec2 cell = floor(uv * pixel_grid);
 	vec2 q_uv = (cell + vec2(0.5)) / pixel_grid;
 	vec2 p = (q_uv - vec2(0.5)) * 2.0;
 
@@ -225,35 +225,16 @@ void fragment() {
 	vec3 col_tail;
 	vec3 col_rim;
 
-	if (rank_stage == 0) {
-		// 阶段1（凡剑）：干净利落冷钢银白
-		col_core = vec3(0.98, 0.99, 1.0);
-		col_body = vec3(0.77, 0.85, 0.92);
-		col_tail = vec3(0.46, 0.56, 0.67);
-		col_rim  = vec3(0.86, 0.92, 0.98);
-	} else if (rank_stage == 1) {
-		// 阶段2（御气）：清透青白色剑光 + 轻盈灵气拖尾
-		col_core = vec3(0.94, 1.0, 0.99);
-		col_body = vec3(0.32, 0.90, 0.88);
-		col_tail = vec3(0.14, 0.58, 0.68);
-		col_rim  = vec3(0.56, 0.98, 0.95);
-	} else {
-		// 阶段3（仙术成型）：霜青主锋 + 高明度银白核心 + 独立外轮廓
-		col_core = vec3(1.0, 1.0, 1.0);
-		col_body = vec3(0.30, 0.84, 1.0);
-		col_tail = vec3(0.14, 0.46, 0.88);
-		col_rim  = vec3(0.64, 0.96, 1.0);
+	// Saturated cyan/azure remains readable over bright sky and gold tiles.
+	col_core = vec3(0.28, 0.88, 1.0);
+	col_body = rank_stage == 1 ? vec3(0.0, 0.76, 0.93) : vec3(0.02, 0.53, 0.98);
+	col_tail = vec3(0.015, 0.16, 0.38);
+	col_rim = vec3(0.02, 0.72, 1.0);
+	if (combo_slot == 2) {
+		col_body = vec3(0.0, 0.48, 1.0);
+		col_tail = vec3(0.01, 0.12, 0.32);
+		col_core = vec3(0.12, 0.82, 1.0);
 	}
-
-	if (combo_slot == 0) {
-		col_body = mix(col_body, vec3(0.85, 0.94, 1.0), 0.65);
-	} else if (combo_slot == 2) {
-		col_body = vec3(0.70, 0.48, 0.20);
-		col_tail = vec3(0.16, 0.11, 0.07);
-		col_rim = vec3(0.94, 0.72, 0.35);
-		col_core = vec3(1.0, 0.94, 0.77);
-	}
-	col_core = mix(col_core, vec3(1.0, 0.94, 0.80), block_recoil * 0.70);
 
 	vec3 final_rgb = mix(col_tail, col_body, clamp(trail_grad * 1.15, 0.0, 1.0));
 	float alpha = body_mask * mix(0.58, 0.90, trail_grad);
@@ -281,9 +262,22 @@ void fragment() {
 
 	alpha *= fade;
 	if (alpha < 0.05) {
-		discard;
+		return vec4(0.0);
 	}
 	alpha = clamp(floor(alpha * 7.0 + 0.5) / 7.0, 0.0, 0.94);
 
-	COLOR = vec4(final_rgb, alpha);
+	return vec4(final_rgb, alpha);
+}
+
+void fragment() {
+ vec4 body = slash_sample(UV);
+ vec2 px = vec2(1.0 / pixel_grid);
+ float edge = max(max(slash_sample(UV + vec2(px.x, 0.0)).a, slash_sample(UV - vec2(px.x, 0.0)).a),
+                  max(slash_sample(UV + vec2(0.0, px.y)).a, slash_sample(UV - vec2(0.0, px.y)).a));
+ if (body.a < 0.05 && edge > 0.10) {
+  COLOR = vec4(0.015, 0.09, 0.19, edge * 0.95);
+ } else {
+  if (body.a < 0.05) { discard; }
+  COLOR = body;
+ }
 }
