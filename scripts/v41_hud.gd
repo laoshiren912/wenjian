@@ -19,6 +19,9 @@ var gm_scroll: ScrollContainer
 var domain_alert_fx: Control
 var _reward_mode := false
 var _victory_mode := false
+var _pause_mode := false
+var _stats_mode := false
+var _rebuilding_ink_modal := false
 var _reward_backdrop: Control
 var _reward_cards: Array[Control] = []
 var _reward_title_label: Label
@@ -308,6 +311,18 @@ func _resize_modal() -> void:
 		return
 	if _victory_mode and is_instance_valid(modal_panel):
 		_layout_victory_screen()
+		_layout_title_screen()
+		return
+	if _pause_mode and is_instance_valid(modal_panel) and not _rebuilding_ink_modal:
+		_rebuilding_ink_modal = true
+		show_pause()
+		_rebuilding_ink_modal = false
+		_layout_title_screen()
+		return
+	if _stats_mode and is_instance_valid(modal_panel) and not _rebuilding_ink_modal:
+		_rebuilding_ink_modal = true
+		show_stats()
+		_rebuilding_ink_modal = false
 		_layout_title_screen()
 		return
 	super._resize_modal()
@@ -1002,6 +1017,8 @@ func set_domain_alert(active: bool) -> void:
 func _clear_ink_modal() -> void:
 	_reward_mode = false
 	_victory_mode = false
+	_pause_mode = false
+	_stats_mode = false
 	_reward_cards.clear()
 	_reward_title_label = null
 	_victory_title_label = null
@@ -1319,37 +1336,200 @@ func show_card_debug() -> void:
 		grid.add_child(button)
 	box.add_child(PrototypeUI.button("返回", func(): run.debug_close(), 38))
 
+func _fmt_stat_num(value: float) -> String:
+	var rounded := roundf(value)
+	if absf(value - rounded) < 0.05:
+		return "%.0f" % rounded
+	return "%.1f" % value
+
+func _open_ink_gold_modal(panel_width: float, compact: bool) -> VBoxContainer:
+	_clear_ink_modal()
+	transition_button = null
+	profession_buttons.clear()
+	profession_layout = null
+	start_button = null
+	for child in overlay_center.get_children():
+		overlay_center.remove_child(child)
+		child.queue_free()
+
+	overlay.color = Color(0, 0, 0, 0)
+	overlay.show()
+	overlay_center.visible = true
+
+	var vignette := REWARD_UI.VignetteBackdrop.new()
+	vignette.darkness = 0.68
+	vignette.edge_alpha = 0.80
+	vignette.tint = Color(0.018, 0.022, 0.028, 1.0)
+	vignette.rebuild()
+	overlay.add_child(vignette)
+	overlay.move_child(vignette, 0)
+	_reward_backdrop = vignette
+
+	modal_panel = PanelContainer.new()
+	modal_panel.name = "InkGoldModal"
+	modal_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var sz := root.size if is_instance_valid(root) and root.size.x > 0.0 and root.size.y > 0.0 else Vector2(1280, 720)
+	modal_panel.custom_minimum_size = Vector2(minf(panel_width, sz.x - 36.0), 0.0)
+	overlay_center.add_child(modal_panel)
+
+	var frame_vis := REWARD_UI.InkGoldPanelVisual.new()
+	frame_vis.name = "InkGoldFrame"
+	modal_panel.add_child(frame_vis)
+
+	var margin := MarginContainer.new()
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var pad_x := 20 if compact else 28
+	var pad_y := 14 if compact else 20
+	margin.add_theme_constant_override("margin_left", pad_x)
+	margin.add_theme_constant_override("margin_right", pad_x)
+	margin.add_theme_constant_override("margin_top", pad_y)
+	margin.add_theme_constant_override("margin_bottom", pad_y)
+	modal_panel.add_child(margin)
+
+	var col := VBoxContainer.new()
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_theme_constant_override("separation", 8 if compact else 11)
+	margin.add_child(col)
+	return col
+
 func show_pause(_gold: int = -1) -> void:
-	var box := _screen("已暂停", "共七关 · 凌霄仙庭迎战" + CONFIG.BOSS_NAME)
-	box.add_child(_modal_label("WASD 移动，鼠标瞄准，左键三连，右键掷剑。\n空格沿走位方向穿阵，松开 WASD 时朝鼠标穿阵。\nE 万剑归宗，M 静音。清场后入阵眼领悟功法。", 16))
-	_add_button(box, "继续  [Esc]", func(): resume_requested.emit())
+	var sz := root.size if is_instance_valid(root) and root.size.x > 0.0 and root.size.y > 0.0 else Vector2(1280, 720)
+	var compact := sz.x < 1100.0 or sz.y < 620.0
+	var col := _open_ink_gold_modal(470.0 if compact else 540.0, compact)
+	_pause_mode = true
+
+	# 1. 书法大字「已暂停」+ 右侧朱砂小印
+	var title_row := HBoxContainer.new()
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_theme_constant_override("separation", 10 if compact else 14)
+	col.add_child(title_row)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "已 暂 停"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_calligraphy_title(title_lbl, 36 if compact else 44, Color("f3dda2"), 4 if compact else 5)
+	title_row.add_child(title_lbl)
+
+	var seal := REWARD_UI.VermilionSeal.new("息", 24.0 if compact else 28.0)
+	seal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title_row.add_child(seal)
+
+	# 暗金云纹分割线
+	var div_wrap := CenterContainer.new()
+	div_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	div_wrap.add_child(REWARD_UI.CloudDivider.new(250.0 if compact else 320.0, Color("c8a86b")))
+	col.add_child(div_wrap)
+
+	# 当前关卡进度铭牌徽章（如：第七关 · 凌霄仙庭）
+	var room_idx := clampi(run.room_index, 0, CONFIG.ROOM_NAMES.size() - 1) if run != null else 0
+	var room_ordinals := ["第一关", "第二关", "第三关", "第四关", "第五关", "第六关", "第七关"]
+	var stage_badge_wrap := CenterContainer.new()
+	stage_badge_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var stage_badge := PanelContainer.new()
+	stage_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage_badge.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(0.784, 0.659, 0.420, 0.72), Color("1b1d23"), 14.0, 3.0 if compact else 4.0))
+	var stage_lbl := Label.new()
+	stage_lbl.text = "%s · %s" % [room_ordinals[room_idx], CONFIG.ROOM_NAMES[room_idx]]
+	stage_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_kai_label(stage_lbl, 15 if compact else 17, Color("efd9a4"), 2)
+	stage_badge.add_child(stage_lbl)
+	stage_badge_wrap.add_child(stage_badge)
+	col.add_child(stage_badge_wrap)
+
+	# 2. 双列暗金键帽微标操作指南
+	var guide_panel := PanelContainer.new()
+	guide_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	guide_panel.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(0.784, 0.659, 0.420, 0.34), Color("101115"), 14.0 if compact else 18.0, 9.0 if compact else 12.0))
+	col.add_child(guide_panel)
+
+	var key_grid := GridContainer.new()
+	key_grid.columns = 2
+	key_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	key_grid.add_theme_constant_override("h_separation", 18 if compact else 26)
+	key_grid.add_theme_constant_override("v_separation", 6 if compact else 9)
+	guide_panel.add_child(key_grid)
+
+	var key_bindings := [
+		["WASD", "步法走位"],
+		["鼠标", "剑指方向"],
+		["左键", "三连剑式"],
+		["右键", "掷剑旋斩"],
+		["空格", "穿阵身法"],
+		["E", "万剑归宗"],
+		["M", "静音开关"],
+		["Tab", "本命属性"],
+	]
+	for pair in key_bindings:
+		key_grid.add_child(REWARD_UI.make_keycap_badge(str(pair[0]), str(pair[1]), compact))
+
+	# 3. 主按钮：「继续问剑 [Esc]」
+	var resume_btn := Button.new()
+	resume_btn.name = "PauseResumeButton"
+	resume_btn.text = "继续问剑  [Esc]"
+	REWARD_UI.style_ink_button(resume_btn, 18 if compact else 20, Vector2(0, 38 if compact else 44))
+	resume_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	resume_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+	resume_btn.pressed.connect(func():
+		_play_reward_sfx(_reward_select_sfx)
+		resume_requested.emit())
+	col.add_child(resume_btn)
+
+	# 4. 中间三枚深墨金边铭牌开关（镜头 / 背景音乐 / 音频）
 	var tools_row := HBoxContainer.new()
-	tools_row.add_theme_constant_override("separation", 8)
-	var cam_btn := PrototypeUI.button("镜头：" + ("近景" if run != null and run.close_view else "远景"), func():
+	tools_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tools_row.add_theme_constant_override("separation", 8 if compact else 10)
+	col.add_child(tools_row)
+
+	var toggle_h := 34 if compact else 38
+	var toggle_fs := 13 if compact else 15
+	var cam_btn := Button.new()
+	cam_btn.text = "镜头：" + ("近景" if run != null and run.close_view else "远景")
+	REWARD_UI.style_plaque_toggle_button(cam_btn, toggle_fs, Vector2(0, toggle_h))
+	cam_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cam_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+	cam_btn.pressed.connect(func():
+		_play_reward_sfx(_reward_select_sfx)
 		if run != null:
 			run.toggle_view()
-		show_pause(), 38)
-	cam_btn.focus_mode = Control.FOCUS_NONE
-	cam_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cam_btn.add_theme_font_size_override("font_size", 16)
+		show_pause())
 	tools_row.add_child(cam_btn)
+
 	if run != null and is_instance_valid(run.audio_mgr):
-		var bgm_btn := PrototypeUI.button("背景音乐：" + ("关" if run.audio_mgr.bgm_muted else "开"), func():
-			run.audio_mgr.toggle_bgm_mute()
-			show_pause(), 38)
-		bgm_btn.focus_mode = Control.FOCUS_NONE
+		var bgm_btn := Button.new()
+		bgm_btn.text = "背景音乐：" + ("关" if run.audio_mgr.bgm_muted else "开")
+		REWARD_UI.style_plaque_toggle_button(bgm_btn, toggle_fs, Vector2(0, toggle_h))
 		bgm_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		bgm_btn.add_theme_font_size_override("font_size", 16)
-		var mute_btn := PrototypeUI.button("音频：" + ("静音" if run.audio_mgr.master_muted else "开启"), func():
-			run.audio_mgr.toggle_master_mute()
-			show_pause(), 38)
-		mute_btn.focus_mode = Control.FOCUS_NONE
-		mute_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mute_btn.add_theme_font_size_override("font_size", 16)
+		bgm_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+		bgm_btn.pressed.connect(func():
+			_play_reward_sfx(_reward_select_sfx)
+			run.audio_mgr.toggle_bgm_mute()
+			show_pause())
 		tools_row.add_child(bgm_btn)
+
+		var mute_btn := Button.new()
+		mute_btn.text = "音频：" + ("静音" if run.audio_mgr.master_muted else "开启")
+		REWARD_UI.style_plaque_toggle_button(mute_btn, toggle_fs, Vector2(0, toggle_h))
+		mute_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mute_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+		mute_btn.pressed.connect(func():
+			_play_reward_sfx(_reward_select_sfx)
+			run.audio_mgr.toggle_master_mute()
+			show_pause())
 		tools_row.add_child(mute_btn)
-	box.add_child(tools_row)
-	_add_button(box, "重新开始", func(): restart_requested.emit())
+
+	# 5. 底部克制暗朱砂红微光边框「重新开始」
+	var restart_btn := Button.new()
+	restart_btn.name = "PauseRestartButton"
+	restart_btn.text = "重新开始"
+	REWARD_UI.style_crimson_button(restart_btn, 16 if compact else 17, Vector2(0, 34 if compact else 38))
+	restart_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	restart_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+	restart_btn.pressed.connect(func():
+		_play_reward_sfx(_reward_select_sfx)
+		restart_requested.emit())
+	col.add_child(restart_btn)
 
 
 func _open_sample(scene: String) -> void:
@@ -1359,30 +1539,325 @@ func _open_sample(scene: String) -> void:
 	Engine.time_scale = 1.0
 	get_tree().change_scene_to_file("res://scenes/" + scene + ".tscn")
 
+func _build_stats_skill_plaque(key_text: String, title_text: String, accent: Color, compact: bool) -> VBoxContainer:
+	var card := PanelContainer.new()
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(accent.r, accent.g, accent.b, 0.50), Color("191b21"), 11.0 if compact else 14.0, 8.0 if compact else 10.0))
+
+	var inner := VBoxContainer.new()
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_theme_constant_override("separation", 5 if compact else 7)
+	card.add_child(inner)
+
+	var head := HBoxContainer.new()
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_theme_constant_override("separation", 7 if compact else 9)
+	inner.add_child(head)
+
+	var cap := PanelContainer.new()
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var cap_st := StyleBoxFlat.new()
+	cap_st.bg_color = Color("21232b")
+	cap_st.border_color = accent
+	cap_st.set_border_width_all(1)
+	cap_st.set_corner_radius_all(2)
+	cap_st.content_margin_left = 6.0
+	cap_st.content_margin_right = 6.0
+	cap_st.content_margin_top = 1.0
+	cap_st.content_margin_bottom = 1.0
+	cap.add_theme_stylebox_override("panel", cap_st)
+	var k_lbl := Label.new()
+	k_lbl.text = key_text
+	k_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(k_lbl, 11 if compact else 12, Color("f6e3b0"), 1)
+	cap.add_child(k_lbl)
+	head.add_child(cap)
+
+	var t_lbl := Label.new()
+	t_lbl.text = title_text
+	t_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	t_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(t_lbl, 15 if compact else 17, accent.lerp(Color("fff6df"), 0.35), 2)
+	head.add_child(t_lbl)
+
+	var sep := ColorRect.new()
+	sep.custom_minimum_size = Vector2(0, 1)
+	sep.color = Color(accent.r, accent.g, accent.b, 0.24)
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_child(sep)
+
+	return inner
+
+func _make_stat_chip(label_text: String, val_text: String, val_col: Color, compact: bool) -> PanelContainer:
+	var chip := PanelContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chip.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(0.784, 0.659, 0.420, 0.26), Color("111216"), 6.0 if compact else 8.0, 3.0 if compact else 4.0))
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 5)
+	chip.add_child(row)
+	var kl := Label.new()
+	kl.text = label_text
+	kl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(kl, 12 if compact else 13, Color("bcb4a3"), 1)
+	row.add_child(kl)
+	var vl := Label.new()
+	vl.text = val_text
+	vl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(vl, 13 if compact else 15, val_col, 1)
+	row.add_child(vl)
+	return chip
+
 func show_stats() -> void:
-	var rank: int = clampi(player.cultivation, 0, CONFIG.CULTIVATION_NAMES.size() - 1)
-	var box := _screen("角色属性", CONFIG.CULTIVATION_NAMES[rank])
-	box.add_theme_constant_override("separation", 8)
-	box.add_child(_modal_label("生命 %.0f / %.0f · 体力 %.0f / %.0f\n%s" % [player.health, player.max_health, player.stamina, player.max_stamina, reward_summary()], 15))
-	for i in range(player.combo.stages.size()):
+	var sz := root.size if is_instance_valid(root) and root.size.x > 0.0 and root.size.y > 0.0 else Vector2(1280, 720)
+	var compact := sz.x < 1100.0 or sz.y < 620.0
+	var col := _open_ink_gold_modal(660.0 if compact else 780.0, compact)
+	_stats_mode = true
+
+	var rank: int = clampi(player.cultivation, 0, CONFIG.CULTIVATION_NAMES.size() - 1) if is_instance_valid(player) else 0
+	var rank_accent := Color("f0cf78") if rank == 2 else (Color("7be6d8") if rank == 1 else Color("d9be83"))
+
+	# 1. 顶部修为与气血概览栏
+	var header_row := HBoxContainer.new()
+	header_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header_row.add_theme_constant_override("separation", 12 if compact else 18)
+	col.add_child(header_row)
+
+	var left_title := HBoxContainer.new()
+	left_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	left_title.add_theme_constant_override("separation", 8 if compact else 12)
+	header_row.add_child(left_title)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "本 命 属 性"
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_calligraphy_title(title_lbl, 32 if compact else 40, Color("f3dda2"), 4 if compact else 5)
+	left_title.add_child(title_lbl)
+
+	var seal := REWARD_UI.VermilionSeal.new("道", 22.0 if compact else 26.0)
+	seal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	left_title.add_child(seal)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header_row.add_child(spacer)
+
+	# 右侧：当前修为境界暗金徽章 + 生命/体力条
+	var right_overview := HBoxContainer.new()
+	right_overview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	right_overview.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	right_overview.add_theme_constant_override("separation", 10 if compact else 14)
+	header_row.add_child(right_overview)
+
+	var rank_badge := PanelContainer.new()
+	rank_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rank_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	rank_badge.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(rank_accent, Color("1c1e24"), 10.0 if compact else 12.0, 4.0 if compact else 6.0))
+	var rank_col := VBoxContainer.new()
+	rank_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	rank_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rank_col.add_theme_constant_override("separation", 1)
+	rank_badge.add_child(rank_col)
+	var rk_k := Label.new()
+	rk_k.text = "当前境界"
+	rk_k.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rk_k.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(rk_k, 10 if compact else 11, Color("b4aa96"), 1)
+	rank_col.add_child(rk_k)
+	var rk_v := Label.new()
+	rk_v.text = CONFIG.CULTIVATION_NAMES[rank]
+	rk_v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rk_v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_kai_label(rk_v, 16 if compact else 19, rank_accent, 2)
+	rank_col.add_child(rk_v)
+	right_overview.add_child(rank_badge)
+
+	var bars_col := VBoxContainer.new()
+	bars_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bars_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	bars_col.add_theme_constant_override("separation", 5 if compact else 7)
+	right_overview.add_child(bars_col)
+
+	var bar_w := 108.0 if compact else 136.0
+	var bar_h := 8.0 if compact else 10.0
+	for pair in [
+		["生命", player.health, player.max_health, Color("d95353"), Color("f4d8d8")],
+		["体力", player.stamina, player.max_stamina, Color("5fd8d4"), Color("d2f2f0")],
+	]:
+		var b_row := HBoxContainer.new()
+		b_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b_row.add_theme_constant_override("separation", 6 if compact else 8)
+		var lbl := Label.new()
+		lbl.text = str(pair[0])
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		REWARD_UI.style_ink_label(lbl, 12 if compact else 13, pair[4], 1)
+		b_row.add_child(lbl)
+		var pb := _slim_bar(pair[3], bar_w, bar_h)
+		pb.max_value = float(pair[2])
+		pb.value = float(pair[1])
+		b_row.add_child(pb)
+		var val := Label.new()
+		val.text = "%.0f/%.0f" % [float(pair[1]), float(pair[2])]
+		val.custom_minimum_size = Vector2(54 if compact else 62, 0)
+		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		val.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		REWARD_UI.style_ink_label(val, 12 if compact else 13, Color("eee9dd"), 1)
+		b_row.add_child(val)
+		bars_col.add_child(b_row)
+
+	var div_wrap := CenterContainer.new()
+	div_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	div_wrap.add_child(REWARD_UI.CloudDivider.new(440.0 if compact else 560.0, Color("c8a86b")))
+	col.add_child(div_wrap)
+
+	# 2. 已悟功法展示栏
+	var arts_panel := PanelContainer.new()
+	arts_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arts_panel.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(0.784, 0.659, 0.420, 0.36), Color("101115"), 12.0 if compact else 15.0, 7.0 if compact else 10.0))
+	col.add_child(arts_panel)
+
+	var arts_col := VBoxContainer.new()
+	arts_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	arts_col.add_theme_constant_override("separation", 5 if compact else 7)
+	arts_panel.add_child(arts_col)
+
+	var arts_head := Label.new()
+	arts_head.text = "已悟功法"
+	arts_head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(arts_head, 13 if compact else 14, Color("d8be85"), 1)
+	arts_col.add_child(arts_head)
+
+	var learned: Array[int] = []
+	if run != null:
+		for index in range(POOL.TITLES.size()):
+			if int(run.reward_counts[index]) > 0:
+				learned.append(index)
+
+	if learned.is_empty():
+		var empty_lbl := Label.new()
+		empty_lbl.text = "道心初启 · 尚未领悟功法"
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		REWARD_UI.style_kai_label(empty_lbl, 15 if compact else 17, Color("a99874"), 1)
+		arts_col.add_child(empty_lbl)
+	else:
+		var arts_grid := GridContainer.new()
+		arts_grid.columns = mini(3, learned.size())
+		arts_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		arts_grid.add_theme_constant_override("h_separation", 7 if compact else 10)
+		arts_grid.add_theme_constant_override("v_separation", 5 if compact else 7)
+		arts_col.add_child(arts_grid)
+		for index in learned:
+			var count: int = int(run.reward_counts[index])
+			var tier: int = POOL.tier(index)
+			var edge_col: Color = REWARD_UI.TIER_EDGES[tier]
+			var plaque := PanelContainer.new()
+			plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			plaque.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			plaque.add_theme_stylebox_override("panel", REWARD_UI.make_sub_panel_style(Color(edge_col.r, edge_col.g, edge_col.b, 0.72), Color("1a1c22"), 8.0 if compact else 10.0, 4.0 if compact else 5.0))
+			var p_col := VBoxContainer.new()
+			p_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			p_col.add_theme_constant_override("separation", 1)
+			plaque.add_child(p_col)
+			var nm := Label.new()
+			nm.text = POOL.TITLES[index] + (" ×%d" % count if count > 1 else "")
+			nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			REWARD_UI.style_ink_label(nm, 12 if compact else 14, Color("f3dfb0"), 1)
+			p_col.add_child(nm)
+			var ef := Label.new()
+			ef.text = REWARD_UI.CARD_SHORT_EFFECTS[index]
+			ef.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			REWARD_UI.style_ink_label(ef, 11 if compact else 12, Color("b8c2c0"), 1)
+			p_col.add_child(ef)
+			arts_grid.add_child(plaque)
+
+	# 3. 招式数值卡片化（四栏暗金剑式铭牌，隐藏距离/落点半径/剑痕0.0等内部调试参数）
+	var skills_grid := GridContainer.new()
+	skills_grid.columns = 2
+	skills_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skills_grid.add_theme_constant_override("h_separation", 10 if compact else 14)
+	skills_grid.add_theme_constant_override("v_separation", 8 if compact else 12)
+	col.add_child(skills_grid)
+
+	var mult: float = player.damage_multiplier if is_instance_valid(player) else 1.0
+
+	# 铭牌 1：[左键] 普攻三连
+	var combo_inner := _build_stats_skill_plaque("左键", "普攻三连", Color("d8b770"), compact)
+	skills_grid.add_child(combo_inner.get_parent())
+	var combo_row := HBoxContainer.new()
+	combo_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	combo_row.add_theme_constant_override("separation", 5 if compact else 7)
+	combo_inner.add_child(combo_row)
+	var combo_names := ["一式横斩", "二式斜斩", "三式重劈"]
+	for i in range(mini(3, player.combo.stages.size())):
 		var data: Dictionary = player.combo.stages[i]
-		box.add_child(_modal_label("左键 %d %s · 伤害 %.1f · 距离 %.0f" % [i + 1, data.name, float(data.damage) * player.damage_multiplier, float(data.reach) + CONFIG.SWORD_EXTENSION[rank]], 15, Color("e1cc9c")))
-	var mult: float = player.damage_multiplier
-	box.add_child(_modal_label("空格 穿阵一线 · 距离 %.0f · 体力 %.0f · 冷却 %.2f 秒 · 直击 %.1f / 剑痕 %.1f" % [
-		CONFIG.DASH_DISTANCE[rank], CONFIG.DASH_COST, CONFIG.DASH_COOLDOWN,
-		CONFIG.DASH_DAMAGE[rank] * mult, CONFIG.DASH_MARK_DAMAGE[rank] * mult,
-	], 15))
-	box.add_child(_modal_label("右键 掷剑旋斩 · 距离 %.0f · 体力 %.0f · 冷却 %.1f 秒 · 飞出 %.1f / 旋斩 %.1f×%d / 回程 %.1f" % [
-		CONFIG.THROW_DISTANCE[rank], CONFIG.THROW_COST, CONFIG.THROW_COOLDOWN,
-		CONFIG.THROW_OUT_DAMAGE[rank] * mult, CONFIG.THROW_SPIN_DAMAGE[rank] * mult, int(CONFIG.THROW_SPIN_TICKS[rank]), CONFIG.THROW_RETURN_DAMAGE[rank] * mult,
-	], 15))
+		var dmg_val: float = float(data.damage) * mult
+		combo_row.add_child(_make_stat_chip(combo_names[i], _fmt_stat_num(dmg_val), Color("f5dc99"), compact))
+
+	# 铭牌 2：[空格] 穿阵身法
+	var dash_inner := _build_stats_skill_plaque("空格", "穿阵身法", Color("7edfd5"), compact)
+	skills_grid.add_child(dash_inner.get_parent())
+	var dash_row := HBoxContainer.new()
+	dash_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dash_row.add_theme_constant_override("separation", 6 if compact else 8)
+	dash_inner.add_child(dash_row)
+	dash_row.add_child(_make_stat_chip("直击伤害", _fmt_stat_num(CONFIG.DASH_DAMAGE[rank] * mult), Color("9ef2e8"), compact))
+	dash_row.add_child(_make_stat_chip("冷却", "%.2f 秒" % CONFIG.DASH_COOLDOWN, Color("e8dec6"), compact))
+
+	# 铭牌 3：[右键] 掷剑旋斩
+	var throw_inner := _build_stats_skill_plaque("右键", "掷剑旋斩", Color("d8b770"), compact)
+	skills_grid.add_child(throw_inner.get_parent())
+	var throw_row := HBoxContainer.new()
+	throw_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	throw_row.add_theme_constant_override("separation", 5 if compact else 7)
+	throw_inner.add_child(throw_row)
+	throw_row.add_child(_make_stat_chip("飞出", _fmt_stat_num(CONFIG.THROW_OUT_DAMAGE[rank] * mult), Color("f5dc99"), compact))
+	throw_row.add_child(_make_stat_chip("旋斩", "%s×%d" % [_fmt_stat_num(CONFIG.THROW_SPIN_DAMAGE[rank] * mult), int(CONFIG.THROW_SPIN_TICKS[rank])], Color("f5dc99"), compact))
+	throw_row.add_child(_make_stat_chip("回程", _fmt_stat_num(CONFIG.THROW_RETURN_DAMAGE[rank] * mult), Color("f5dc99"), compact))
+	var throw_cd := Label.new()
+	throw_cd.text = "冷却 %.1f 秒" % CONFIG.THROW_COOLDOWN
+	throw_cd.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	throw_cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(throw_cd, 11 if compact else 12, Color("b4ad9c"), 1)
+	throw_inner.add_child(throw_cd)
+
+	# 铭牌 4：[E] 万剑归宗
+	var rain_inner := _build_stats_skill_plaque("E", "万剑归宗", Color("86e4f2"), compact)
+	skills_grid.add_child(rain_inner.get_parent())
 	var sword_count: int = int(CONFIG.SWORD_RAIN_COUNT[rank]) * (2 if player.card_level(CARDS.RAIN) > 0 else 1)
-	var rain_radius: float = CONFIG.SWORD_RAIN_IMPACT_RADIUS
-	box.add_child(_modal_label("E 万剑归宗 · %d 柄天降飞剑 · 单剑伤害 %.1f · 落点半径 %.0f · 体力 %.0f · 冷却 %.1f 秒" % [
-		sword_count, float(CONFIG.SWORD_RAIN_DAMAGE[rank]) * mult, rain_radius,
-		CONFIG.SWORD_RAIN_COST, player.sword_rain_base_cooldown(),
-	], 15, Color("9de8ef")))
-	_add_button(box, "返回战斗  [Tab / Esc]", func(): resume_requested.emit())
+	var rain_row := HBoxContainer.new()
+	rain_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rain_row.add_theme_constant_override("separation", 6 if compact else 8)
+	rain_inner.add_child(rain_row)
+	rain_row.add_child(_make_stat_chip("飞剑", "%d 柄" % sword_count, Color("9feef9"), compact))
+	rain_row.add_child(_make_stat_chip("单剑伤害", _fmt_stat_num(float(CONFIG.SWORD_RAIN_DAMAGE[rank]) * mult), Color("f5dc99"), compact))
+	var rain_cd := Label.new()
+	rain_cd.text = "当前境界冷却 %.1f 秒" % player.sword_rain_base_cooldown()
+	rain_cd.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	rain_cd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	REWARD_UI.style_ink_label(rain_cd, 11 if compact else 12, Color("a9cfd4"), 1)
+	rain_inner.add_child(rain_cd)
+
+	# 4. 底部暗金按钮：「返回战斗 [Tab / Esc]」
+	var back_wrap := CenterContainer.new()
+	back_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(back_wrap)
+	var back_btn := Button.new()
+	back_btn.name = "StatsReturnButton"
+	back_btn.text = "返回战斗  [Tab / Esc]"
+	REWARD_UI.style_ink_button(back_btn, 17 if compact else 19, Vector2(236 if compact else 276, 36 if compact else 42))
+	back_btn.mouse_entered.connect(func(): _play_reward_sfx(_reward_hover_sfx))
+	back_btn.pressed.connect(func():
+		_play_reward_sfx(_reward_select_sfx)
+		resume_requested.emit())
+	back_wrap.add_child(back_btn)
 
 func show_run_result(won: bool) -> void:
 	if won:

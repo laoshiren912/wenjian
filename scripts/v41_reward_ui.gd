@@ -7,12 +7,27 @@ const TIER_EDGES := [Color("8c8d80"), Color("5db9aa"), Color("d3aa57")]
 const TIER_NAMES := ["凡品", "进阶", "仙品"]
 const CARD_TAGS := ["剑气", "身法", "破阵", "剑气御剑流", "剑气御剑流", "身法破阵流", "身法破阵流", "剑气御剑流", "剑气御剑流", "身法破阵流"]
 const CARD_ICONS := ["sword_aura", "wind_array", "spirit_pill", "flying_sword", "sword_aura", "sword_aura", "wind_array", "flying_sword", "sword_aura", "wind_array"]
+const CARD_SHORT_EFFECTS: Array[String] = [
+	"三击出穿透剑气",
+	"穿阵留影延爆破盾",
+	"斩敌回血回体",
+	"首击分裂双小剑",
+	"三击剑气加宽加远",
+	"穿阵后下击必暴击",
+	"破盾背斩刷穿阵",
+	"飞剑翻倍吸血减冷",
+	"三击齐射三道剑气",
+	"飞剑残影引雷链",
+]
 
 static func calligraphy_face() -> FontFile:
 	return preload("res://assets/fonts/STXINGKA.ttf")
 
 static func serif_face() -> FontFile:
 	return preload("res://assets/fonts/simkai.ttf")
+
+static func ui_face() -> FontFile:
+	return preload("res://assets/fonts/msyh.ttc")
 
 class CastFocus extends Control:
 	const DURATION := 0.12
@@ -244,6 +259,135 @@ static func style_victory_label(label: Label, size: int, color: Color, outline_s
 	label.add_theme_constant_override("shadow_offset_x", 0)
 	label.add_theme_constant_override("shadow_offset_y", 2)
 
+static func style_calligraphy_title(label: Label, font_size: int, color: Color = Color("f2dca4"), outline_size: int = 5) -> Label:
+	label.add_theme_font_override("font", calligraphy_face())
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color("090a0d"))
+	label.add_theme_constant_override("outline_size", outline_size)
+	label.add_theme_color_override("font_shadow_color", Color(0.01, 0.015, 0.02, 0.78))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	return label
+
+static func style_kai_label(label: Label, font_size: int, color: Color = Color("d8c495"), outline_size: int = 2) -> Label:
+	label.add_theme_font_override("font", serif_face())
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color("0a0b0e"))
+	label.add_theme_constant_override("outline_size", outline_size)
+	return label
+
+static func style_plaque_toggle_button(btn: Button, font_size: int = 15, min_size: Vector2 = Vector2(118, 36)) -> Button:
+	btn.custom_minimum_size = min_size
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.add_theme_font_size_override("font_size", font_size)
+	btn.add_theme_color_override("font_color", Color("e8dcc0"))
+	btn.add_theme_color_override("font_hover_color", Color("fff6db"))
+	btn.add_theme_color_override("font_pressed_color", Color("ffe7a3"))
+	btn.add_theme_color_override("font_outline_color", Color("090a0d"))
+	btn.add_theme_constant_override("outline_size", 2)
+	for pair in [
+		["normal", Color("181a1f"), Color("9d824f"), 1, 0],
+		["hover", Color("22252c"), Color("e8c982"), 1, 5],
+		["pressed", Color("2a2d35"), Color("f6dc96"), 2, 3],
+	]:
+		var st := StyleBoxFlat.new()
+		st.bg_color = pair[1]
+		st.border_color = pair[2]
+		st.set_border_width_all(int(pair[3]))
+		st.set_corner_radius_all(2)
+		if int(pair[4]) > 0:
+			st.shadow_color = Color(0.84, 0.68, 0.34, 0.24)
+			st.shadow_size = int(pair[4])
+		st.content_margin_left = 10.0
+		st.content_margin_right = 10.0
+		st.content_margin_top = 6.0
+		st.content_margin_bottom = 6.0
+		btn.add_theme_stylebox_override(str(pair[0]), st)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	return btn
+
+static func style_crimson_button(btn: Button, font_size: int = 17, min_size: Vector2 = Vector2(200, 38)) -> Button:
+	btn.custom_minimum_size = min_size
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.add_theme_font_size_override("font_size", font_size)
+	btn.add_theme_color_override("font_color", Color("e6b8ae"))
+	btn.add_theme_color_override("font_hover_color", Color("ffe6e0"))
+	btn.add_theme_color_override("font_pressed_color", Color("ffd0c4"))
+	btn.add_theme_color_override("font_outline_color", Color("0c0707"))
+	btn.add_theme_constant_override("outline_size", 3)
+	for pair in [
+		["normal", Color("1b1315"), Color("9c433a"), 1, 3],
+		["hover", Color("28171a"), Color("d96858"), 2, 7],
+		["pressed", Color("331c20"), Color("ee7d6d"), 2, 4],
+	]:
+		var st := StyleBoxFlat.new()
+		st.bg_color = pair[1]
+		st.border_color = pair[2]
+		st.set_border_width_all(int(pair[3]))
+		st.set_corner_radius_all(3)
+		st.shadow_color = Color(0.76, 0.24, 0.19, 0.24 if int(pair[4]) > 4 else 0.12)
+		st.shadow_size = int(pair[4])
+		st.content_margin_left = 18.0
+		st.content_margin_right = 18.0
+		st.content_margin_top = 6.0
+		st.content_margin_bottom = 6.0
+		btn.add_theme_stylebox_override(str(pair[0]), st)
+	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	return btn
+
+static func make_sub_panel_style(border_col: Color = Color("c8a86b"), bg_col: Color = Color("181a1f"), pad_x: float = 12.0, pad_y: float = 8.0) -> StyleBoxFlat:
+	var st := StyleBoxFlat.new()
+	st.bg_color = bg_col
+	st.border_color = border_col
+	st.set_border_width_all(1)
+	st.set_corner_radius_all(2)
+	st.content_margin_left = pad_x
+	st.content_margin_right = pad_x
+	st.content_margin_top = pad_y
+	st.content_margin_bottom = pad_y
+	return st
+
+static func make_keycap_badge(key_text: String, desc_text: String, compact: bool = false) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 7 if compact else 9)
+
+	var cap := PanelContainer.new()
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var cap_style := StyleBoxFlat.new()
+	cap_style.bg_color = Color("1d1f26")
+	cap_style.border_color = Color("c8a86b")
+	cap_style.set_border_width_all(1)
+	cap_style.set_corner_radius_all(2)
+	cap_style.content_margin_left = 6.0 if compact else 8.0
+	cap_style.content_margin_right = 6.0 if compact else 8.0
+	cap_style.content_margin_top = 1.0 if compact else 2.0
+	cap_style.content_margin_bottom = 1.0 if compact else 2.0
+	cap.add_theme_stylebox_override("panel", cap_style)
+	cap.custom_minimum_size = Vector2(56 if compact else 64, 0)
+
+	var k_lbl := Label.new()
+	k_lbl.text = key_text
+	k_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	k_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	style_ink_label(k_lbl, 12 if compact else 13, Color("f3dda2"), 1)
+	cap.add_child(k_lbl)
+	row.add_child(cap)
+
+	var d_lbl := Label.new()
+	d_lbl.text = desc_text
+	d_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	d_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	style_ink_label(d_lbl, 13 if compact else 14, Color("dcd6c7"), 1)
+	row.add_child(d_lbl)
+	return row
+
 static func style_ink_button(btn: Button, font_size: int = 21, min_size: Vector2 = Vector2(204, 48)) -> Button:
 	btn.custom_minimum_size = min_size
 	btn.focus_mode = Control.FOCUS_NONE
@@ -315,8 +459,9 @@ class VermilionSeal extends Control:
 		draw_rect(outer, Color("9e2722"), true)
 		draw_rect(outer, Color("d85a4a"), false, 1.5)
 		draw_rect(outer.grow(-3.0), Color(0.95, 0.82, 0.72, 0.45), false, 1.0)
-		var font := preload("res://assets/fonts/msyh.ttc")
-		var fsize := int(round(seal_size * 0.56))
+		var kai := V41RewardUI.serif_face()
+		var font: Font = kai if (glyph.length() > 0 and kai.has_char(glyph.unicode_at(0))) else V41RewardUI.ui_face()
+		var fsize := int(round(seal_size * 0.58))
 		var tsize := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize)
 		var pos := Vector2((size.x - tsize.x) * 0.5, (size.y + font.get_ascent(fsize) - font.get_descent(fsize)) * 0.5 - 1.0)
 		draw_string(font, pos.round(), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize, Color("f6e7d4"))
@@ -503,6 +648,55 @@ class VictoryPlaque extends Control:
 			var p: Vector2 = c[0]
 			draw_line(p, p + c[1] * k, Color("f0cf80"), 1.8, true)
 			draw_line(p, p + c[2] * k, Color("f0cf80"), 1.8, true)
+
+class InkGoldPanelVisual extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	func _draw() -> void:
+		if size.x < 16.0 or size.y < 16.0:
+			return
+		var r := Rect2(Vector2.ZERO, size)
+		# 深玄墨主底色 #141518 + 顶部极淡暖金气晕 + 底部沉墨微压
+		draw_rect(r, Color(0.078, 0.082, 0.094, 0.96), true)
+		draw_rect(Rect2(1.0, 1.0, size.x - 2.0, minf(size.y * 0.30, 118.0)), Color(0.78, 0.66, 0.42, 0.055), true)
+		draw_rect(Rect2(1.0, size.y * 0.78, size.x - 2.0, size.y * 0.22 - 1.0), Color(0.02, 0.022, 0.03, 0.36), true)
+
+		# 暗金双线描边 #C8A86B
+		var outer_gold := Color("c8a86b")
+		var inner_gold := Color(0.784, 0.659, 0.420, 0.46)
+		var bright_gold := Color("ead092")
+		draw_rect(r.grow(-1.0), outer_gold, false, 1.8)
+		var inner := r.grow(-7.0)
+		draw_rect(inner, inner_gold, false, 1.0)
+
+		# 四角精致国风回纹装饰（严格位于面板内框，绝不越出外缘）
+		var arm := 16.0
+		var step := 6.0
+		var hook := 4.0
+		for c in [
+			[inner.position, Vector2(1, 0), Vector2(0, 1)],
+			[Vector2(inner.end.x, inner.position.y), Vector2(-1, 0), Vector2(0, 1)],
+			[Vector2(inner.position.x, inner.end.y), Vector2(1, 0), Vector2(0, -1)],
+			[inner.end, Vector2(-1, 0), Vector2(0, -1)],
+		]:
+			var p: Vector2 = c[0]
+			var dx: Vector2 = c[1]
+			var dy: Vector2 = c[2]
+			# 外折角亮金托线
+			draw_line(p, p + dx * arm, bright_gold, 1.8, false)
+			draw_line(p, p + dy * arm, bright_gold, 1.8, false)
+			# 内回纹小折钩
+			var q: Vector2 = p + dx * step + dy * step
+			draw_polyline(PackedVector2Array([
+				p + dx * (step + hook) + dy * 0.0,
+				p + dx * (step + hook) + dy * step,
+				q,
+				p + dx * step + dy * (step + hook),
+				p + dx * 0.0 + dy * (step + hook),
+			]), Color(0.88, 0.75, 0.48, 0.78), 1.2, false)
+			draw_rect(Rect2((p + dx * 2.5 + dy * 2.5) - Vector2(1.2, 1.2), Vector2(2.4, 2.4)), bright_gold, true)
 
 class DomainAlertOverlay extends Control:
 	var intensity := 0.0
