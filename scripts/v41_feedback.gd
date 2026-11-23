@@ -60,6 +60,7 @@ func _ready() -> void:
 	}
 
 func reset_sword_cues() -> void:
+	crit_sparks.clear()
 	sword_voices.clear()
 	cue_times.clear()
 	slash_impacts.clear()

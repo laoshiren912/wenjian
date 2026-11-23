@@ -115,10 +115,14 @@ func _physics_process(delta: float) -> void:
 	if dead or not is_instance_valid(player) or player.dead:
 		return
 	if kind == Kind.BOSS:
+		var previous_position := position
 		_boss_process(delta)
+		_recover_arena_position(previous_position)
 		return
 	if encounter_id >= 0:
+		var previous_position := position
 		_encounter_process(delta)
+		_recover_arena_position(previous_position)
 		return
 	flash = maxf(0.0, flash - delta)
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
@@ -577,6 +581,20 @@ func _boss_recover(next_attack: int) -> void:
 	boss_state = BossState.RECOVERY
 	boss_timer = 0.7 if health <= max_health * 0.5 else 1.0
 	velocity = Vector2.ZERO
+
+func _recover_arena_position(previous_position: Vector2) -> void:
+	# Segment walls remain the normal collision path. Recover exceptional displacement
+	# beyond their corners so a living wave member can never become unreachable.
+	if not v41_pressure or not is_instance_valid(world) or world.floor_cells.is_empty():
+		return
+	if global_position.is_finite() and Geometry2D.is_point_in_polygon(position, world.walkable):
+		return
+	var anchor: Vector2 = position if position.is_finite() else home_position
+	position = previous_position if previous_position.is_finite() and Geometry2D.is_point_in_polygon(previous_position, world.walkable) else world.cell_center(world.nearest_cell(anchor))
+	velocity = Vector2.ZERO
+	knockback = Vector2.ZERO
+	path.clear()
+	repath = 0.0
 
 func _follow_path(target: Vector2) -> Vector2:
 	if v41_pressure:

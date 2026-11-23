@@ -47,6 +47,7 @@ var clear_is_boss := false
 var wave_wait_elapsed := 0.0
 var wave_summon_started := false
 var pending_wave_points: Array[Vector2] = []
+var _web_focus_callback: JavaScriptObject
 
 func _end_hitstop() -> void:
 	hitstop_generation += 1
@@ -59,8 +60,28 @@ func _end_hitstop() -> void:
 		Engine.time_scale = 1.0
 
 func _exit_tree() -> void:
+	if _web_focus_callback != null:
+		JavaScriptBridge.get_interface("document").removeEventListener("visibilitychange", _web_focus_callback)
+		JavaScriptBridge.get_interface("window").removeEventListener("blur", _web_focus_callback)
 	_end_defeat_slowmo()
 	_end_hitstop()
+
+func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		_pause_on_focus_loss()
+
+func _pause_on_focus_loss() -> void:
+	if is_inside_tree() and is_instance_valid(hud) and not get_tree().paused and phase in ["combat", "wave_transition", "exit_ready", "clear_celebration", "defeat_transition"]:
+		# Resume explicitly: never advance combat or replay buffered input on returning.
+		menu_open = true
+		stats_open = false
+		get_tree().paused = true
+		hud.show_pause()
+
+func _on_web_focus_changed(_args: Array) -> void:
+	var document = JavaScriptBridge.get_interface("document")
+	if document.hidden or not document.hasFocus():
+		_pause_on_focus_loss.call_deferred()
 
 func _trigger_combo_shake(strength: float, duration: float) -> void:
 	var now := Time.get_ticks_msec()
@@ -163,6 +184,10 @@ func _should_start_on_title() -> bool:
 
 func _ready() -> void:
 	_setup_inputs()
+	if OS.has_feature("web"):
+		_web_focus_callback = JavaScriptBridge.create_callback(_on_web_focus_changed)
+		JavaScriptBridge.get_interface("document").addEventListener("visibilitychange", _web_focus_callback)
+		JavaScriptBridge.get_interface("window").addEventListener("blur", _web_focus_callback)
 	audio_mgr = AudioManager.new()
 	audio_mgr.name = "V41Audio"
 	add_child(audio_mgr)
