@@ -47,7 +47,7 @@ func _px(origin: Vector2, gx: int, gy: int, gw: int, gh: int, col: Color) -> voi
 	draw_rect(Rect2(origin + Vector2(roundf(gx * s), roundf(gy * s)), Vector2(roundf(gw * s), roundf(gh * s))), col)
 
 func _draw() -> void:
-	var font := ThemeDB.fallback_font
+	var font := preload("res://assets/fonts/msyh.ttc")
 	var center_x := size.x * 0.5
 	var icon_size := 55.0
 	var bounce := sin(clampf(pulse_age, 0.0, 1.0) * PI) * 5.0 if pulse_age < 1.0 else 0.0

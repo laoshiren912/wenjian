@@ -769,8 +769,8 @@ func _draw() -> void:
 				# 头顶破防眩晕标识（赤金碎盾菱标 + 旋转晕眩光弧）
 				var warn_y := bar_y - 14.0
 				draw_arc(Vector2(0, warn_y), 7.5, guard_anim_clock * 6.0, guard_anim_clock * 6.0 + PI * 1.35, 14, Color(1.0, 0.72, 0.25, 0.95), 2.0, true)
-				draw_string_outline(ThemeDB.fallback_font, Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color("200a06"))
-				draw_string(ThemeDB.fallback_font, Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("ffbe45"))
+				draw_string_outline(preload("res://assets/fonts/msyh.ttc"), Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, Color("200a06"))
+				draw_string(preload("res://assets/fonts/msyh.ttc"), Vector2(-14, warn_y + 4.0), "破防", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("ffbe45"))
 			else:
 				var ratio := clampf(posture / maxf(1.0, posture_max), 0.0, 1.0)
 				draw_rect(Rect2(bar_x, py, bar_w * ratio, 4.5), Color("f8d848"))

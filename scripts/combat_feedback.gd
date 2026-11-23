@@ -20,18 +20,13 @@ func _ready() -> void:
 func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: bool = true, blocked: bool = false, crit: bool = false) -> void:
 	if amount <= 0.0:
 		return
-	var tier := "player" if is_player else ("blocked" if blocked else ("crit" if crit else "normal"))
+	var tier := "player" if is_player else "normal"
 	var color := Color("ff7878") if is_player else Color("f6ecd4")
 	var caption := "-%d" % roundi(amount)
-	if tier == "blocked":
-		color = Color("8e979f")
-		caption = "格挡 " + caption
-	elif tier == "crit":
-		color = Color("ffa838")
-		caption = "%s!" % caption
+	if crit and not is_player and not blocked:
 		_spawn_crit_sparks(point)
 	_popup(point, caption, color, "player_damage" if is_player else "enemy_damage", amount, tier)
-	var burst_col := Color("a8b2ba") if tier == "blocked" else (Color("ffba52") if tier == "crit" else color)
+	var burst_col := Color("a8b2ba") if blocked else (Color("ffba52") if crit else color)
 	bursts.append({"point": point, "age": 0.0, "color": burst_col, "local_impact": not camera_shake})
 	if camera_shake:
 		request_camera_shake(8.0 if is_player else (4.6 if crit else 3.5), 0.18)
@@ -83,21 +78,11 @@ func _popup(point: Vector2, text: String, color: Color, kind: String, amount: fl
 		font_size = 24
 		outline_size = 6
 		outline_col = Color("261108")
-	elif tier == "crit":
-		# 暴击 / 背刺 / 破防重击：放大 1.4 倍赤金炽橙
-		font_size = 30
-		outline_size = 7
-		outline_col = Color("2b0c08")
-	elif tier == "blocked":
-		# 命中格挡（减伤刮痧）：缩小至 0.75 倍暗铁灰
-		font_size = 16
-		outline_size = 4
-		outline_col = Color("111519")
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", outline_col)
 	label.add_theme_constant_override("outline_size", outline_size)
-	label.z_index = 4 if tier == "crit" else (3 if kind == "player_damage" else (2 if kind == "enemy_damage" else 1))
+	label.z_index = 3 if kind == "player_damage" else (2 if kind == "enemy_damage" else 1)
 	add_child(label)
 
 	# 独立物理抛物线初速度与重力（左右交替+微扰保证连击自然散开不重叠）
@@ -113,15 +98,6 @@ func _popup(point: Vector2, text: String, color: Color, kind: String, amount: fl
 		vel = Vector2(0.0, -78.0)
 		gravity = 120.0
 		duration = 0.95
-	elif tier == "blocked":
-		# 格挡刮痧向侧下方弹开
-		vel = Vector2(side * _popup_rng.randf_range(115.0, 165.0), _popup_rng.randf_range(-34.0, -8.0))
-		gravity = 420.0
-		duration = 0.74
-	elif tier == "crit":
-		vel = Vector2(side * _popup_rng.randf_range(95.0, 148.0), _popup_rng.randf_range(-225.0, -185.0))
-		gravity = 480.0
-		duration = 0.98
 	elif kind == "player_damage":
 		vel = Vector2(side * _popup_rng.randf_range(50.0, 90.0), _popup_rng.randf_range(-160.0, -128.0))
 		gravity = 420.0
@@ -147,8 +123,6 @@ func _popup(point: Vector2, text: String, color: Color, kind: String, amount: fl
 	}
 	_place_popup(popup)
 	label.pivot_offset = label.size * 0.5
-	if tier == "crit":
-		label.scale = Vector2.ONE * 0.55
 	popups.append(popup)
 	return popup
 
@@ -224,16 +198,6 @@ func _process(delta: float) -> void:
 		var dur: float = float(popup.get("duration", 0.9))
 		var label: Label = popup.label
 		label.position = _visible_position(popup, popup.origin + _popup_drift(popup))
-		if popup.get("tier", "normal") == "crit":
-			# 弹出瞬间弹性放大回弹（0.55 -> 1.34 -> 1.0）
-			var sc := 1.0
-			if t < 0.08:
-				sc = lerpf(0.55, 1.34, t / 0.08)
-			elif t < 0.22:
-				sc = lerpf(1.34, 1.0, (t - 0.08) / 0.14)
-			label.scale = Vector2.ONE * sc
-		elif popup.get("tier", "normal") == "blocked":
-			label.scale = Vector2.ONE * lerpf(0.95, 0.88, clampf(t / dur, 0.0, 1.0))
 		label.modulate.a = clampf((dur - t) / 0.28, 0.0, 1.0)
 		if t >= dur:
 			if label == _experience_popup.get("label"):

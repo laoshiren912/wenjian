@@ -287,7 +287,7 @@ class ScreenBannerFX extends Control:
 			draw_colored_polygon(sweep_poly, Color(1.0, 0.98, 0.88, sa))
 
 		# 大号主标题 + 副行仙侠小字（深墨厚描边）
-		var font := ThemeDB.fallback_font
+		var font := preload("res://assets/fonts/msyh.ttc")
 		var title_sz := 32 if size.x >= 1100.0 else 27
 		var t_dim := font.get_string_size(title, HORIZONTAL_ALIGNMENT_CENTER, -1, title_sz)
 		var tp := Vector2(roundf(cx - t_dim.x * 0.5), roundf(cy + 4.0))

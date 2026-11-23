@@ -113,8 +113,9 @@ func front_block():
 	check(not game.feedback.guard_effects.is_empty(), "block sparks emitted")
 	var caption := false
 	for popup in game.feedback.popups:
-		if popup.label.text.begins_with("格挡 "): caption = true
-	check(caption, "blue block number labelled")
+		if popup.label.text == "-8" and popup.label.get_theme_font_size("font_size") == 21 and popup.label.get_theme_color("font_color") == Color("f6ecd4") and popup.label.scale == Vector2.ONE:
+			caption = true
+	check(caption, "blocked hit uses the plain default damage number")
 	check(game.feedback.guard_sound.data.size() > 0, "block sound samples present")
 	check(not game.hitstop_active, "first hit has no finisher hitstop")
 	await snapshot("guard")

@@ -362,7 +362,6 @@ func show_damage(point: Vector2, amount: float, is_player: bool, camera_shake: b
 		_guard_effect(point, false)
 
 func show_guard_break(point: Vector2) -> void:
-	_popup(point, "破防!", Color("ffb84d"), "guard_break", 0.0, "crit")
 	_spawn_crit_sparks(point)
 	_guard_effect(point, true)
 

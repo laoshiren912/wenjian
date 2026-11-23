@@ -67,10 +67,11 @@ func run() -> void:
 	check(is_equal_approx(target.knockback.length(), CONFIG.THIRD_MOB_PUSH) and target.v41_heavy_stun > 0.0, "third hit suppresses with configured small push")
 	check(not target.last_hit_blocked and is_equal_approx(target.guard_cooldown, CONFIG.HEAVY_BASE_BREAK) and is_equal_approx(target.v41_heavy_stun, CONFIG.BREAK_STUN), "third breaks active guard for base duration and stun")
 	check(not game.feedback.guard_effects.is_empty() and game.feedback.guard_effects.back().broken and game.feedback.break_sound.data.size() > 0, "third emits break shards and sound")
-	var break_caption := false
+	var clean_numbers: bool = not game.feedback.popups.is_empty()
 	for popup in game.feedback.popups:
-		if popup.label.text == "破防!": break_caption = true
-	check(break_caption, "third emits break caption")
+		clean_numbers = clean_numbers and popup.kind == "enemy_damage" and popup.label.text.begins_with("-") and popup.label.text.substr(1).is_valid_int()
+		clean_numbers = clean_numbers and popup.label.get_theme_font_size("font_size") == 21 and popup.label.get_theme_color("font_color") == Color("f6ecd4") and popup.label.scale == Vector2.ONE
+	check(clean_numbers, "guard-breaking critical hits only emit default damage numbers")
 	check(game.feedback.shake_strength >= CONFIG.THIRD_SHAKE and game.feedback.shake_time > 0.0, "third hit shakes camera")
 	await create_timer(CONFIG.THIRD_HITSTOP + 0.05, true, false, true).timeout
 	check(not game.hitstop_active and is_equal_approx(Engine.time_scale, 1.0), "hitstop restores time scale")

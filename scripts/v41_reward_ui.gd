@@ -8,16 +8,11 @@ const TIER_NAMES := ["凡品", "进阶", "仙品"]
 const CARD_TAGS := ["剑气", "身法", "破阵", "剑气御剑流", "剑气御剑流", "身法破阵流", "身法破阵流", "剑气御剑流", "剑气御剑流", "身法破阵流"]
 const CARD_ICONS := ["sword_aura", "wind_array", "spirit_pill", "flying_sword", "sword_aura", "sword_aura", "wind_array", "flying_sword", "sword_aura", "wind_array"]
 
-static func calligraphy_face() -> SystemFont:
-	var face := SystemFont.new()
-	face.font_names = PackedStringArray(["STXingkai", "FZShuTi", "KaiTi", "STKaiti", "Kaiti SC", "STSong", "SimSun", "Noto Serif CJK SC"])
-	face.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_AUTO
-	return face
+static func calligraphy_face() -> FontFile:
+	return preload("res://assets/fonts/STXINGKA.ttf")
 
-static func serif_face() -> SystemFont:
-	var face := SystemFont.new()
-	face.font_names = PackedStringArray(["KaiTi", "STKaiti", "STSong", "SimSun", "Noto Serif CJK SC"])
-	return face
+static func serif_face() -> FontFile:
+	return preload("res://assets/fonts/simkai.ttf")
 
 class CastFocus extends Control:
 	const DURATION := 0.12
@@ -77,8 +72,8 @@ class DefeatTitle extends Control:
 
 	func _draw() -> void:
 		var mid := size * 0.5
-		var font: Font = brush_font if brush_font.has_char(0x8d25) and brush_font.has_char(0x5317) else ThemeDB.fallback_font
-		var sfont: Font = seal_font if seal_font.has_char(0x6b8b) else ThemeDB.fallback_font
+		var font: Font = brush_font if brush_font.has_char(0x8d25) and brush_font.has_char(0x5317) else preload("res://assets/fonts/msyh.ttc")
+		var sfont: Font = seal_font if seal_font.has_char(0x6b8b) else preload("res://assets/fonts/msyh.ttc")
 		# 端正稳重、凌厉微错落布局（不做歪斜旋转）
 		var sz_a := 106
 		var sz_b := 96
@@ -151,8 +146,8 @@ class CoverTitle extends Control:
 		var label := get_parent() as Label
 		var scale_factor := (float(label.get_theme_font_size("font_size")) / 76.0) if label != null else 1.0
 		var center := size * 0.5
-		var font: Font = brush_font if brush_font.has_char(0x95ee) and brush_font.has_char(0x5251) else ThemeDB.fallback_font
-		var sfont: Font = seal_font if seal_font.has_char(0x5251) else ThemeDB.fallback_font
+		var font: Font = brush_font if brush_font.has_char(0x95ee) and brush_font.has_char(0x5251) else preload("res://assets/fonts/msyh.ttc")
+		var sfont: Font = seal_font if seal_font.has_char(0x5251) else preload("res://assets/fonts/msyh.ttc")
 		# 克制、高级的水平微错落书法排版（端正重心，0 角度不歪斜，问略大于剑）
 		var sz_wen := roundi(98.0 * scale_factor)
 		var sz_jian := roundi(86.0 * scale_factor)
@@ -320,7 +315,7 @@ class VermilionSeal extends Control:
 		draw_rect(outer, Color("9e2722"), true)
 		draw_rect(outer, Color("d85a4a"), false, 1.5)
 		draw_rect(outer.grow(-3.0), Color(0.95, 0.82, 0.72, 0.45), false, 1.0)
-		var font := ThemeDB.fallback_font
+		var font := preload("res://assets/fonts/msyh.ttc")
 		var fsize := int(round(seal_size * 0.56))
 		var tsize := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_CENTER, -1, fsize)
 		var pos := Vector2((size.x - tsize.x) * 0.5, (size.y + font.get_ascent(fsize) - font.get_descent(fsize)) * 0.5 - 1.0)
